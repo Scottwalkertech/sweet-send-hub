@@ -173,15 +173,26 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200">
+        <div className="bg-slate-900">
+          <div className="max-w-6xl mx-auto px-6 py-1.5 flex items-center justify-end gap-6 text-[11px] tracking-wide uppercase">
+            {["Personal Banking", "Small Business", "Commercial Accounts", "Wire Services"].map((l) => (
+              <a key={l} href="#" className="text-white/60 hover:text-white transition-colors">{l}</a>
+            ))}
+          </div>
+        </div>
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold">M</div>
             <div>
-              <div className="text-sm font-semibold text-slate-900">Meridian Trust</div>
+              <div className="text-sm font-semibold text-slate-900 tracking-wide">DYNAMIC BANK OF WEST</div>
               <div className="text-xs text-slate-500">Personal Banking</div>
             </div>
           </div>
-          <button onClick={onLogout} className="text-sm text-slate-600 hover:text-slate-900">Sign out</button>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-slate-600 hidden sm:inline">Hello, Customer</span>
+            <DbwMenu />
+            <button onClick={onLogout} className="text-sm text-slate-600 hover:text-slate-900">Sign out</button>
+          </div>
         </div>
       </header>
 
@@ -283,6 +294,49 @@ function AccountCard({ name, number, routing, balance, primary }: { name: string
   );
 }
 
+function DbwMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+  const items = [
+    { icon: "👤", label: "My Profile Settings", action: () => {} },
+    { icon: "💳", label: "Debit Card Controls", action: () => {} },
+    { icon: "📋", label: "Routing & Account Info", action: () => {} },
+    { icon: "🔒", label: "Open Secure Messages", action: () => window.dispatchEvent(new CustomEvent("mt:open-chat")) },
+  ];
+  return (
+    <div ref={ref} className="relative" onMouseEnter={() => setOpen(true)}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="h-9 w-9 rounded-md bg-gradient-to-br from-amber-300 via-yellow-500 to-amber-700 text-slate-900 text-[11px] font-bold shadow-md ring-1 ring-amber-600/40 hover:brightness-110 transition"
+        aria-label="DBW menu"
+      >
+        DBW
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-lg shadow-xl py-1.5 z-50">
+          {items.map((it) => (
+            <button
+              key={it.label}
+              onClick={() => { it.action(); setOpen(false); }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 text-left"
+            >
+              <span className="text-base">{it.icon}</span>
+              <span>{it.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [adminMode, setAdminMode] = useState(false);
@@ -308,6 +362,12 @@ function ChatWidget() {
       }
     }, 800);
     return () => clearInterval(i);
+  }, []);
+
+  useEffect(() => {
+    function openIt() { setOpen(true); }
+    window.addEventListener("mt:open-chat", openIt);
+    return () => window.removeEventListener("mt:open-chat", openIt);
   }, []);
 
   useEffect(() => {
