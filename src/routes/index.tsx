@@ -225,23 +225,47 @@ const SEGMENTS: Record<Segment, { label: string; sub: string; primary: { name: s
   },
 };
 
+const LS_CHK_BAL = "mt_chk_bal";
+const LS_SAV_BAL = "mt_sav_bal";
+const LS_CHK_TX = "mt_chk_tx";
+const LS_SAV_TX = "mt_sav_tx";
+
+const seedCheckingTx: Tx[] = [
+  { id: "c1", date: "2026-06-26", description: "Employer Direct Deposit", amount: 2450.00, category: "Income" },
+  { id: "c2", date: "2026-06-25", description: "Starbucks Coffee", amount: -6.75, category: "Dining" },
+  { id: "c3", date: "2026-06-24", description: "Target Superstore", amount: -84.22, category: "Shopping" },
+];
+const seedSavingsTx: Tx[] = [
+  { id: "s1", date: "2026-06-20", description: "Quarterly Interest Credit", amount: 42.50, category: "Interest" },
+  { id: "s2", date: "2026-06-15", description: "Automated Smart Save", amount: 50.00, category: "Auto-Save" },
+];
+
+type DashView = "dashboard" | "profile" | "card" | "checking" | "savings" | "about";
+
 function Dashboard({ onLogout }: { onLogout: () => void }) {
-  const [balance, setBalance] = useState(12480.33);
-  const [savings] = useState(48210.00);
-  const [tx, setTx] = useState<Tx[]>(seedTx);
-  const [view, setView] = useState<"dashboard" | "profile" | "card">("dashboard");
+  const [checkingBal, setCheckingBal] = useState(12480.33);
+  const [savingsBal, setSavingsBal] = useState(48210.00);
+  const [checkingTx, setCheckingTx] = useState<Tx[]>(seedCheckingTx);
+  const [savingsTx, setSavingsTx] = useState<Tx[]>(seedSavingsTx);
+  const [view, setView] = useState<DashView>("dashboard");
   const [segment, setSegment] = useState<Segment>("personal");
   const [routingOpen, setRoutingOpen] = useState(false);
 
   useEffect(() => {
-    const b = localStorage.getItem(LS_BAL);
-    const t = localStorage.getItem(LS_TX);
-    if (b) setBalance(parseFloat(b));
-    if (t) { try { setTx(JSON.parse(t)); } catch {} }
+    const cb = localStorage.getItem(LS_CHK_BAL);
+    const sb = localStorage.getItem(LS_SAV_BAL);
+    const ct = localStorage.getItem(LS_CHK_TX);
+    const st = localStorage.getItem(LS_SAV_TX);
+    if (cb) setCheckingBal(parseFloat(cb));
+    if (sb) setSavingsBal(parseFloat(sb));
+    if (ct) { try { setCheckingTx(JSON.parse(ct)); } catch {} }
+    if (st) { try { setSavingsTx(JSON.parse(st)); } catch {} }
   }, []);
 
-  useEffect(() => { localStorage.setItem(LS_BAL, String(balance)); }, [balance]);
-  useEffect(() => { localStorage.setItem(LS_TX, JSON.stringify(tx)); }, [tx]);
+  useEffect(() => { localStorage.setItem(LS_CHK_BAL, String(checkingBal)); }, [checkingBal]);
+  useEffect(() => { localStorage.setItem(LS_SAV_BAL, String(savingsBal)); }, [savingsBal]);
+  useEffect(() => { localStorage.setItem(LS_CHK_TX, JSON.stringify(checkingTx)); }, [checkingTx]);
+  useEffect(() => { localStorage.setItem(LS_SAV_TX, JSON.stringify(savingsTx)); }, [savingsTx]);
 
   useEffect(() => {
     const onProfile = () => setView("profile");
@@ -270,7 +294,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       setFlash("Please complete all fields with a valid amount.");
       return;
     }
-    if (amt > balance) {
+    if (amt > checkingBal) {
       setFlash("Insufficient funds in primary balance.");
       return;
     }
@@ -281,16 +305,41 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       amount: -amt,
       category: "Transfer",
     };
-    setTx([newTx, ...tx]);
-    setBalance((b) => +(b - amt).toFixed(2));
+    setCheckingTx([newTx, ...checkingTx]);
+    setCheckingBal((b) => +(b - amt).toFixed(2));
     setRecipient(""); setRouting(""); setAmount(""); setMemo("");
     setFlash(`Settled ${fmt(amt)} to ${newTx.description.replace("Transfer to ", "")}.`);
     setTimeout(() => setFlash(null), 4000);
   }
 
+  function internalTransfer(from: "checking" | "savings", to: "checking" | "savings", amt: number): string | null {
+    if (from === to) return "Source and destination must differ.";
+    if (!amt || amt <= 0) return "Enter a positive amount.";
+    const srcBal = from === "checking" ? checkingBal : savingsBal;
+    if (amt > srcBal) return "Insufficient funds in source account.";
+    const date = new Date().toISOString().slice(0, 10);
+    const outTx: Tx = { id: uid(), date, description: `Internal Transfer to ${to === "checking" ? "Everyday Checking" : "Way2Save Savings"}`, amount: -amt, category: "Transfer" };
+    const inTx: Tx = { id: uid(), date, description: `Internal Transfer from ${from === "checking" ? "Everyday Checking" : "Way2Save Savings"}`, amount: amt, category: "Transfer" };
+    if (from === "checking") {
+      setCheckingBal((b) => +(b - amt).toFixed(2));
+      setCheckingTx((t) => [outTx, ...t]);
+      setSavingsBal((b) => +(b + amt).toFixed(2));
+      setSavingsTx((t) => [inTx, ...t]);
+    } else {
+      setSavingsBal((b) => +(b - amt).toFixed(2));
+      setSavingsTx((t) => [outTx, ...t]);
+      setCheckingBal((b) => +(b + amt).toFixed(2));
+      setCheckingTx((t) => [inTx, ...t]);
+    }
+    return null;
+  }
+
   const seg = SEGMENTS[segment];
-  // Personal segment uses live balance; other segments use mock balances
-  const primaryBal = segment === "personal" ? balance : seg.primary.balance;
+  const isPersonal = segment === "personal";
+  const primaryBal = isPersonal ? checkingBal : seg.primary.balance;
+  const secondaryBal = isPersonal ? savingsBal : seg.secondary.balance;
+  const combinedTx = [...checkingTx, ...savingsTx].sort((a, b) => b.date.localeCompare(a.date));
+  const displayTx = isPersonal ? combinedTx : seedTx;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -301,11 +350,17 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               <button
                 key={k}
                 onClick={() => { setSegment(k); setView("dashboard"); }}
-                className={`transition-colors ${segment === k ? "text-white" : "text-white/60 hover:text-white"}`}
+                className={`transition-colors ${segment === k && view !== "about" ? "text-white" : "text-white/60 hover:text-white"}`}
               >
                 {SEGMENTS[k].label}
               </button>
             ))}
+            <button
+              onClick={() => setView("about")}
+              className={`transition-colors ${view === "about" ? "text-amber-300" : "text-white/60 hover:text-white"}`}
+            >
+              About Us
+            </button>
           </div>
         </div>
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -313,7 +368,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             <div className="h-9 w-9 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold">M</div>
             <div>
               <div className="text-sm font-semibold text-slate-900 tracking-wide">DYNAMIC BANK OF WEST</div>
-              <div className="text-xs text-slate-500">{seg.sub}</div>
+              <div className="text-xs text-slate-500">{view === "about" ? "Institutional Overview" : seg.sub}</div>
             </div>
           </button>
           <div className="flex items-center gap-4">
@@ -327,6 +382,29 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-8">
         {view === "profile" && <ProfileView onBack={() => setView("dashboard")} />}
         {view === "card" && <CardView onBack={() => setView("dashboard")} />}
+        {view === "about" && <AboutView onBack={() => setView("dashboard")} />}
+        {view === "checking" && (
+          <AccountPage
+            kind="checking"
+            name="Everyday Checking"
+            number="••••4421"
+            balance={checkingBal}
+            tx={checkingTx}
+            onBack={() => setView("dashboard")}
+            onTransfer={internalTransfer}
+          />
+        )}
+        {view === "savings" && (
+          <AccountPage
+            kind="savings"
+            name="Way2Save Savings"
+            number="••••9087"
+            balance={savingsBal}
+            tx={savingsTx}
+            onBack={() => setView("dashboard")}
+            onTransfer={internalTransfer}
+          />
+        )}
         {view === "dashboard" && (
           <>
             <section>
@@ -335,15 +413,28 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             </section>
 
             <section className="grid md:grid-cols-2 gap-4">
-              <AccountCard name={seg.primary.name} number={seg.primary.number} routing="121000248" balance={primaryBal} primary />
-              <AccountCard name={seg.secondary.name} number={seg.secondary.number} routing="121000248" balance={seg.secondary.balance} />
+              <AccountCard
+                name={isPersonal ? "Everyday Checking" : seg.primary.name}
+                number={seg.primary.number}
+                routing="121000248"
+                balance={primaryBal}
+                primary
+                onClick={isPersonal ? () => setView("checking") : undefined}
+              />
+              <AccountCard
+                name={isPersonal ? "Way2Save Savings" : seg.secondary.name}
+                number={seg.secondary.number}
+                routing="121000248"
+                balance={secondaryBal}
+                onClick={isPersonal ? () => setView("savings") : undefined}
+              />
             </section>
 
             <section className="grid lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl">
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-slate-900">Transaction Log</h2>
-                  <span className="text-xs text-slate-500">{tx.length} records · immutable</span>
+                  <span className="text-xs text-slate-500">{displayTx.length} records · immutable</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -356,7 +447,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {tx.map((t) => (
+                      {displayTx.map((t) => (
                         <tr key={t.id} className="border-t border-slate-100">
                           <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.date}</td>
                           <td className="px-6 py-3 text-slate-900">{t.description}</td>
@@ -373,7 +464,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
               <div className="bg-white border border-slate-200 rounded-xl p-6">
                 <h2 className="text-sm font-semibold text-slate-900 mb-1">Transfer Funds</h2>
-                <p className="text-xs text-slate-500 mb-4">Deducted from Primary Checking.</p>
+                <p className="text-xs text-slate-500 mb-4">Deducted from Everyday Checking.</p>
                 <form onSubmit={settle} className="space-y-3">
                   <Field label="Recipient name" value={recipient} onChange={setRecipient} placeholder="Jane Doe" />
                   <Field label="Routing number" value={routing} onChange={setRouting} placeholder="123456789" />
@@ -393,6 +484,152 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       {routingOpen && <RoutingModal onClose={() => setRoutingOpen(false)} />}
       <ChatWidget />
     </div>
+  );
+}
+
+function AccountPage({
+  kind, name, number, balance, tx, onBack, onTransfer,
+}: {
+  kind: "checking" | "savings";
+  name: string;
+  number: string;
+  balance: number;
+  tx: Tx[];
+  onBack: () => void;
+  onTransfer: (from: "checking" | "savings", to: "checking" | "savings", amt: number) => string | null;
+}) {
+  const [dest, setDest] = useState<"checking" | "savings">(kind === "checking" ? "savings" : "checking");
+  const [amt, setAmt] = useState("");
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const n = parseFloat(amt);
+    const err = onTransfer(kind, dest, n);
+    if (err) {
+      setMsg({ kind: "err", text: err });
+      return;
+    }
+    setMsg({ kind: "ok", text: `Transferred ${fmt(n)} to ${dest === "checking" ? "Everyday Checking" : "Way2Save Savings"}.` });
+    setAmt("");
+    setTimeout(() => setMsg(null), 4000);
+  }
+
+  return (
+    <section className="space-y-6">
+      <button onClick={onBack} className="text-sm text-amber-200 hover:text-amber-100">← Back to portfolio</button>
+
+      <div className="rounded-2xl overflow-hidden shadow-2xl border border-amber-700/40">
+        <div className="bg-gradient-to-br from-red-900 via-red-950 to-black text-white px-8 py-10 relative">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.15),transparent_60%)]" />
+          <div className="relative flex items-start justify-between flex-wrap gap-6">
+            <div>
+              <div className="flex items-center gap-2 text-amber-300 text-xs uppercase tracking-[0.2em] font-semibold">
+                <span className="h-px w-8 bg-amber-400" />
+                {kind === "checking" ? "Personal Checking Profile" : "Personal Savings Profile"}
+              </div>
+              <h1 className="text-3xl font-semibold mt-3 tracking-wide">{name}</h1>
+              <div className="text-xs text-amber-200/80 mt-1 tabular-nums">Account {number} · Routing 121000248</div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs uppercase tracking-wider text-amber-200/80">Available Balance</div>
+              <div className="text-4xl font-semibold tabular-nums mt-1 bg-gradient-to-b from-amber-200 to-amber-400 bg-clip-text text-transparent">
+                {fmt(balance)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-0 bg-white">
+          <div className="lg:col-span-2 border-r border-slate-100">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-red-50 to-transparent">
+              <h2 className="text-sm font-semibold text-red-900">{kind === "checking" ? "Checking" : "Savings"} Ledger</h2>
+              <span className="text-xs text-slate-500">{tx.length} records</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="text-left px-6 py-3 font-medium">Date</th>
+                    <th className="text-left px-6 py-3 font-medium">Description</th>
+                    <th className="text-right px-6 py-3 font-medium">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tx.map((t) => (
+                    <tr key={t.id} className="border-t border-slate-100">
+                      <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.date}</td>
+                      <td className="px-6 py-3 text-slate-900">{t.description}</td>
+                      <td className={`px-6 py-3 text-right font-medium tabular-nums ${t.amount < 0 ? "text-red-800" : "text-emerald-600"}`}>
+                        {t.amount < 0 ? "-" : "+"}{fmt(Math.abs(t.amount))}
+                      </td>
+                    </tr>
+                  ))}
+                  {tx.length === 0 && (
+                    <tr><td colSpan={3} className="px-6 py-8 text-center text-slate-400 text-sm">No activity yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="p-6 bg-gradient-to-b from-amber-50/40 to-white">
+            <h2 className="text-sm font-semibold text-red-900 mb-1">Internal Transfer</h2>
+            <p className="text-xs text-slate-500 mb-4">Move funds instantly between your DBW accounts.</p>
+            <form onSubmit={submit} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Destination</label>
+                <select
+                  value={dest}
+                  onChange={(e) => setDest(e.target.value as "checking" | "savings")}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-800"
+                >
+                  <option value="checking">Transfer to Checking</option>
+                  <option value="savings">Transfer to Savings</option>
+                </select>
+              </div>
+              <Field label="Amount (USD)" value={amt} onChange={setAmt} placeholder="0.00" type="number" />
+              {msg && (
+                <div className={`text-xs rounded px-3 py-2 ${msg.kind === "ok" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+                  {msg.text}
+                </div>
+              )}
+              <button type="submit" className="w-full bg-gradient-to-b from-red-800 to-red-950 hover:from-red-700 hover:to-red-900 text-white text-sm font-semibold py-2.5 rounded-md shadow border border-amber-600/40">
+                Submit Transfer
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AboutView({ onBack }: { onBack: () => void }) {
+  return (
+    <section className="max-w-3xl">
+      <button onClick={onBack} className="text-sm text-slate-500 hover:text-slate-900 mb-4">← Back to dashboard</button>
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="bg-gradient-to-r from-red-900 to-red-950 text-white px-8 py-8">
+          <div className="text-xs uppercase tracking-[0.2em] text-amber-300 font-semibold">Institutional Overview</div>
+          <h1 className="text-2xl font-semibold mt-2">About Dynamic Bank of West</h1>
+        </div>
+        <div className="p-8 space-y-6 text-sm leading-relaxed text-slate-700">
+          <p>
+            <strong className="text-slate-900">DYNAMIC BANK OF WEST</strong>, established in 1998, operates under FDIC certificate #48291, managing global digital retail and secure institutional capital reserves across the Western United States.
+          </p>
+          <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-4 pt-4 border-t border-slate-100">
+            <div><dt className="text-xs uppercase tracking-wide text-slate-500">Founded</dt><dd className="text-slate-900 mt-1">1998</dd></div>
+            <div><dt className="text-xs uppercase tracking-wide text-slate-500">FDIC Certificate</dt><dd className="text-slate-900 mt-1 tabular-nums">#48291</dd></div>
+            <div><dt className="text-xs uppercase tracking-wide text-slate-500">Headquarters</dt><dd className="text-slate-900 mt-1">Western United States</dd></div>
+            <div><dt className="text-xs uppercase tracking-wide text-slate-500">Lines of Business</dt><dd className="text-slate-900 mt-1">Digital Retail · Institutional Capital Reserves</dd></div>
+          </dl>
+          <p className="text-xs text-slate-500 pt-4 border-t border-slate-100">
+            Member FDIC · Equal Housing Lender · © {new Date().getFullYear()} Dynamic Bank of West. All rights reserved.
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }
 
