@@ -205,8 +205,8 @@ type Segment = "personal" | "business" | "commercial" | "wire";
 const SEGMENTS: Record<Segment, { label: string; sub: string; primary: { name: string; number: string; balance: number }; secondary: { name: string; number: string; balance: number } }> = {
   personal: {
     label: "Personal Banking", sub: "Personal Banking",
-    primary: { name: "Primary Checking", number: "••••4421", balance: 12480.33 },
-    secondary: { name: "High-Yield Savings", number: "••••9087", balance: 48210.00 },
+    primary: { name: "Everyday Checking", number: "••••4421", balance: 12480.33 },
+    secondary: { name: "Way2Save Savings", number: "••••9087", balance: 48210.00 },
   },
   business: {
     label: "Small Business", sub: "Small Business",
