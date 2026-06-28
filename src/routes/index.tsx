@@ -365,6 +365,12 @@ function ChatWidget() {
   }, []);
 
   useEffect(() => {
+    function openIt() { setOpen(true); }
+    window.addEventListener("mt:open-chat", openIt);
+    return () => window.removeEventListener("mt:open-chat", openIt);
+  }, []);
+
+  useEffect(() => {
     if (msgs.length) localStorage.setItem(LS_CHAT, JSON.stringify(msgs));
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [msgs, open]);
