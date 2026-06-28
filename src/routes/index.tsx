@@ -173,15 +173,26 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200">
+        <div className="bg-slate-900">
+          <div className="max-w-6xl mx-auto px-6 py-1.5 flex items-center justify-end gap-6 text-[11px] tracking-wide uppercase">
+            {["Personal Banking", "Small Business", "Commercial Accounts", "Wire Services"].map((l) => (
+              <a key={l} href="#" className="text-white/60 hover:text-white transition-colors">{l}</a>
+            ))}
+          </div>
+        </div>
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold">M</div>
             <div>
-              <div className="text-sm font-semibold text-slate-900">Meridian Trust</div>
+              <div className="text-sm font-semibold text-slate-900 tracking-wide">DYNAMIC BANK OF WEST</div>
               <div className="text-xs text-slate-500">Personal Banking</div>
             </div>
           </div>
-          <button onClick={onLogout} className="text-sm text-slate-600 hover:text-slate-900">Sign out</button>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-slate-600 hidden sm:inline">Hello, Customer</span>
+            <DbwMenu />
+            <button onClick={onLogout} className="text-sm text-slate-600 hover:text-slate-900">Sign out</button>
+          </div>
         </div>
       </header>
 
