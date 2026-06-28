@@ -1,29 +1,409 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Your App" },
-      { name: "description", content: "Replace this with a one-sentence description of your app." },
-      { property: "og:title", content: "Your App" },
-      { property: "og:description", content: "Replace this with a one-sentence description of your app." },
+      { title: "Meridian Trust — Online Banking" },
+      { name: "description", content: "Secure online banking portal." },
     ],
   }),
-  component: Index,
+  component: App,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+type Tx = {
+  id: string;
+  date: string;
+  description: string;
+  amount: number; // negative = debit
+  category: string;
+};
+
+type ChatMsg = {
+  id: string;
+  from: "user" | "agent";
+  text: string;
+  ts: number;
+};
+
+const LS_AUTH = "mt_auth";
+const LS_TX = "mt_tx";
+const LS_BAL = "mt_bal";
+const LS_CHAT = "mt_chat";
+
+const seedTx: Tx[] = [
+  { id: "t1", date: "2026-06-26", description: "Direct Deposit — ACME Payroll", amount: 3420.55, category: "Income" },
+  { id: "t2", date: "2026-06-25", description: "Starbucks #4421", amount: -7.85, category: "Dining" },
+  { id: "t3", date: "2026-06-24", description: "Target T-1138", amount: -124.62, category: "Shopping" },
+  { id: "t4", date: "2026-06-22", description: "Starbucks #4421", amount: -6.40, category: "Dining" },
+  { id: "t5", date: "2026-06-20", description: "Direct Deposit — Stripe Payout", amount: 812.10, category: "Income" },
+  { id: "t6", date: "2026-06-18", description: "Target T-0098", amount: -58.19, category: "Shopping" },
+];
+
+function fmt(n: number) {
+  return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function App() {
+  const [authed, setAuthed] = useState(false);
+  const [booted, setBooted] = useState(false);
+
+  useEffect(() => {
+    setAuthed(localStorage.getItem(LS_AUTH) === "1");
+    setBooted(true);
+  }, []);
+
+  if (!booted) return null;
+  return authed ? <Dashboard onLogout={() => { localStorage.removeItem(LS_AUTH); setAuthed(false); }} /> : <Login onAuth={() => { localStorage.setItem(LS_AUTH, "1"); setAuthed(true); }} />;
+}
+
+function Login({ onAuth }: { onAuth: () => void }) {
+  const [u, setU] = useState("");
+  const [p, setP] = useState("");
+  const [err, setErr] = useState("");
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (u.trim().length < 3 || p.length < 4) {
+      setErr("Enter your username and password to continue.");
+      return;
+    }
+    onAuth();
+  }
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+      <div className="w-full max-w-md">
+        <div className="flex items-center gap-3 justify-center mb-8">
+          <div className="h-10 w-10 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold">M</div>
+          <div>
+            <div className="text-xl font-semibold text-slate-900">Meridian Trust</div>
+            <div className="text-xs text-slate-500">Secure Online Banking</div>
+          </div>
+        </div>
+        <form onSubmit={submit} className="bg-white border border-slate-200 rounded-xl p-8 shadow-sm space-y-5">
+          <h1 className="text-lg font-semibold text-slate-900">Sign in to your account</h1>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Username</label>
+            <input
+              type="text"
+              autoComplete="username"
+              value={u}
+              onChange={(e) => setU(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+              placeholder="your.username"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={p}
+              onChange={(e) => setP(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 tracking-widest"
+              placeholder="••••••••"
+            />
+            <p className="mt-1 text-xs text-slate-500">Password input is masked.</p>
+          </div>
+          {err && <div className="text-sm text-red-600">{err}</div>}
+          <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium py-2.5 rounded-md">
+            Sign in securely
+          </button>
+          <div className="text-xs text-slate-500 text-center pt-2 border-t border-slate-100">
+            🔒 256-bit TLS encryption · FDIC Insured
+          </div>
+        </form>
+      </div>
+      <ChatWidget />
+    </div>
+  );
+}
+
+function Dashboard({ onLogout }: { onLogout: () => void }) {
+  const [balance, setBalance] = useState(12480.33);
+  const [savings] = useState(48210.00);
+  const [tx, setTx] = useState<Tx[]>(seedTx);
+
+  useEffect(() => {
+    const b = localStorage.getItem(LS_BAL);
+    const t = localStorage.getItem(LS_TX);
+    if (b) setBalance(parseFloat(b));
+    if (t) { try { setTx(JSON.parse(t)); } catch {} }
+  }, []);
+
+  useEffect(() => { localStorage.setItem(LS_BAL, String(balance)); }, [balance]);
+  useEffect(() => { localStorage.setItem(LS_TX, JSON.stringify(tx)); }, [tx]);
+
+  const [recipient, setRecipient] = useState("");
+  const [routing, setRouting] = useState("");
+  const [amount, setAmount] = useState("");
+  const [memo, setMemo] = useState("");
+  const [flash, setFlash] = useState<string | null>(null);
+
+  function settle(e: React.FormEvent) {
+    e.preventDefault();
+    const amt = parseFloat(amount);
+    if (!recipient.trim() || !routing.trim() || !amt || amt <= 0) {
+      setFlash("Please complete all fields with a valid amount.");
+      return;
+    }
+    if (amt > balance) {
+      setFlash("Insufficient funds in primary balance.");
+      return;
+    }
+    const newTx: Tx = {
+      id: uid(),
+      date: new Date().toISOString().slice(0, 10),
+      description: `Transfer to ${recipient}${memo ? ` — ${memo}` : ""}`,
+      amount: -amt,
+      category: "Transfer",
+    };
+    setTx([newTx, ...tx]);
+    setBalance((b) => +(b - amt).toFixed(2));
+    setRecipient(""); setRouting(""); setAmount(""); setMemo("");
+    setFlash(`Settled ${fmt(amt)} to ${newTx.description.replace("Transfer to ", "")}.`);
+    setTimeout(() => setFlash(null), 4000);
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold">M</div>
+            <div>
+              <div className="text-sm font-semibold text-slate-900">Meridian Trust</div>
+              <div className="text-xs text-slate-500">Personal Banking</div>
+            </div>
+          </div>
+          <button onClick={onLogout} className="text-sm text-slate-600 hover:text-slate-900">Sign out</button>
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-6 py-8 space-y-8">
+        <section>
+          <h1 className="text-2xl font-semibold text-slate-900 mb-1">Welcome back</h1>
+          <p className="text-sm text-slate-500">Here's your portfolio at a glance.</p>
+        </section>
+
+        <section className="grid md:grid-cols-2 gap-4">
+          <AccountCard name="Primary Checking" number="••••4421" routing="011000138" balance={balance} primary />
+          <AccountCard name="High-Yield Savings" number="••••9087" routing="011000138" balance={savings} />
+        </section>
+
+        <section className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-900">Transaction Log</h2>
+              <span className="text-xs text-slate-500">{tx.length} records · immutable</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="text-left px-6 py-3 font-medium">Date</th>
+                    <th className="text-left px-6 py-3 font-medium">Description</th>
+                    <th className="text-left px-6 py-3 font-medium">Category</th>
+                    <th className="text-right px-6 py-3 font-medium">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tx.map((t) => (
+                    <tr key={t.id} className="border-t border-slate-100">
+                      <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.date}</td>
+                      <td className="px-6 py-3 text-slate-900">{t.description}</td>
+                      <td className="px-6 py-3 text-slate-600">{t.category}</td>
+                      <td className={`px-6 py-3 text-right font-medium tabular-nums ${t.amount < 0 ? "text-slate-900" : "text-emerald-600"}`}>
+                        {t.amount < 0 ? "-" : "+"}{fmt(Math.abs(t.amount))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-xl p-6">
+            <h2 className="text-sm font-semibold text-slate-900 mb-1">Transfer Funds</h2>
+            <p className="text-xs text-slate-500 mb-4">Deducted from Primary Checking.</p>
+            <form onSubmit={settle} className="space-y-3">
+              <Field label="Recipient name" value={recipient} onChange={setRecipient} placeholder="Jane Doe" />
+              <Field label="Routing number" value={routing} onChange={setRouting} placeholder="123456789" />
+              <Field label="Amount (USD)" value={amount} onChange={setAmount} placeholder="0.00" type="number" />
+              <Field label="Memo (optional)" value={memo} onChange={setMemo} placeholder="Rent" />
+              {flash && <div className="text-xs text-slate-700 bg-slate-100 rounded px-3 py-2">{flash}</div>}
+              <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium py-2.5 rounded-md">
+                Settle
+              </button>
+            </form>
+          </div>
+        </section>
+      </main>
+
+      <ChatWidget />
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, placeholder, type = "text" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-slate-700 mb-1">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
       />
     </div>
+  );
+}
+
+function AccountCard({ name, number, routing, balance, primary }: { name: string; number: string; routing: string; balance: number; primary?: boolean }) {
+  return (
+    <div className={`rounded-xl p-6 border ${primary ? "bg-slate-900 text-white border-slate-900" : "bg-white border-slate-200"}`}>
+      <div className="flex items-start justify-between">
+        <div>
+          <div className={`text-xs uppercase tracking-wide ${primary ? "text-slate-300" : "text-slate-500"}`}>{name}</div>
+          <div className={`text-3xl font-semibold mt-2 tabular-nums ${primary ? "text-white" : "text-slate-900"}`}>{fmt(balance)}</div>
+        </div>
+        {primary && <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white">Primary</span>}
+      </div>
+      <div className={`mt-6 flex gap-6 text-xs ${primary ? "text-slate-300" : "text-slate-500"}`}>
+        <div><span className="block uppercase tracking-wide opacity-75">Account</span><span className="tabular-nums">{number}</span></div>
+        <div><span className="block uppercase tracking-wide opacity-75">Routing</span><span className="tabular-nums">{routing}</span></div>
+      </div>
+    </div>
+  );
+}
+
+function ChatWidget() {
+  const [open, setOpen] = useState(false);
+  const [adminMode, setAdminMode] = useState(false);
+  const [msgs, setMsgs] = useState<ChatMsg[]>([]);
+  const [draft, setDraft] = useState("");
+  const [clicks, setClicks] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(LS_CHAT);
+    if (stored) { try { setMsgs(JSON.parse(stored)); } catch {} }
+    else {
+      setMsgs([{ id: uid(), from: "agent", text: "Hi! I'm Riley from Meridian Support. How can I help today?", ts: Date.now() }]);
+    }
+    // Poll for cross-view updates
+    const i = setInterval(() => {
+      const s = localStorage.getItem(LS_CHAT);
+      if (s) {
+        try {
+          const parsed = JSON.parse(s) as ChatMsg[];
+          setMsgs((cur) => parsed.length !== cur.length ? parsed : cur);
+        } catch {}
+      }
+    }, 800);
+    return () => clearInterval(i);
+  }, []);
+
+  useEffect(() => {
+    if (msgs.length) localStorage.setItem(LS_CHAT, JSON.stringify(msgs));
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [msgs, open]);
+
+  function send(e: React.FormEvent) {
+    e.preventDefault();
+    if (!draft.trim()) return;
+    setMsgs((m) => [...m, { id: uid(), from: adminMode ? "agent" : "user", text: draft.trim(), ts: Date.now() }]);
+    setDraft("");
+  }
+
+  // Hidden admin toggle: click the tiny corner dot 3 times
+  function secretClick() {
+    const n = clicks + 1;
+    setClicks(n);
+    if (n >= 3) {
+      setAdminMode((a) => !a);
+      setClicks(0);
+    }
+    setTimeout(() => setClicks(0), 1500);
+  }
+
+  return (
+    <>
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-slate-900 hover:bg-slate-800 text-white shadow-lg flex items-center justify-center z-50"
+          aria-label="Open support chat"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </button>
+      )}
+
+      {open && (
+        <div className="fixed bottom-6 right-6 w-[360px] h-[520px] bg-white rounded-xl shadow-2xl border border-slate-200 flex flex-col z-50 overflow-hidden">
+          <div className={`px-4 py-3 flex items-center justify-between ${adminMode ? "bg-amber-500" : "bg-slate-900"} text-white`}>
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center text-sm font-semibold">R</div>
+              <div>
+                <div className="text-sm font-semibold">{adminMode ? "Admin View" : "Riley · Support"}</div>
+                <div className="text-xs opacity-80">{adminMode ? "Replying as agent" : "Typically replies in seconds"}</div>
+              </div>
+            </div>
+            <button onClick={() => setOpen(false)} className="text-white/80 hover:text-white text-lg leading-none">×</button>
+          </div>
+
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+            {msgs.map((m) => {
+              const mine = adminMode ? m.from === "agent" : m.from === "user";
+              const isAgent = m.from === "agent";
+              return (
+                <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
+                    mine
+                      ? "bg-slate-900 text-white rounded-br-sm"
+                      : "bg-white border border-slate-200 text-slate-900 rounded-bl-sm"
+                  }`}>
+                    {!mine && (
+                      <div className={`text-[10px] uppercase tracking-wide mb-0.5 ${isAgent ? "text-emerald-600" : "text-slate-500"}`}>
+                        {isAgent ? "Agent" : "Customer"}
+                      </div>
+                    )}
+                    <div className="whitespace-pre-wrap">{m.text}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <form onSubmit={send} className="border-t border-slate-200 p-3 flex gap-2 bg-white">
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={adminMode ? "Type agent reply…" : "Type a message…"}
+              className="flex-1 rounded-full border border-slate-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            />
+            <button type="submit" className="rounded-full bg-slate-900 hover:bg-slate-800 text-white px-4 text-sm font-medium">
+              Send
+            </button>
+          </form>
+
+          <div className="px-3 pb-2 flex items-center justify-between text-[10px] text-slate-400 bg-white">
+            <span>End-to-end encrypted</span>
+            <button
+              onClick={secretClick}
+              className="h-3 w-3 rounded-full bg-slate-200 hover:bg-slate-300"
+              aria-label="."
+              title=""
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
