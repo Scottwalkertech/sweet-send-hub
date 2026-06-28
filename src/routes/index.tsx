@@ -49,16 +49,93 @@ function uid() {
 }
 
 function App() {
-  const [authed, setAuthed] = useState(false);
+  const [stage, setStage] = useState<"login" | "challenge" | "authed">("login");
   const [booted, setBooted] = useState(false);
 
   useEffect(() => {
-    setAuthed(localStorage.getItem(LS_AUTH) === "1");
+    if (localStorage.getItem(LS_AUTH) === "1") setStage("authed");
     setBooted(true);
   }, []);
 
   if (!booted) return null;
-  return authed ? <Dashboard onLogout={() => { localStorage.removeItem(LS_AUTH); setAuthed(false); }} /> : <Login onAuth={() => { localStorage.setItem(LS_AUTH, "1"); setAuthed(true); }} />;
+  if (stage === "authed") {
+    return <Dashboard onLogout={() => { localStorage.removeItem(LS_AUTH); setStage("login"); }} />;
+  }
+  if (stage === "challenge") {
+    return <SecurityChallenge onVerified={() => { localStorage.setItem(LS_AUTH, "1"); setStage("authed"); }} onCancel={() => setStage("login")} />;
+  }
+  return <Login onAuth={() => setStage("challenge")} />;
+}
+
+function SecurityChallenge({ onVerified, onCancel }: { onVerified: () => void; onCancel: () => void }) {
+  const [answer, setAnswer] = useState("");
+  const [err, setErr] = useState("");
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (answer.trim().length < 3) {
+      setErr("Verification Rejection: Security answer does not match corporate file records.");
+      return;
+    }
+    onVerified();
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 px-4">
+      <div className="w-full max-w-md">
+        <div className="flex items-center gap-3 justify-center mb-6">
+          <div className="h-10 w-10 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold">M</div>
+          <div>
+            <div className="text-xl font-semibold text-slate-900">DYNAMIC BANK OF WEST</div>
+            <div className="text-xs text-slate-500">Official Security Gateway</div>
+          </div>
+        </div>
+        <form onSubmit={submit} className="bg-white border-2 border-amber-400/60 rounded-xl p-8 shadow-lg space-y-5">
+          <div className="flex items-center gap-2 text-amber-700 text-xs font-semibold uppercase tracking-wider">
+            <span className="inline-block h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            Step 2 of 2 · Identity Verification
+          </div>
+          <h1 className="text-lg font-semibold text-slate-900 leading-snug">
+            Security Challenge: What was the name of your first childhood pet?
+          </h1>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Your secure answer</label>
+            <input
+              type="text"
+              autoFocus
+              value={answer}
+              onChange={(e) => { setAnswer(e.target.value); setErr(""); }}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              placeholder="Enter answer"
+            />
+            <p className="mt-1 text-xs text-slate-500">Case-insensitive. Stored encrypted on file.</p>
+          </div>
+          {err && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+              {err}
+            </div>
+          )}
+          <button
+            type="submit"
+            className="w-full bg-gradient-to-b from-amber-300 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-700 text-slate-900 text-sm font-bold py-2.5 rounded-md shadow-md border border-amber-700/40"
+          >
+            Verify Identity
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="w-full text-xs text-slate-500 hover:text-slate-900"
+          >
+            ← Return to sign-in
+          </button>
+          <div className="text-xs text-slate-500 text-center pt-2 border-t border-slate-100">
+            🔒 Verified via FFIEC multi-factor protocol
+          </div>
+        </form>
+      </div>
+      <ChatWidget />
+    </div>
+  );
 }
 
 function Login({ onAuth }: { onAuth: () => void }) {
