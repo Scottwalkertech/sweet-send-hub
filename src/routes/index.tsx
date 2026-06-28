@@ -124,10 +124,37 @@ function Login({ onAuth }: { onAuth: () => void }) {
   );
 }
 
+type Segment = "personal" | "business" | "commercial" | "wire";
+const SEGMENTS: Record<Segment, { label: string; sub: string; primary: { name: string; number: string; balance: number }; secondary: { name: string; number: string; balance: number } }> = {
+  personal: {
+    label: "Personal Banking", sub: "Personal Banking",
+    primary: { name: "Primary Checking", number: "••••4421", balance: 12480.33 },
+    secondary: { name: "High-Yield Savings", number: "••••9087", balance: 48210.00 },
+  },
+  business: {
+    label: "Small Business", sub: "Small Business",
+    primary: { name: "Business Checking", number: "••••7702", balance: 8420.55 },
+    secondary: { name: "Business Reserve", number: "••••3310", balance: 15200.00 },
+  },
+  commercial: {
+    label: "Commercial Accounts", sub: "Commercial Accounts",
+    primary: { name: "Commercial Operating", number: "••••8821", balance: 25000.00 },
+    secondary: { name: "Commercial Money Market", number: "••••2244", balance: 142500.00 },
+  },
+  wire: {
+    label: "Wire Services", sub: "Wire Services",
+    primary: { name: "Wire Settlement", number: "••••0001", balance: 5000.00 },
+    secondary: { name: "FX Reserve", number: "••••0002", balance: 22000.00 },
+  },
+};
+
 function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [balance, setBalance] = useState(12480.33);
   const [savings] = useState(48210.00);
   const [tx, setTx] = useState<Tx[]>(seedTx);
+  const [view, setView] = useState<"dashboard" | "profile" | "card">("dashboard");
+  const [segment, setSegment] = useState<Segment>("personal");
+  const [routingOpen, setRoutingOpen] = useState(false);
 
   useEffect(() => {
     const b = localStorage.getItem(LS_BAL);
@@ -138,6 +165,20 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   useEffect(() => { localStorage.setItem(LS_BAL, String(balance)); }, [balance]);
   useEffect(() => { localStorage.setItem(LS_TX, JSON.stringify(tx)); }, [tx]);
+
+  useEffect(() => {
+    const onProfile = () => setView("profile");
+    const onCard = () => setView("card");
+    const onRouting = () => setRoutingOpen(true);
+    window.addEventListener("mt:view-profile", onProfile);
+    window.addEventListener("mt:view-card", onCard);
+    window.addEventListener("mt:open-routing", onRouting);
+    return () => {
+      window.removeEventListener("mt:view-profile", onProfile);
+      window.removeEventListener("mt:view-card", onCard);
+      window.removeEventListener("mt:open-routing", onRouting);
+    };
+  }, []);
 
   const [recipient, setRecipient] = useState("");
   const [routing, setRouting] = useState("");
@@ -170,24 +211,34 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     setTimeout(() => setFlash(null), 4000);
   }
 
+  const seg = SEGMENTS[segment];
+  // Personal segment uses live balance; other segments use mock balances
+  const primaryBal = segment === "personal" ? balance : seg.primary.balance;
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200">
         <div className="bg-slate-900">
           <div className="max-w-6xl mx-auto px-6 py-1.5 flex items-center justify-end gap-6 text-[11px] tracking-wide uppercase">
-            {["Personal Banking", "Small Business", "Commercial Accounts", "Wire Services"].map((l) => (
-              <a key={l} href="#" className="text-white/60 hover:text-white transition-colors">{l}</a>
+            {(["personal", "business", "commercial", "wire"] as Segment[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => { setSegment(k); setView("dashboard"); }}
+                className={`transition-colors ${segment === k ? "text-white" : "text-white/60 hover:text-white"}`}
+              >
+                {SEGMENTS[k].label}
+              </button>
             ))}
           </div>
         </div>
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <button onClick={() => setView("dashboard")} className="flex items-center gap-3 text-left">
             <div className="h-9 w-9 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold">M</div>
             <div>
               <div className="text-sm font-semibold text-slate-900 tracking-wide">DYNAMIC BANK OF WEST</div>
-              <div className="text-xs text-slate-500">Personal Banking</div>
+              <div className="text-xs text-slate-500">{seg.sub}</div>
             </div>
-          </div>
+          </button>
           <div className="flex items-center gap-4">
             <span className="text-sm text-slate-600 hidden sm:inline">Hello, Customer</span>
             <DbwMenu />
@@ -197,66 +248,211 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-8">
-        <section>
-          <h1 className="text-2xl font-semibold text-slate-900 mb-1">Welcome back</h1>
-          <p className="text-sm text-slate-500">Here's your portfolio at a glance.</p>
-        </section>
+        {view === "profile" && <ProfileView onBack={() => setView("dashboard")} />}
+        {view === "card" && <CardView onBack={() => setView("dashboard")} />}
+        {view === "dashboard" && (
+          <>
+            <section>
+              <h1 className="text-2xl font-semibold text-slate-900 mb-1">{seg.label}</h1>
+              <p className="text-sm text-slate-500">Here's your portfolio at a glance.</p>
+            </section>
 
-        <section className="grid md:grid-cols-2 gap-4">
-          <AccountCard name="Primary Checking" number="••••4421" routing="011000138" balance={balance} primary />
-          <AccountCard name="High-Yield Savings" number="••••9087" routing="011000138" balance={savings} />
-        </section>
+            <section className="grid md:grid-cols-2 gap-4">
+              <AccountCard name={seg.primary.name} number={seg.primary.number} routing="121000248" balance={primaryBal} primary />
+              <AccountCard name={seg.secondary.name} number={seg.secondary.number} routing="121000248" balance={seg.secondary.balance} />
+            </section>
 
-        <section className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">Transaction Log</h2>
-              <span className="text-xs text-slate-500">{tx.length} records · immutable</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th className="text-left px-6 py-3 font-medium">Date</th>
-                    <th className="text-left px-6 py-3 font-medium">Description</th>
-                    <th className="text-left px-6 py-3 font-medium">Category</th>
-                    <th className="text-right px-6 py-3 font-medium">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tx.map((t) => (
-                    <tr key={t.id} className="border-t border-slate-100">
-                      <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.date}</td>
-                      <td className="px-6 py-3 text-slate-900">{t.description}</td>
-                      <td className="px-6 py-3 text-slate-600">{t.category}</td>
-                      <td className={`px-6 py-3 text-right font-medium tabular-nums ${t.amount < 0 ? "text-slate-900" : "text-emerald-600"}`}>
-                        {t.amount < 0 ? "-" : "+"}{fmt(Math.abs(t.amount))}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+            <section className="grid lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-slate-900">Transaction Log</h2>
+                  <span className="text-xs text-slate-500">{tx.length} records · immutable</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                      <tr>
+                        <th className="text-left px-6 py-3 font-medium">Date</th>
+                        <th className="text-left px-6 py-3 font-medium">Description</th>
+                        <th className="text-left px-6 py-3 font-medium">Category</th>
+                        <th className="text-right px-6 py-3 font-medium">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tx.map((t) => (
+                        <tr key={t.id} className="border-t border-slate-100">
+                          <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.date}</td>
+                          <td className="px-6 py-3 text-slate-900">{t.description}</td>
+                          <td className="px-6 py-3 text-slate-600">{t.category}</td>
+                          <td className={`px-6 py-3 text-right font-medium tabular-nums ${t.amount < 0 ? "text-slate-900" : "text-emerald-600"}`}>
+                            {t.amount < 0 ? "-" : "+"}{fmt(Math.abs(t.amount))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-6">
-            <h2 className="text-sm font-semibold text-slate-900 mb-1">Transfer Funds</h2>
-            <p className="text-xs text-slate-500 mb-4">Deducted from Primary Checking.</p>
-            <form onSubmit={settle} className="space-y-3">
-              <Field label="Recipient name" value={recipient} onChange={setRecipient} placeholder="Jane Doe" />
-              <Field label="Routing number" value={routing} onChange={setRouting} placeholder="123456789" />
-              <Field label="Amount (USD)" value={amount} onChange={setAmount} placeholder="0.00" type="number" />
-              <Field label="Memo (optional)" value={memo} onChange={setMemo} placeholder="Rent" />
-              {flash && <div className="text-xs text-slate-700 bg-slate-100 rounded px-3 py-2">{flash}</div>}
-              <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium py-2.5 rounded-md">
-                Settle
-              </button>
-            </form>
-          </div>
-        </section>
+              <div className="bg-white border border-slate-200 rounded-xl p-6">
+                <h2 className="text-sm font-semibold text-slate-900 mb-1">Transfer Funds</h2>
+                <p className="text-xs text-slate-500 mb-4">Deducted from Primary Checking.</p>
+                <form onSubmit={settle} className="space-y-3">
+                  <Field label="Recipient name" value={recipient} onChange={setRecipient} placeholder="Jane Doe" />
+                  <Field label="Routing number" value={routing} onChange={setRouting} placeholder="123456789" />
+                  <Field label="Amount (USD)" value={amount} onChange={setAmount} placeholder="0.00" type="number" />
+                  <Field label="Memo (optional)" value={memo} onChange={setMemo} placeholder="Rent" />
+                  {flash && <div className="text-xs text-slate-700 bg-slate-100 rounded px-3 py-2">{flash}</div>}
+                  <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium py-2.5 rounded-md">
+                    Settle
+                  </button>
+                </form>
+              </div>
+            </section>
+          </>
+        )}
       </main>
 
+      {routingOpen && <RoutingModal onClose={() => setRoutingOpen(false)} />}
       <ChatWidget />
+    </div>
+  );
+}
+
+function ProfileView({ onBack }: { onBack: () => void }) {
+  const [sent, setSent] = useState(false);
+  return (
+    <section className="max-w-2xl">
+      <button onClick={onBack} className="text-sm text-slate-500 hover:text-slate-900 mb-4">← Back to dashboard</button>
+      <div className="bg-white border border-slate-200 rounded-xl p-8">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="h-16 w-16 rounded-full bg-slate-900 text-white flex items-center justify-center text-2xl font-semibold">JD</div>
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">Jordan Davis</h1>
+            <p className="text-sm text-slate-500">Member since March 2018</p>
+          </div>
+        </div>
+        <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+          <div><dt className="text-xs uppercase tracking-wide text-slate-500">Mailing Address</dt><dd className="text-slate-900 mt-1">1428 Elm Street<br/>Springfield, IL 62704</dd></div>
+          <div><dt className="text-xs uppercase tracking-wide text-slate-500">Phone</dt><dd className="text-slate-900 mt-1 tabular-nums">(217) 555-0142</dd></div>
+          <div><dt className="text-xs uppercase tracking-wide text-slate-500">Email</dt><dd className="text-slate-900 mt-1">jordan.davis@example.com</dd></div>
+          <div><dt className="text-xs uppercase tracking-wide text-slate-500">2FA</dt><dd className="text-emerald-600 mt-1">Enabled · SMS</dd></div>
+        </dl>
+        <div className="border-t border-slate-100 mt-8 pt-6">
+          <button
+            onClick={() => { setSent(true); setTimeout(() => setSent(false), 4000); }}
+            className="bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium px-5 py-2.5 rounded-md"
+          >
+            🔒 Send secure password reset link
+          </button>
+          {sent && <p className="text-xs text-emerald-600 mt-3">Reset link sent to your verified email.</p>}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CardView({ onBack }: { onBack: () => void }) {
+  const [frozen, setFrozen] = useState(false);
+  const [limit, setLimit] = useState(500);
+  return (
+    <section className="max-w-2xl">
+      <button onClick={onBack} className="text-sm text-slate-500 hover:text-slate-900 mb-4">← Back to dashboard</button>
+      <div className="bg-white border border-slate-200 rounded-xl p-8 space-y-8">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 mb-1">Debit Card Controls</h1>
+          <p className="text-sm text-slate-500">Manage your physical and virtual card.</p>
+        </div>
+
+        <div className={`relative mx-auto w-full max-w-sm aspect-[1.586] rounded-2xl p-6 text-white shadow-xl bg-gradient-to-br from-red-600 via-red-700 to-red-900 ${frozen ? "opacity-70" : ""}`}>
+          <div className="flex items-start justify-between">
+            <div className="text-xs uppercase tracking-widest opacity-80">DBW · Debit</div>
+            <div className="h-8 w-10 rounded-md bg-gradient-to-br from-amber-300 to-amber-600" />
+          </div>
+          <div className="mt-10 text-lg font-mono tracking-widest">•••• •••• •••• 4421</div>
+          <div className="mt-6 flex items-end justify-between text-xs">
+            <div><div className="opacity-70 uppercase">Cardholder</div><div className="font-semibold tracking-wide">JORDAN DAVIS</div></div>
+            <div><div className="opacity-70 uppercase">Exp</div><div className="font-semibold tabular-nums">08 / 28</div></div>
+          </div>
+          {frozen && (
+            <div className="absolute inset-0 rounded-2xl bg-slate-900/40 flex items-center justify-center backdrop-blur-[2px]">
+              <span className="text-sm font-semibold tracking-widest bg-white/90 text-slate-900 px-3 py-1 rounded">❄ FROZEN</span>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-slate-100 pt-6 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-slate-900">Freeze / Lock Card</div>
+            <div className="text-xs text-slate-500">Instantly block all new transactions.</div>
+          </div>
+          <button
+            onClick={() => setFrozen((f) => !f)}
+            className={`relative h-7 w-12 rounded-full transition-colors ${frozen ? "bg-red-600" : "bg-slate-300"}`}
+            aria-label="Freeze card"
+          >
+            <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${frozen ? "translate-x-5" : "translate-x-0.5"}`} />
+          </button>
+        </div>
+
+        <div className="border-t border-slate-100 pt-6">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-medium text-slate-900">Daily spending limit</div>
+            <div className="text-sm font-semibold tabular-nums text-slate-900">{fmt(limit)}</div>
+          </div>
+          <input
+            type="range" min={100} max={5000} step={50}
+            value={limit} onChange={(e) => setLimit(parseInt(e.target.value))}
+            className="w-full accent-slate-900"
+          />
+          <div className="flex justify-between text-xs text-slate-500 mt-1 tabular-nums">
+            <span>$100</span><span>$5,000</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RoutingModal({ onClose }: { onClose: () => void }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  function copy(label: string, val: string) {
+    navigator.clipboard?.writeText(val);
+    setCopied(label);
+    setTimeout(() => setCopied(null), 1800);
+  }
+  const Row = ({ label, value, copyVal }: { label: string; value: string; copyVal: string }) => (
+    <div className="border border-slate-200 rounded-lg p-4">
+      <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="flex items-center justify-between mt-1">
+        <div className="text-lg font-mono font-semibold text-slate-900 tabular-nums">{value}</div>
+        <button onClick={() => copy(label, copyVal)} className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-md">
+          {copied === label ? "Copied ✓" : "Copy"}
+        </button>
+      </div>
+    </div>
+  );
+  return (
+    <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded bg-slate-900 text-white text-xs font-bold flex items-center justify-center">M</div>
+            <div>
+              <div className="text-sm font-semibold text-slate-900">Account & Routing Details</div>
+              <div className="text-[11px] text-slate-500">Official — Dynamic Bank of West</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
+        </div>
+        <div className="p-6 space-y-4">
+          <Row label="Routing Number" value="121000248" copyVal="121000248" />
+          <Row label="Checking Account Number" value="•••• 5678" copyVal="000123455678" />
+          <p className="text-[11px] text-slate-500 leading-relaxed pt-2 border-t border-slate-100">
+            Use these numbers for direct deposit and ACH transfers. Never share with unverified parties. Dynamic Bank of West will never ask for your full account number by phone or email.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -305,9 +501,9 @@ function DbwMenu() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
   const items = [
-    { icon: "👤", label: "My Profile Settings", action: () => {} },
-    { icon: "💳", label: "Debit Card Controls", action: () => {} },
-    { icon: "📋", label: "Routing & Account Info", action: () => {} },
+    { icon: "👤", label: "My Profile Settings", action: () => window.dispatchEvent(new CustomEvent("mt:view-profile")) },
+    { icon: "💳", label: "Debit Card Controls", action: () => window.dispatchEvent(new CustomEvent("mt:view-card")) },
+    { icon: "📋", label: "Routing & Account Info", action: () => window.dispatchEvent(new CustomEvent("mt:open-routing")) },
     { icon: "🔒", label: "Open Secure Messages", action: () => window.dispatchEvent(new CustomEvent("mt:open-chat")) },
   ];
   return (
