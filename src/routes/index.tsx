@@ -786,9 +786,16 @@ function Field({ label, value, onChange, placeholder, type = "text" }: { label: 
   );
 }
 
-function AccountCard({ name, number, routing, balance, primary }: { name: string; number: string; routing: string; balance: number; primary?: boolean }) {
+function AccountCard({ name, number, routing, balance, primary, onClick }: { name: string; number: string; routing: string; balance: number; primary?: boolean; onClick?: () => void }) {
+  const interactive = !!onClick;
   return (
-    <div className={`rounded-xl p-6 border ${primary ? "bg-slate-900 text-white border-slate-900" : "bg-white border-slate-200"}`}>
+    <div
+      onClick={onClick}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onKeyDown={interactive ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick!(); } } : undefined}
+      className={`rounded-xl p-6 border transition ${primary ? "bg-slate-900 text-white border-slate-900" : "bg-white border-slate-200"} ${interactive ? "cursor-pointer hover:ring-2 hover:ring-amber-400 hover:-translate-y-0.5" : ""}`}
+    >
       <div className="flex items-start justify-between">
         <div>
           <div className={`text-xs uppercase tracking-wide ${primary ? "text-slate-300" : "text-slate-500"}`}>{name}</div>
@@ -800,6 +807,7 @@ function AccountCard({ name, number, routing, balance, primary }: { name: string
         <div><span className="block uppercase tracking-wide opacity-75">Account</span><span className="tabular-nums">{number}</span></div>
         <div><span className="block uppercase tracking-wide opacity-75">Routing</span><span className="tabular-nums">{routing}</span></div>
       </div>
+      {interactive && <div className={`mt-4 text-xs font-medium ${primary ? "text-amber-300" : "text-red-800"}`}>View account →</div>}
     </div>
   );
 }
