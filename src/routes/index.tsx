@@ -294,6 +294,49 @@ function AccountCard({ name, number, routing, balance, primary }: { name: string
   );
 }
 
+function DbwMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+  const items = [
+    { icon: "👤", label: "My Profile Settings", action: () => {} },
+    { icon: "💳", label: "Debit Card Controls", action: () => {} },
+    { icon: "📋", label: "Routing & Account Info", action: () => {} },
+    { icon: "🔒", label: "Open Secure Messages", action: () => window.dispatchEvent(new CustomEvent("mt:open-chat")) },
+  ];
+  return (
+    <div ref={ref} className="relative" onMouseEnter={() => setOpen(true)}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="h-9 w-9 rounded-md bg-gradient-to-br from-amber-300 via-yellow-500 to-amber-700 text-slate-900 text-[11px] font-bold shadow-md ring-1 ring-amber-600/40 hover:brightness-110 transition"
+        aria-label="DBW menu"
+      >
+        DBW
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-lg shadow-xl py-1.5 z-50">
+          {items.map((it) => (
+            <button
+              key={it.label}
+              onClick={() => { it.action(); setOpen(false); }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 text-left"
+            >
+              <span className="text-base">{it.icon}</span>
+              <span>{it.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [adminMode, setAdminMode] = useState(false);
