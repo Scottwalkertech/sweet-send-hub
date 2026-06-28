@@ -501,9 +501,9 @@ function DbwMenu() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
   const items = [
-    { icon: "👤", label: "My Profile Settings", action: () => {} },
-    { icon: "💳", label: "Debit Card Controls", action: () => {} },
-    { icon: "📋", label: "Routing & Account Info", action: () => {} },
+    { icon: "👤", label: "My Profile Settings", action: () => window.dispatchEvent(new CustomEvent("mt:view-profile")) },
+    { icon: "💳", label: "Debit Card Controls", action: () => window.dispatchEvent(new CustomEvent("mt:view-card")) },
+    { icon: "📋", label: "Routing & Account Info", action: () => window.dispatchEvent(new CustomEvent("mt:open-routing")) },
     { icon: "🔒", label: "Open Secure Messages", action: () => window.dispatchEvent(new CustomEvent("mt:open-chat")) },
   ];
   return (
