@@ -867,7 +867,7 @@ function ChatWidget() {
     const stored = localStorage.getItem(LS_CHAT);
     if (stored) { try { setMsgs(JSON.parse(stored)); } catch {} }
     else {
-      setMsgs([{ id: uid(), from: "agent", text: "Hi! I'm Riley from Meridian Support. How can I help today?", ts: Date.now() }]);
+      setMsgs([{ id: uid(), from: "agent", text: "Hi! I'm Riley from Dynamic Bank of West Support. How can I help today?", ts: Date.now() }]);
     }
     // Poll for cross-view updates
     const i = setInterval(() => {
