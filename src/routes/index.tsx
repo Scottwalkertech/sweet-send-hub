@@ -240,7 +240,43 @@ const seedSavingsTx: Tx[] = [
   { id: "s2", date: "2026-06-15", description: "Automated Smart Save", amount: 50.00, category: "Auto-Save" },
 ];
 
-type DashView = "dashboard" | "profile" | "card" | "checking" | "savings" | "about";
+const segmentSeedTx: Record<Segment, { primary: Tx[]; secondary: Tx[] }> = {
+  personal: { primary: seedCheckingTx, secondary: seedSavingsTx },
+  business: {
+    primary: [
+      { id: "bp1", date: "2026-06-26", description: "Stripe Payout — Invoice #2241", amount: 4820.00, category: "Income" },
+      { id: "bp2", date: "2026-06-24", description: "AWS Cloud Services", amount: -312.44, category: "Software" },
+      { id: "bp3", date: "2026-06-22", description: "Office Lease — June", amount: -1850.00, category: "Operating" },
+    ],
+    secondary: [
+      { id: "bs1", date: "2026-06-20", description: "Reserve Sweep", amount: 1500.00, category: "Transfer" },
+      { id: "bs2", date: "2026-06-12", description: "Quarterly Interest", amount: 18.40, category: "Interest" },
+    ],
+  },
+  commercial: {
+    primary: [
+      { id: "cp1", date: "2026-06-26", description: "Wholesale Receivable — Acme Co", amount: 18200.00, category: "Income" },
+      { id: "cp2", date: "2026-06-23", description: "Vendor Payment — Globex Mfg", amount: -7420.55, category: "AP" },
+      { id: "cp3", date: "2026-06-21", description: "Payroll Run #21", amount: -12480.00, category: "Payroll" },
+    ],
+    secondary: [
+      { id: "cs1", date: "2026-06-18", description: "Money Market Yield", amount: 412.88, category: "Interest" },
+      { id: "cs2", date: "2026-06-10", description: "Treasury Sweep", amount: 25000.00, category: "Transfer" },
+    ],
+  },
+  wire: {
+    primary: [
+      { id: "wp1", date: "2026-06-26", description: "Outbound Wire — Settlement #88421", amount: -4200.00, category: "Wire Out" },
+      { id: "wp2", date: "2026-06-25", description: "Inbound Wire — Counterparty MERIDIAN", amount: 9500.00, category: "Wire In" },
+    ],
+    secondary: [
+      { id: "ws1", date: "2026-06-22", description: "FX Conversion EUR→USD", amount: 1180.40, category: "FX" },
+      { id: "ws2", date: "2026-06-19", description: "Correspondent Bank Fee", amount: -25.00, category: "Fee" },
+    ],
+  },
+};
+
+type DashView = "dashboard" | "profile" | "card" | "checking" | "savings" | "about" | "segment-account";
 
 function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [checkingBal, setCheckingBal] = useState(12480.33);
