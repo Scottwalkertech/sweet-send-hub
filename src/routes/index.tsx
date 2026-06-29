@@ -84,7 +84,7 @@ function SecurityChallenge({ onVerified, onCancel }: { onVerified: () => void; o
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 px-4">
       <div className="w-full max-w-md">
         <div className="flex items-center gap-3 justify-center mb-6">
-          <div className="h-10 w-10 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold">M</div>
+          <div className="h-10 w-10 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-[11px] tracking-wide">DBW</div>
           <div>
             <div className="text-xl font-semibold text-slate-900">DYNAMIC BANK OF WEST</div>
             <div className="text-xs text-slate-500">Official Security Gateway</div>
