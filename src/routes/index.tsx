@@ -606,25 +606,69 @@ function AccountPage({
 }
 
 function AboutView({ onBack }: { onBack: () => void }) {
+  const images = [
+    { src: "https://images.unsplash.com/photo-1609220136736-443140cffec6?auto=format&fit=crop&w=800&q=80", alt: "Multi-generational family reviewing finances at a table", caption: "Families We Serve" },
+    { src: "https://images.unsplash.com/photo-1447710441604-5bdc41bc6517?auto=format&fit=crop&w=800&q=80", alt: "Active senior citizens enjoying retirement in a park", caption: "A Secure Retirement" },
+    { src: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=800&q=80", alt: "Scenic western landscape representing our roots", caption: "Rooted in the West" },
+  ];
   return (
-    <section className="max-w-3xl">
+    <section className="max-w-5xl">
       <button onClick={onBack} className="text-sm text-slate-500 hover:text-slate-900 mb-4">← Back to dashboard</button>
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-        <div className="bg-gradient-to-r from-red-900 to-red-950 text-white px-8 py-8">
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-8 py-10">
           <div className="text-xs uppercase tracking-[0.2em] text-amber-300 font-semibold">Institutional Overview</div>
-          <h1 className="text-2xl font-semibold mt-2">About Dynamic Bank of West</h1>
+          <h1 className="text-3xl font-semibold mt-2">About Dynamic Bank of West</h1>
+          <p className="text-slate-300 mt-3 max-w-2xl text-sm leading-relaxed">A community-focused financial institution serving families, retirees, and small businesses across the Western United States since 1998.</p>
         </div>
-        <div className="p-8 space-y-6 text-sm leading-relaxed text-slate-700">
-          <p>
-            <strong className="text-slate-900">DYNAMIC BANK OF WEST</strong>, established in 1998, operates under FDIC certificate #48291, managing global digital retail and secure institutional capital reserves across the Western United States.
+
+        <div className="px-8 py-10 border-b border-slate-100">
+          <div className="text-xs uppercase tracking-[0.18em] text-amber-600 font-semibold">Our Mission</div>
+          <h2 className="text-2xl font-semibold text-slate-900 mt-2">Banking built around the people we serve.</h2>
+          <p className="mt-4 text-slate-700 leading-relaxed max-w-3xl">
+            We believe a bank should be a steady hand for the community it calls home. Every product we build, every account we open, and every dollar we safeguard is in service of the families, neighbors, and local businesses that make the West remarkable. Our mission is simple: deliver dependable, transparent banking with the kind of personal attention you'd expect from a trusted neighbor.
           </p>
-          <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-4 pt-4 border-t border-slate-100">
-            <div><dt className="text-xs uppercase tracking-wide text-slate-500">Founded</dt><dd className="text-slate-900 mt-1">1998</dd></div>
-            <div><dt className="text-xs uppercase tracking-wide text-slate-500">FDIC Certificate</dt><dd className="text-slate-900 mt-1 tabular-nums">#48291</dd></div>
-            <div><dt className="text-xs uppercase tracking-wide text-slate-500">Headquarters</dt><dd className="text-slate-900 mt-1">Western United States</dd></div>
-            <div><dt className="text-xs uppercase tracking-wide text-slate-500">Lines of Business</dt><dd className="text-slate-900 mt-1">Digital Retail · Institutional Capital Reserves</dd></div>
+        </div>
+
+        <div className="px-8 py-10 border-b border-slate-100">
+          <div className="text-xs uppercase tracking-[0.18em] text-amber-600 font-semibold">Community Focus</div>
+          <h2 className="text-2xl font-semibold text-slate-900 mt-2">Invested in the lives behind every account.</h2>
+          <div className="mt-6 grid sm:grid-cols-3 gap-5">
+            {images.map((img) => (
+              <figure key={img.src} className="rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                <img src={img.src} alt={img.alt} loading="lazy" className="w-full h-48 object-cover" />
+                <figcaption className="px-4 py-3 text-sm font-medium text-slate-900 border-t border-slate-200">
+                  <span className="block text-[10px] uppercase tracking-wider text-amber-600 font-semibold mb-0.5">{img.caption}</span>
+                  {img.alt}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </div>
+
+        <div className="px-8 py-10 border-b border-slate-100">
+          <div className="text-xs uppercase tracking-[0.18em] text-amber-600 font-semibold">Our Story</div>
+          <h2 className="text-2xl font-semibold text-slate-900 mt-2">Three decades of trust, security, and steady growth.</h2>
+          <div className="mt-4 space-y-4 text-slate-700 leading-relaxed max-w-3xl">
+            <p>
+              Dynamic Bank of West was founded in 1998 by a small group of regional bankers who believed the West deserved a financial institution that combined the stability of a national bank with the warmth of a community lender. From a single branch office, we have grown into a multi-state operation safeguarding deposits for hundreds of thousands of households.
+            </p>
+            <p>
+              Security has been the cornerstone of our growth. We operate under FDIC certificate #48291, maintain 24/7 fraud monitoring, multi-factor authentication on every digital channel, and end-to-end encryption across our online and mobile platforms. Independent auditors review our controls annually, and our reserves consistently exceed federal capital requirements.
+            </p>
+            <p>
+              As we look forward, our commitment hasn't changed: protect what our customers have worked hard to build, and help the next generation build something of their own.
+            </p>
+          </div>
+        </div>
+
+        <div className="px-8 py-8 bg-slate-50">
+          <dl className="grid sm:grid-cols-4 gap-x-6 gap-y-4 text-sm">
+            <div><dt className="text-xs uppercase tracking-wide text-slate-500">Founded</dt><dd className="text-slate-900 mt-1 font-medium">1998</dd></div>
+            <div><dt className="text-xs uppercase tracking-wide text-slate-500">FDIC Certificate</dt><dd className="text-slate-900 mt-1 tabular-nums font-medium">#48291</dd></div>
+            <div><dt className="text-xs uppercase tracking-wide text-slate-500">Headquarters</dt><dd className="text-slate-900 mt-1 font-medium">Western U.S.</dd></div>
+            <div><dt className="text-xs uppercase tracking-wide text-slate-500">Branches</dt><dd className="text-slate-900 mt-1 font-medium">Digital & Regional</dd></div>
           </dl>
-          <p className="text-xs text-slate-500 pt-4 border-t border-slate-100">
+          <p className="text-xs text-slate-500 pt-6 mt-6 border-t border-slate-200">
             Member FDIC · Equal Housing Lender · © {new Date().getFullYear()} Dynamic Bank of West. All rights reserved.
           </p>
         </div>
