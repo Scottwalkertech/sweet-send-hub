@@ -751,7 +751,7 @@ function RoutingModal({ onClose }: { onClose: () => void }) {
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded bg-slate-900 text-white text-xs font-bold flex items-center justify-center">M</div>
+            <div className="h-7 w-7 rounded bg-slate-900 text-white text-[9px] font-bold flex items-center justify-center tracking-wide">DBW</div>
             <div>
               <div className="text-sm font-semibold text-slate-900">Account & Routing Details</div>
               <div className="text-[11px] text-slate-500">Official — Dynamic Bank of West</div>
