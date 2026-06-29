@@ -156,9 +156,9 @@ function Login({ onAuth }: { onAuth: () => void }) {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-md">
         <div className="flex items-center gap-3 justify-center mb-8">
-          <div className="h-10 w-10 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold">M</div>
+          <div className="h-10 w-10 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-[11px] tracking-wide">DBW</div>
           <div>
-            <div className="text-xl font-semibold text-slate-900">Meridian Trust</div>
+            <div className="text-xl font-semibold text-slate-900">Dynamic Bank of West</div>
             <div className="text-xs text-slate-500">Secure Online Banking</div>
           </div>
         </div>
