@@ -296,7 +296,17 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     if (sb) setSavingsBal(parseFloat(sb));
     if (ct) { try { setCheckingTx(JSON.parse(ct)); } catch {} }
     if (st) { try { setSavingsTx(JSON.parse(st)); } catch {} }
-  }, []);
+  const [segAcc, setSegAcc] = useState<"primary" | "secondary" | null>(null);
+
+  function openSegmentAccount(slot: "primary" | "secondary") {
+    if (segment === "personal") {
+      setView(slot === "primary" ? "checking" : "savings");
+    } else {
+      setSegAcc(slot);
+      setView("segment-account");
+    }
+  }
+
 
   useEffect(() => { localStorage.setItem(LS_CHK_BAL, String(checkingBal)); }, [checkingBal]);
   useEffect(() => { localStorage.setItem(LS_SAV_BAL, String(savingsBal)); }, [savingsBal]);
