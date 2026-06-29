@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Meridian Trust — Online Banking" },
+      { title: "Dynamic Bank of West — Online Banking" },
       { name: "description", content: "Secure online banking portal." },
     ],
   }),
