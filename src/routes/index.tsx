@@ -455,6 +455,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             onTransfer={internalTransfer}
           />
         )}
+        {view === "segment-account" && segAcc && segment !== "personal" && (
+          <SegmentAccountPage
+            segment={segment}
+            slot={segAcc}
+            onBack={() => { setSegAcc(null); setView("dashboard"); }}
+          />
+        )}
         {view === "dashboard" && (
           <>
             <section>
@@ -469,16 +476,17 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 routing="121000248"
                 balance={primaryBal}
                 primary
-                onClick={isPersonal ? () => setView("checking") : undefined}
+                onClick={() => openSegmentAccount("primary")}
               />
               <AccountCard
                 name={isPersonal ? "Way2Save Savings" : seg.secondary.name}
                 number={seg.secondary.number}
                 routing="121000248"
                 balance={secondaryBal}
-                onClick={isPersonal ? () => setView("savings") : undefined}
+                onClick={() => openSegmentAccount("secondary")}
               />
             </section>
+
 
             <section className="grid lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl">
