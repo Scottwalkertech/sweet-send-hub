@@ -365,7 +365,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <button onClick={() => setView("dashboard")} className="flex items-center gap-3 text-left">
-            <div className="h-9 w-9 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold">M</div>
+            <div className="h-9 w-9 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-[10px] tracking-wide">DBW</div>
             <div>
               <div className="text-sm font-semibold text-slate-900 tracking-wide">DYNAMIC BANK OF WEST</div>
               <div className="text-xs text-slate-500">{view === "about" ? "Institutional Overview" : seg.sub}</div>
