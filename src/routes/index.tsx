@@ -240,7 +240,43 @@ const seedSavingsTx: Tx[] = [
   { id: "s2", date: "2026-06-15", description: "Automated Smart Save", amount: 50.00, category: "Auto-Save" },
 ];
 
-type DashView = "dashboard" | "profile" | "card" | "checking" | "savings" | "about";
+const segmentSeedTx: Record<Segment, { primary: Tx[]; secondary: Tx[] }> = {
+  personal: { primary: seedCheckingTx, secondary: seedSavingsTx },
+  business: {
+    primary: [
+      { id: "bp1", date: "2026-06-26", description: "Stripe Payout — Invoice #2241", amount: 4820.00, category: "Income" },
+      { id: "bp2", date: "2026-06-24", description: "AWS Cloud Services", amount: -312.44, category: "Software" },
+      { id: "bp3", date: "2026-06-22", description: "Office Lease — June", amount: -1850.00, category: "Operating" },
+    ],
+    secondary: [
+      { id: "bs1", date: "2026-06-20", description: "Reserve Sweep", amount: 1500.00, category: "Transfer" },
+      { id: "bs2", date: "2026-06-12", description: "Quarterly Interest", amount: 18.40, category: "Interest" },
+    ],
+  },
+  commercial: {
+    primary: [
+      { id: "cp1", date: "2026-06-26", description: "Wholesale Receivable — Acme Co", amount: 18200.00, category: "Income" },
+      { id: "cp2", date: "2026-06-23", description: "Vendor Payment — Globex Mfg", amount: -7420.55, category: "AP" },
+      { id: "cp3", date: "2026-06-21", description: "Payroll Run #21", amount: -12480.00, category: "Payroll" },
+    ],
+    secondary: [
+      { id: "cs1", date: "2026-06-18", description: "Money Market Yield", amount: 412.88, category: "Interest" },
+      { id: "cs2", date: "2026-06-10", description: "Treasury Sweep", amount: 25000.00, category: "Transfer" },
+    ],
+  },
+  wire: {
+    primary: [
+      { id: "wp1", date: "2026-06-26", description: "Outbound Wire — Settlement #88421", amount: -4200.00, category: "Wire Out" },
+      { id: "wp2", date: "2026-06-25", description: "Inbound Wire — Counterparty MERIDIAN", amount: 9500.00, category: "Wire In" },
+    ],
+    secondary: [
+      { id: "ws1", date: "2026-06-22", description: "FX Conversion EUR→USD", amount: 1180.40, category: "FX" },
+      { id: "ws2", date: "2026-06-19", description: "Correspondent Bank Fee", amount: -25.00, category: "Fee" },
+    ],
+  },
+};
+
+type DashView = "dashboard" | "profile" | "card" | "checking" | "savings" | "about" | "segment-account";
 
 function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [checkingBal, setCheckingBal] = useState(12480.33);
@@ -261,6 +297,20 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     if (ct) { try { setCheckingTx(JSON.parse(ct)); } catch {} }
     if (st) { try { setSavingsTx(JSON.parse(st)); } catch {} }
   }, []);
+
+  const [segAcc, setSegAcc] = useState<"primary" | "secondary" | null>(null);
+
+  function openSegmentAccount(slot: "primary" | "secondary") {
+    if (segment === "personal") {
+      setView(slot === "primary" ? "checking" : "savings");
+    } else {
+      setSegAcc(slot);
+      setView("segment-account");
+    }
+  }
+
+
+
 
   useEffect(() => { localStorage.setItem(LS_CHK_BAL, String(checkingBal)); }, [checkingBal]);
   useEffect(() => { localStorage.setItem(LS_SAV_BAL, String(savingsBal)); }, [savingsBal]);
@@ -405,6 +455,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             onTransfer={internalTransfer}
           />
         )}
+        {view === "segment-account" && segAcc && segment !== "personal" && (
+          <SegmentAccountPage
+            segment={segment}
+            slot={segAcc}
+            onBack={() => { setSegAcc(null); setView("dashboard"); }}
+          />
+        )}
         {view === "dashboard" && (
           <>
             <section>
@@ -419,16 +476,17 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 routing="121000248"
                 balance={primaryBal}
                 primary
-                onClick={isPersonal ? () => setView("checking") : undefined}
+                onClick={() => openSegmentAccount("primary")}
               />
               <AccountCard
                 name={isPersonal ? "Way2Save Savings" : seg.secondary.name}
                 number={seg.secondary.number}
                 routing="121000248"
                 balance={secondaryBal}
-                onClick={isPersonal ? () => setView("savings") : undefined}
+                onClick={() => openSegmentAccount("secondary")}
               />
             </section>
+
 
             <section className="grid lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl">
@@ -1027,5 +1085,114 @@ function ChatWidget() {
         </div>
       )}
     </>
+  );
+}
+
+function SegmentAccountPage({ segment, slot, onBack }: { segment: Exclude<Segment, "personal">; slot: "primary" | "secondary"; onBack: () => void }) {
+  const seg = SEGMENTS[segment];
+  const acct = seg[slot];
+  const tx = segmentSeedTx[segment][slot];
+  const [q, setQ] = useState("");
+  const [type, setType] = useState<"all" | "credit" | "debit">("all");
+
+  const filtered = tx.filter((t) => {
+    if (type === "credit" && t.amount < 0) return false;
+    if (type === "debit" && t.amount >= 0) return false;
+    if (q && !t.description.toLowerCase().includes(q.toLowerCase())) return false;
+    return true;
+  });
+
+  function exportCsv() {
+    const rows = [["Date", "Description", "Category", "Amount"], ...filtered.map((t) => [t.date, t.description, t.category, t.amount.toFixed(2)])];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${acct.name.replace(/\s+/g, "-").toLowerCase()}-history.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <section className="space-y-6">
+      <button onClick={onBack} className="text-sm text-amber-700 hover:text-amber-900">← Back to {seg.label}</button>
+
+      <div className="rounded-2xl overflow-hidden shadow-2xl border border-amber-700/40">
+        <div className="bg-gradient-to-br from-red-900 via-red-950 to-black text-white px-8 py-10 relative">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.15),transparent_60%)]" />
+          <div className="relative flex items-start justify-between flex-wrap gap-6">
+            <div>
+              <div className="flex items-center gap-2 text-amber-300 text-xs uppercase tracking-[0.2em] font-semibold">
+                <span className="h-px w-8 bg-amber-400" />
+                {seg.label} · {slot === "primary" ? "Primary" : "Reserve"}
+              </div>
+              <h1 className="text-3xl font-semibold mt-3 tracking-wide">{acct.name}</h1>
+              <div className="text-xs text-amber-200/80 mt-1 tabular-nums">Account {acct.number} · Routing 121000248</div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs uppercase tracking-wider text-amber-200/80">Available Balance</div>
+              <div className="text-4xl font-semibold tabular-nums mt-1 bg-gradient-to-b from-amber-200 to-amber-400 bg-clip-text text-transparent">
+                {fmt(acct.balance)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap bg-gradient-to-r from-red-50 to-transparent">
+            <h2 className="text-sm font-semibold text-red-900">Transaction History</h2>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search…"
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-red-800"
+              />
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as "all" | "credit" | "debit")}
+                className="rounded-md border border-slate-300 px-2 py-1.5 text-xs bg-white"
+              >
+                <option value="all">All</option>
+                <option value="credit">Credits</option>
+                <option value="debit">Debits</option>
+              </select>
+              <button onClick={exportCsv} className="text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-md">
+                Export CSV
+              </button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="text-left px-6 py-3 font-medium">Date</th>
+                  <th className="text-left px-6 py-3 font-medium">Description</th>
+                  <th className="text-left px-6 py-3 font-medium">Category</th>
+                  <th className="text-right px-6 py-3 font-medium">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((t) => (
+                  <tr key={t.id} className="border-t border-slate-100">
+                    <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.date}</td>
+                    <td className="px-6 py-3 text-slate-900">{t.description}</td>
+                    <td className="px-6 py-3 text-slate-600">{t.category}</td>
+                    <td className={`px-6 py-3 text-right font-medium tabular-nums ${t.amount < 0 ? "text-red-800" : "text-emerald-600"}`}>
+                      {t.amount < 0 ? "-" : "+"}{fmt(Math.abs(t.amount))}
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr><td colSpan={4} className="px-6 py-8 text-center text-slate-400 text-sm">No matching activity.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
