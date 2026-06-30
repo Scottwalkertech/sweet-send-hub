@@ -9,15 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TransfersRouteImport } from './routes/transfers'
 import { Route as TransferConfirmationRouteImport } from './routes/transfer-confirmation'
 import { Route as IndexRouteImport } from './routes/index'
 
-const TransfersRoute = TransfersRouteImport.update({
-  id: '/transfers',
-  path: '/transfers',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const TransferConfirmationRoute = TransferConfirmationRouteImport.update({
   id: '/transfer-confirmation',
   path: '/transfer-confirmation',
@@ -32,42 +26,31 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
-  '/transfers': typeof TransfersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
-  '/transfers': typeof TransfersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
-  '/transfers': typeof TransfersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/transfer-confirmation' | '/transfers'
+  fullPaths: '/' | '/transfer-confirmation'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/transfer-confirmation' | '/transfers'
-  id: '__root__' | '/' | '/transfer-confirmation' | '/transfers'
+  to: '/' | '/transfer-confirmation'
+  id: '__root__' | '/' | '/transfer-confirmation'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TransferConfirmationRoute: typeof TransferConfirmationRoute
-  TransfersRoute: typeof TransfersRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/transfers': {
-      id: '/transfers'
-      path: '/transfers'
-      fullPath: '/transfers'
-      preLoaderRoute: typeof TransfersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/transfer-confirmation': {
       id: '/transfer-confirmation'
       path: '/transfer-confirmation'
@@ -88,7 +71,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TransferConfirmationRoute: TransferConfirmationRoute,
-  TransfersRoute: TransfersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
