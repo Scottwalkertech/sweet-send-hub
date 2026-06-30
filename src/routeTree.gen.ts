@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TransferConfirmationRouteImport } from './routes/transfer-confirmation'
+import { Route as TransferRouteImport } from './routes/transfer'
 import { Route as IndexRouteImport } from './routes/index'
 
 const TransferConfirmationRoute = TransferConfirmationRouteImport.update({
   id: '/transfer-confirmation',
   path: '/transfer-confirmation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TransferRoute = TransferRouteImport.update({
+  id: '/transfer',
+  path: '/transfer',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -25,27 +31,31 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/transfer': typeof TransferRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/transfer': typeof TransferRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/transfer': typeof TransferRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/transfer-confirmation'
+  fullPaths: '/' | '/transfer' | '/transfer-confirmation'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/transfer-confirmation'
-  id: '__root__' | '/' | '/transfer-confirmation'
+  to: '/' | '/transfer' | '/transfer-confirmation'
+  id: '__root__' | '/' | '/transfer' | '/transfer-confirmation'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  TransferRoute: typeof TransferRoute
   TransferConfirmationRoute: typeof TransferConfirmationRoute
 }
 
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/transfer-confirmation'
       fullPath: '/transfer-confirmation'
       preLoaderRoute: typeof TransferConfirmationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transfer': {
+      id: '/transfer'
+      path: '/transfer'
+      fullPath: '/transfer'
+      preLoaderRoute: typeof TransferRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -70,6 +87,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  TransferRoute: TransferRoute,
   TransferConfirmationRoute: TransferConfirmationRoute,
 }
 export const routeTree = rootRouteImport
