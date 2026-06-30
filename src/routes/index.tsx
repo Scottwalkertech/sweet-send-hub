@@ -488,53 +488,45 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             </section>
 
 
-            <section className="grid lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl">
-                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <section className="bg-white border border-slate-200 rounded-xl">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div>
                   <h2 className="text-sm font-semibold text-slate-900">Transaction Log</h2>
-                  <span className="text-xs text-slate-500">{displayTx.length} records · immutable</span>
+                  <p className="text-xs text-slate-500 mt-0.5">{displayTx.length} records · immutable</p>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                      <tr>
-                        <th className="text-left px-6 py-3 font-medium">Date</th>
-                        <th className="text-left px-6 py-3 font-medium">Description</th>
-                        <th className="text-left px-6 py-3 font-medium">Category</th>
-                        <th className="text-right px-6 py-3 font-medium">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayTx.map((t) => (
-                        <tr key={t.id} className="border-t border-slate-100">
-                          <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.date}</td>
-                          <td className="px-6 py-3 text-slate-900">{t.description}</td>
-                          <td className="px-6 py-3 text-slate-600">{t.category}</td>
-                          <td className={`px-6 py-3 text-right font-medium tabular-nums ${t.amount < 0 ? "text-slate-900" : "text-emerald-600"}`}>
-                            {t.amount < 0 ? "-" : "+"}{fmt(Math.abs(t.amount))}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <a
+                  href="/transfer"
+                  className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold"
+                >
+                  Send Money →
+                </a>
               </div>
-
-              <div className="bg-white border border-slate-200 rounded-xl p-6">
-                <h2 className="text-sm font-semibold text-slate-900 mb-1">Transfer Funds</h2>
-                <p className="text-xs text-slate-500 mb-4">Deducted from Everyday Checking.</p>
-                <form onSubmit={settle} className="space-y-3">
-                  <Field label="Recipient name" value={recipient} onChange={setRecipient} placeholder="Jane Doe" />
-                  <Field label="Routing number" value={routing} onChange={setRouting} placeholder="123456789" />
-                  <Field label="Amount (USD)" value={amount} onChange={setAmount} placeholder="0.00" type="number" />
-                  <Field label="Memo (optional)" value={memo} onChange={setMemo} placeholder="Rent" />
-                  {flash && <div className="text-xs text-slate-700 bg-slate-100 rounded px-3 py-2">{flash}</div>}
-                  <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium py-2.5 rounded-md">
-                    Settle
-                  </button>
-                </form>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                    <tr>
+                      <th className="text-left px-6 py-3 font-medium">Date</th>
+                      <th className="text-left px-6 py-3 font-medium">Description</th>
+                      <th className="text-left px-6 py-3 font-medium">Category</th>
+                      <th className="text-right px-6 py-3 font-medium">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayTx.map((t) => (
+                      <tr key={t.id} className="border-t border-slate-100">
+                        <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.date}</td>
+                        <td className="px-6 py-3 text-slate-900">{t.description}</td>
+                        <td className="px-6 py-3 text-slate-600">{t.category}</td>
+                        <td className={`px-6 py-3 text-right font-medium tabular-nums ${t.amount < 0 ? "text-slate-900" : "text-emerald-600"}`}>
+                          {t.amount < 0 ? "-" : "+"}{fmt(Math.abs(t.amount))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </section>
+
           </>
         )}
       </main>

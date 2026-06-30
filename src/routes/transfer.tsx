@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  Clock,
   AlertTriangle,
   Download,
   RefreshCw,
@@ -12,17 +11,17 @@ import {
   Wallet,
   Users,
   DollarSign,
-  FileText,
+  Loader2,
 } from "lucide-react";
 
-export const Route = createFileRoute("/transfers")({
+export const Route = createFileRoute("/transfer")({
   head: () => ({
     meta: [
       { title: "Fund Transfers — Dynamic Bank of West" },
-      { name: "description", content: "Send money securely between accounts and to beneficiaries." },
+      { name: "description", content: "Send money securely between accounts and to external beneficiaries." },
     ],
   }),
-  component: TransfersPage,
+  component: TransferPage,
 });
 
 type AccountKey = "checking" | "savings" | "commercial";
@@ -33,24 +32,15 @@ const ACCOUNTS: { key: AccountKey; name: string; mask: string; balanceKey: strin
   { key: "commercial", name: "Commercial Operating", mask: "•••• 3344", balanceKey: "mt_commercial_bal", fallback: 25000.0 },
 ];
 
-const BENEFICIARIES = [
-  { id: "b1", name: "Jane Carter", bank: "Chase Bank", acct: "•••• 4421" },
-  { id: "b2", name: "Acme Supplies LLC", bank: "Wells Fargo", acct: "•••• 7732" },
-  { id: "b3", name: "Michael Tran", bank: "Bank of America", acct: "•••• 0098" },
-  { id: "b4", name: "Pacific Rentals", bank: "US Bank", acct: "•••• 5510" },
-];
-
 function fmt(n: number) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
-
 function readBal(key: string, fallback: number) {
   if (typeof window === "undefined") return fallback;
   const raw = localStorage.getItem(key);
   const n = raw ? Number(raw) : NaN;
   return Number.isFinite(n) ? n : fallback;
 }
-
 function writeBal(key: string, n: number) {
   if (typeof window === "undefined") return;
   localStorage.setItem(key, String(n));
@@ -63,14 +53,21 @@ type Stage =
   | { kind: "pending"; trackingId: string; eta: string }
   | { kind: "failed"; code: string; message: string };
 
-function TransfersPage() {
+function mkTxId() {
+  return "DBW-" + Math.random().toString(36).slice(2, 10).toUpperCase();
+}
+function mkTrk() {
+  return "TRK-" + Math.random().toString(36).slice(2, 10).toUpperCase();
+}
+
+function TransferPage() {
   const [from, setFrom] = useState<AccountKey>("checking");
   const [recipientName, setRecipientName] = useState("");
   const [recipientAcct, setRecipientAcct] = useState("");
+  const [routingCode, setRoutingCode] = useState("");
   const [recipientBank, setRecipientBank] = useState("");
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
-  const [beneficiary, setBeneficiary] = useState("");
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [stage, setStage] = useState<Stage>({ kind: "form" });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -82,21 +79,11 @@ function TransfersPage() {
   const postBalance = validAmount ? fromBalance - amountNum : fromBalance;
   const insufficient = validAmount && amountNum > fromBalance;
 
-  function pickBeneficiary(id: string) {
-    setBeneficiary(id);
-    const b = BENEFICIARIES.find((x) => x.id === id);
-    if (b) {
-      setRecipientName(b.name);
-      setRecipientBank(b.bank);
-      setRecipientAcct(b.acct.replace(/[^0-9]/g, "") || "44210000");
-    }
-  }
-
   function validateStep1() {
     const e: Record<string, string> = {};
     if (!recipientName.trim()) e.name = "Recipient name is required.";
-    if (!recipientAcct.trim() || recipientAcct.replace(/\D/g, "").length < 4)
-      e.acct = "Enter a valid account number.";
+    if (recipientAcct.replace(/\D/g, "").length < 4) e.acct = "Enter a valid account number.";
+    if (routingCode.replace(/\D/g, "").length !== 9) e.routing = "Routing / bank code must be 9 digits.";
     if (!recipientBank.trim()) e.bank = "Recipient bank is required.";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -108,31 +95,21 @@ function TransfersPage() {
     return Object.keys(e).length === 0;
   }
 
-  function goReview() {
-    if (!validateStep2()) return;
-    setStage({ kind: "review" });
-  }
-
   function submitTransfer() {
-    // Simulate outcomes: insufficient → failed; >$10k → pending; otherwise success.
     if (insufficient) {
       setStage({
         kind: "failed",
         code: "ERR_INSUFFICIENT_FUNDS_402",
-        message: "Your selected account does not have enough available funds to complete this transfer.",
+        message: "Insufficient Funds — your account balance is lower than the requested amount.",
       });
       return;
     }
     writeBal(fromAccount.balanceKey, fromBalance - amountNum);
     if (amountNum > 10000) {
-      setStage({
-        kind: "pending",
-        trackingId: "TRK-" + Math.random().toString(36).slice(2, 10).toUpperCase(),
-        eta: "1–2 business days",
-      });
+      setStage({ kind: "pending", trackingId: mkTrk(), eta: "1–2 business days" });
       return;
     }
-    setStage({ kind: "success", txId: "DBW-" + Math.random().toString(36).slice(2, 10).toUpperCase() });
+    setStage({ kind: "success", txId: mkTxId() });
   }
 
   function resetAll() {
@@ -141,11 +118,39 @@ function TransfersPage() {
     setErrors({});
   }
 
+  // Dev-only state simulator
+  function devSimulate(k: "success" | "pending" | "failed") {
+    if (!recipientName) setRecipientName("Jane Carter");
+    if (!recipientBank) setRecipientBank("Chase Bank");
+    if (!recipientAcct) setRecipientAcct("44210000");
+    if (!routingCode) setRoutingCode("121000248");
+    if (!amount) setAmount("250.00");
+    if (k === "success") setStage({ kind: "success", txId: mkTxId() });
+    if (k === "pending") setStage({ kind: "pending", trackingId: mkTrk(), eta: "1–2 business days" });
+    if (k === "failed")
+      setStage({ kind: "failed", code: "ERR_INSUFFICIENT_FUNDS_402", message: "Insufficient Funds — your account balance is lower than the requested amount." });
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Dev preview state toggles */}
+      <div className="bg-slate-950 border-b border-amber-600/30">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2 flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-[10px] uppercase tracking-[0.25em] text-amber-300/80 font-semibold">
+            Dev Preview · Switch State
+          </div>
+          <div className="flex items-center gap-1.5">
+            <DevBtn active={stage.kind === "form" || stage.kind === "review"} onClick={resetAll} label="Form" />
+            <DevBtn active={stage.kind === "success"} onClick={() => devSimulate("success")} label="Success" tone="emerald" />
+            <DevBtn active={stage.kind === "pending"} onClick={() => devSimulate("pending")} label="Pending" tone="amber" />
+            <DevBtn active={stage.kind === "failed"} onClick={() => devSimulate("failed")} label="Failed" tone="red" />
+          </div>
+        </div>
+      </div>
+
       <header className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-amber-600/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3 group">
+          <Link to="/" className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-md bg-gradient-to-br from-amber-300 via-yellow-500 to-amber-700 text-slate-900 text-[11px] font-extrabold flex items-center justify-center shadow ring-1 ring-amber-600/40">
               DBW
             </div>
@@ -161,12 +166,12 @@ function TransfersPage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
-        {stage.kind === "form" || stage.kind === "review" ? (
+        {(stage.kind === "form" || stage.kind === "review") && (
           <>
             <div className="mb-6">
               <h1 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight">Fund Transfers</h1>
               <p className="text-sm text-slate-600 mt-1">
-                Move money between your accounts or send to a beneficiary. All transfers are encrypted end-to-end.
+                Send money to an external account. Encrypted end-to-end and verified at every step.
               </p>
             </div>
 
@@ -176,20 +181,6 @@ function TransfersPage() {
               {stage.kind === "form" && step === 1 && (
                 <Section icon={<Users className="h-4 w-4" />} title="Recipient Details" subtitle="Who are you sending money to?">
                   <div className="space-y-4">
-                    <Field label="Recent Beneficiaries">
-                      <select
-                        value={beneficiary}
-                        onChange={(e) => pickBeneficiary(e.target.value)}
-                        className="w-full h-12 px-4 rounded-lg border border-slate-300 bg-white text-slate-900 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 outline-none"
-                      >
-                        <option value="">Select a saved recipient…</option>
-                        {BENEFICIARIES.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.name} — {b.bank} {b.acct}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
                     <Field label="Recipient Full Name" error={errors.name}>
                       <input
                         value={recipientName}
@@ -198,19 +189,28 @@ function TransfersPage() {
                         className="w-full h-12 px-4 rounded-lg border border-slate-300 bg-white text-slate-900 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 outline-none"
                       />
                     </Field>
+                    <Field label="Recipient Bank" error={errors.bank}>
+                      <input
+                        value={recipientBank}
+                        onChange={(e) => setRecipientBank(e.target.value)}
+                        placeholder="e.g. Chase Bank"
+                        className="w-full h-12 px-4 rounded-lg border border-slate-300 bg-white text-slate-900 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 outline-none"
+                      />
+                    </Field>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <Field label="Recipient Bank" error={errors.bank}>
+                      <Field label="Routing / Bank Code (9 digits)" error={errors.routing}>
                         <input
-                          value={recipientBank}
-                          onChange={(e) => setRecipientBank(e.target.value)}
-                          placeholder="e.g. Chase Bank"
-                          className="w-full h-12 px-4 rounded-lg border border-slate-300 bg-white text-slate-900 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 outline-none"
+                          value={routingCode}
+                          onChange={(e) => setRoutingCode(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                          inputMode="numeric"
+                          placeholder="121000248"
+                          className="w-full h-12 px-4 rounded-lg border border-slate-300 bg-white text-slate-900 tabular-nums focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 outline-none"
                         />
                       </Field>
                       <Field label="Account Number" error={errors.acct}>
                         <input
                           value={recipientAcct}
-                          onChange={(e) => setRecipientAcct(e.target.value.replace(/[^0-9]/g, ""))}
+                          onChange={(e) => setRecipientAcct(e.target.value.replace(/\D/g, ""))}
                           inputMode="numeric"
                           placeholder="000000000000"
                           className="w-full h-12 px-4 rounded-lg border border-slate-300 bg-white text-slate-900 tabular-nums focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 outline-none"
@@ -276,14 +276,14 @@ function TransfersPage() {
                         <span className="font-semibold tabular-nums text-slate-900">{fmt(fromBalance)}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm mt-2">
-                        <span className="text-slate-600">Estimated balance after transfer</span>
+                        <span className="text-slate-600">After transfer</span>
                         <span className={`font-semibold tabular-nums ${insufficient ? "text-red-600" : "text-slate-900"}`}>
                           {fmt(postBalance)}
                         </span>
                       </div>
                       {insufficient && (
                         <div className="mt-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-                          Heads up: this amount exceeds your available balance.
+                          This amount exceeds your available balance.
                         </div>
                       )}
                     </div>
@@ -298,10 +298,10 @@ function TransfersPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={goReview}
+                      onClick={() => validateStep2() && setStage({ kind: "review" })}
                       className="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"
                     >
-                      Review Transfer <ArrowRight className="h-4 w-4" />
+                      Review & Confirm <ArrowRight className="h-4 w-4" />
                     </button>
                   </Footer>
                 </Section>
@@ -313,6 +313,7 @@ function TransfersPage() {
                     <Row label="From" value={`${fromAccount.name} (${fromAccount.mask})`} />
                     <Row label="Recipient" value={recipientName} />
                     <Row label="Bank" value={recipientBank} />
+                    <Row label="Routing Code" value={routingCode} mono />
                     <Row label="Account" value={`•••• ${recipientAcct.slice(-4)}`} mono />
                     <Row label="Amount" value={fmt(amountNum)} mono strong />
                     {memo && <Row label="Memo" value={memo} />}
@@ -326,9 +327,7 @@ function TransfersPage() {
                           Pre-transfer balance check
                         </div>
                         <div className={`mt-0.5 ${insufficient ? "text-red-700" : "text-emerald-800"}`}>
-                          Current balance <span className="font-semibold tabular-nums">{fmt(fromBalance)}</span> → after
-                          transfer <span className="font-semibold tabular-nums">{fmt(postBalance)}</span>.
-                          {insufficient ? " Insufficient funds — this transfer will fail." : " Funds are available."}
+                          {fmt(fromBalance)} → {fmt(postBalance)} after this transfer.
                         </div>
                       </div>
                     </div>
@@ -358,20 +357,20 @@ function TransfersPage() {
               <Shield className="h-3.5 w-3.5" /> 256-bit TLS encryption · FDIC certificate #48291
             </p>
           </>
-        ) : null}
+        )}
 
         {stage.kind === "success" && (
-          <StatusCard
-            tone="success"
-            icon={<CheckCircle2 className="h-10 w-10" />}
-            title="Transfer Successful"
-            subtitle="Your funds have been sent. A receipt is ready for your records."
-          >
+          <StatusCard tone="success" title="Transfer Successful" subtitle="Your funds have been sent. Below is your full transaction receipt.">
+            <div className="mx-auto h-20 w-20 rounded-full ring-8 ring-emerald-100 bg-emerald-50 text-emerald-600 flex items-center justify-center -mt-14 mb-4 shadow-sm">
+              <CheckCircle2 className="h-10 w-10" strokeWidth={2.25} />
+            </div>
             <SummaryRows
               rows={[
-                ["Amount", fmt(amountNum), true],
-                ["Recipient", recipientName],
-                ["Bank", recipientBank],
+                ["Amount", fmt(amountNum || 250), true],
+                ["Recipient", recipientName || "Jane Carter"],
+                ["Bank", recipientBank || "Chase Bank"],
+                ["Routing", routingCode || "121000248", true],
+                ["Account", `•••• ${(recipientAcct || "0000").slice(-4)}`, true],
                 ["Transaction ID", stage.txId, true],
                 ["Date", new Date().toLocaleString()],
               ]}
@@ -381,9 +380,9 @@ function TransfersPage() {
                 type="button"
                 onClick={() =>
                   downloadReceipt({
-                    amount: amountNum,
-                    recipient: recipientName,
-                    bank: recipientBank,
+                    amount: amountNum || 250,
+                    recipient: recipientName || "Jane Carter",
+                    bank: recipientBank || "Chase Bank",
                     txId: stage.txId,
                   })
                 }
@@ -391,34 +390,35 @@ function TransfersPage() {
               >
                 <Download className="h-4 w-4" /> Download Receipt
               </button>
-              <button
-                type="button"
-                onClick={resetAll}
+              <Link
+                to="/"
                 className="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold"
               >
-                New Transfer
-              </button>
+                <ArrowLeft className="h-4 w-4" /> Return to Dashboard
+              </Link>
             </Actions>
           </StatusCard>
         )}
 
         {stage.kind === "pending" && (
-          <StatusCard
-            tone="pending"
-            icon={<Clock className="h-10 w-10" />}
-            title="Processing Transfer"
-            subtitle="Large transfers are reviewed for your protection."
-          >
+          <StatusCard tone="pending" title="Processing Transfer" subtitle="We're securely routing your funds. This won't take long.">
+            <div className="mx-auto -mt-14 mb-4 relative h-20 w-20">
+              <div className="absolute inset-0 rounded-full bg-amber-400/30 animate-ping" />
+              <div className="relative h-20 w-20 rounded-full ring-8 ring-amber-100 bg-amber-50 text-amber-600 flex items-center justify-center shadow-sm">
+                <Loader2 className="h-10 w-10 animate-spin" strokeWidth={2.25} />
+              </div>
+            </div>
             <SummaryRows
               rows={[
-                ["Amount", fmt(amountNum), true],
-                ["Recipient", recipientName],
+                ["Status", "Processing"],
+                ["Amount", fmt(amountNum || 250), true],
+                ["Recipient", recipientName || "Jane Carter"],
                 ["Tracking Number", stage.trackingId, true],
-                ["Estimated Arrival", stage.eta],
+                ["Estimated Completion", stage.eta],
               ]}
             />
-            <div className="mt-4 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-              You'll receive an email and in-app notification once the transfer settles.
+            <div className="mt-4 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              Estimated completion: <span className="font-semibold">{stage.eta}</span>. You'll be notified by email and in-app once the transfer settles.
             </div>
             <Actions>
               <Link
@@ -427,29 +427,29 @@ function TransfersPage() {
               >
                 <ArrowLeft className="h-4 w-4" /> Back to Dashboard
               </Link>
-              <button
-                type="button"
-                onClick={resetAll}
-                className="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-lg border border-slate-300 text-slate-900 text-sm font-semibold hover:bg-slate-50"
-              >
-                New Transfer
-              </button>
             </Actions>
           </StatusCard>
         )}
 
         {stage.kind === "failed" && (
-          <StatusCard
-            tone="failed"
-            icon={<AlertTriangle className="h-10 w-10" />}
-            title="Transfer Failed"
-            subtitle={stage.message}
-          >
+          <StatusCard tone="failed" title="Transfer Failed" subtitle="We weren't able to complete this transfer.">
+            <div className="mx-auto -mt-14 mb-4 h-20 w-20 rounded-full ring-8 ring-red-100 bg-red-50 text-red-600 flex items-center justify-center shadow-sm">
+              <AlertTriangle className="h-10 w-10" strokeWidth={2.25} />
+            </div>
+            <div className="rounded-lg border border-red-200 bg-red-50/70 px-4 py-3 mb-4 flex items-start gap-3">
+              <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+              <div className="text-sm">
+                <div className="font-semibold text-red-800">{stage.message.split("—")[0].trim()}</div>
+                <div className="text-red-700 mt-0.5 text-xs">
+                  Error code <span className="font-mono">{stage.code}</span>
+                </div>
+              </div>
+            </div>
             <SummaryRows
               rows={[
-                ["Amount", fmt(amountNum), true],
+                ["Attempted Amount", fmt(amountNum || 250), true],
                 ["Recipient", recipientName || "—"],
-                ["Error Code", stage.code, true],
+                ["Reason", stage.message],
                 ["Date", new Date().toLocaleString()],
               ]}
             />
@@ -459,19 +459,51 @@ function TransfersPage() {
                 onClick={() => setStage({ kind: "form" })}
                 className="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold"
               >
-                <RefreshCw className="h-4 w-4" /> Try Again
+                <RefreshCw className="h-4 w-4" /> Modify & Retry
               </button>
-              <a
-                href="mailto:support@dynamicbankofwest.example"
+              <Link
+                to="/"
                 className="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-lg border border-slate-300 text-slate-900 text-sm font-semibold hover:bg-slate-50"
               >
-                Contact Support
-              </a>
+                Return to Dashboard
+              </Link>
             </Actions>
           </StatusCard>
         )}
       </main>
     </div>
+  );
+}
+
+function DevBtn({
+  active,
+  onClick,
+  label,
+  tone,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  tone?: "emerald" | "amber" | "red";
+}) {
+  const toneRing =
+    tone === "emerald"
+      ? "ring-emerald-400/60"
+      : tone === "amber"
+      ? "ring-amber-400/60"
+      : tone === "red"
+      ? "ring-red-400/60"
+      : "ring-white/40";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-2.5 h-7 rounded-md text-[11px] font-semibold transition ${
+        active ? `bg-white text-slate-900 ring-2 ${toneRing}` : "bg-white/5 text-slate-300 hover:bg-white/10"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -490,20 +522,12 @@ function Stepper({ step }: { step: 1 | 2 | 3 }) {
           <li key={it.n} className="flex items-center gap-2 sm:gap-4 flex-1">
             <div
               className={`h-8 w-8 shrink-0 rounded-full flex items-center justify-center text-xs font-bold ${
-                done
-                  ? "bg-emerald-600 text-white"
-                  : active
-                  ? "bg-slate-900 text-white"
-                  : "bg-slate-200 text-slate-500"
+                done ? "bg-emerald-600 text-white" : active ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-500"
               }`}
             >
               {done ? "✓" : it.n}
             </div>
-            <span
-              className={`text-xs sm:text-sm font-medium ${
-                active ? "text-slate-900" : done ? "text-emerald-700" : "text-slate-500"
-              }`}
-            >
+            <span className={`text-xs sm:text-sm font-medium ${active ? "text-slate-900" : done ? "text-emerald-700" : "text-slate-500"}`}>
               {it.label}
             </span>
             {i < items.length - 1 && <div className="flex-1 h-px bg-slate-200" />}
@@ -555,13 +579,9 @@ function Footer({ children }: { children: React.ReactNode }) {
 
 function Row({ label, value, mono, strong }: { label: string; value: string; mono?: boolean; strong?: boolean }) {
   return (
-    <div className="flex items-center justify-between px-5 py-3.5">
+    <div className="flex items-center justify-between px-5 py-3.5 gap-3">
       <span className="text-xs uppercase tracking-wider text-slate-500 font-medium">{label}</span>
-      <span
-        className={`text-sm text-slate-900 ${mono ? "font-mono tabular-nums" : ""} ${
-          strong ? "font-bold text-base" : "font-semibold"
-        }`}
-      >
+      <span className={`text-sm text-slate-900 text-right break-all ${mono ? "font-mono tabular-nums" : ""} ${strong ? "font-bold text-base" : "font-semibold"}`}>
         {value}
       </span>
     </div>
@@ -570,37 +590,31 @@ function Row({ label, value, mono, strong }: { label: string; value: string; mon
 
 function StatusCard({
   tone,
-  icon,
   title,
   subtitle,
   children,
 }: {
   tone: "success" | "pending" | "failed";
-  icon: React.ReactNode;
   title: string;
   subtitle: string;
   children: React.ReactNode;
 }) {
-  const tones = {
-    success: { ring: "ring-emerald-100", bg: "bg-emerald-50", text: "text-emerald-600", bar: "from-emerald-500 to-emerald-600" },
-    pending: { ring: "ring-amber-100", bg: "bg-amber-50", text: "text-amber-600", bar: "from-amber-400 to-amber-500" },
-    failed: { ring: "ring-red-100", bg: "bg-red-50", text: "text-red-600", bar: "from-red-500 to-red-600" },
+  const bar = {
+    success: "from-emerald-500 to-emerald-600",
+    pending: "from-amber-400 to-amber-500",
+    failed: "from-red-500 to-red-600",
   }[tone];
-
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-      <div className={`h-1.5 bg-gradient-to-r ${tones.bar}`} />
-      <div className="px-6 sm:px-8 pt-10 pb-6 text-center">
-        <div className={`mx-auto h-20 w-20 rounded-full ring-8 ${tones.ring} ${tones.bg} ${tones.text} flex items-center justify-center`}>
-          {icon}
-        </div>
-        <h1 className="mt-6 text-2xl font-semibold text-slate-900 tracking-tight">{title}</h1>
+      <div className={`h-1.5 bg-gradient-to-r ${bar}`} />
+      <div className="px-6 sm:px-8 pt-14 pb-2 text-center">
+        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">{title}</h1>
         <p className="mt-2 text-sm text-slate-600 max-w-md mx-auto">{subtitle}</p>
       </div>
-      <div className="px-6 sm:px-8 pb-8">{children}</div>
+      <div className="px-6 sm:px-8 py-6">{children}</div>
       <div className="px-6 sm:px-8 py-4 bg-slate-50 border-t border-slate-100 text-center">
         <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
-          <Shield className="h-3 w-3" /> Secure transfer · For security, never share your transaction ID.
+          <Shield className="h-3 w-3" /> Secure transfer · Never share your transaction ID.
         </p>
       </div>
     </div>
@@ -644,6 +658,3 @@ function downloadReceipt(d: { amount: number; recipient: string; bank: string; t
   a.remove();
   URL.revokeObjectURL(url);
 }
-
-// satisfy lint for unused icon imports
-void FileText;
