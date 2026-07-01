@@ -154,31 +154,3 @@ export function PageTransitionLoader() {
   );
 }
 
-/**
- * Intercepts in-page navigation clicks so the loader always shows,
- * even when TanStack Router client-navigates to the same-origin route
- * quickly enough that the overlay would otherwise flash imperceptibly.
- */
-export function useInterceptNavigationClicks() {
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (e.defaultPrevented || e.button !== 0) return;
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      const target = e.target as HTMLElement | null;
-      const anchor = target?.closest("a") as HTMLAnchorElement | null;
-      if (!anchor) return;
-      const href = anchor.getAttribute("href");
-      if (!href || href.startsWith("#") || anchor.target === "_blank") return;
-      try {
-        const url = new URL(anchor.href, window.location.href);
-        if (url.origin !== window.location.origin) return;
-        if (url.pathname === window.location.pathname) return;
-      } catch {
-        return;
-      }
-      window.dispatchEvent(new CustomEvent("ptl:force-show"));
-    };
-    document.addEventListener("click", handler, true);
-    return () => document.removeEventListener("click", handler, true);
-  }, []);
-}
