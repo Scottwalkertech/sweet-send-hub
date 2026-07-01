@@ -13,25 +13,75 @@ export function PageTransitionLoader() {
   const [isGlobalLoading, setIsGlobalLoading] = useState(false);
   const [msgIdx, setMsgIdx] = useState(0);
   const firstRender = useRef(true);
+  const timersRef = useRef<{ msg?: ReturnType<typeof setInterval>; hide?: ReturnType<typeof setTimeout> }>({});
 
+  const trigger = () => {
+    setIsGlobalLoading(true);
+    setMsgIdx(0);
+    if (timersRef.current.msg) clearInterval(timersRef.current.msg);
+    if (timersRef.current.hide) clearTimeout(timersRef.current.hide);
+    timersRef.current.msg = setInterval(() => {
+      setMsgIdx((i) => (i + 1) % MESSAGES.length);
+    }, 480);
+    timersRef.current.hide = setTimeout(() => {
+      setIsGlobalLoading(false);
+    }, 1800);
+  };
+
+  // Fire on route path changes
   useEffect(() => {
     if (firstRender.current) {
       firstRender.current = false;
       return;
     }
-    setIsGlobalLoading(true);
-    setMsgIdx(0);
-    const msgTimer = setInterval(() => {
-      setMsgIdx((i) => (i + 1) % MESSAGES.length);
-    }, 480);
-    const hideTimer = setTimeout(() => {
-      setIsGlobalLoading(false);
-    }, 1800);
+    trigger();
     return () => {
-      clearInterval(msgTimer);
-      clearTimeout(hideTimer);
+      if (timersRef.current.msg) clearInterval(timersRef.current.msg);
+      if (timersRef.current.hide) clearTimeout(timersRef.current.hide);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
+
+  // Fire on internal view-change events + intercept nav clicks (in-app SPA views
+  // that don't change the URL still get the loading simulation).
+  useEffect(() => {
+    const onForce = () => trigger();
+    const events = [
+      "ptl:show",
+      "mt:view-profile",
+      "mt:view-card",
+      "mt:open-routing",
+      "mt:open-chat",
+      "mt:segment-change",
+      "mt:open-account",
+      "mt:back-dashboard",
+    ];
+    events.forEach((n) => window.addEventListener(n, onForce));
+
+    const clickHandler = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      // Any anchor or element explicitly marked as navigational
+      const navEl = target.closest<HTMLElement>("a[href], [data-nav], [data-loader]");
+      if (!navEl) return;
+      if (navEl.tagName === "A") {
+        const a = navEl as HTMLAnchorElement;
+        if (!a.href || a.target === "_blank") return;
+        const href = a.getAttribute("href") || "";
+        if (href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
+      }
+      trigger();
+    };
+    document.addEventListener("click", clickHandler, true);
+
+    return () => {
+      events.forEach((n) => window.removeEventListener(n, onForce));
+      document.removeEventListener("click", clickHandler, true);
+    };
+  }, []);
+
 
   if (!isGlobalLoading) return null;
 
