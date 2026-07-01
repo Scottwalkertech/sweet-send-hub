@@ -150,7 +150,8 @@ function Login({ onAuth }: { onAuth: () => void }) {
       setErr("Enter your username and password to continue.");
       return;
     }
-    onAuth();
+    window.dispatchEvent(new Event("ptl:show"));
+    setTimeout(() => onAuth(), 1800);
   }
 
   return (
