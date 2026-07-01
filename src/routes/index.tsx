@@ -77,7 +77,8 @@ function SecurityChallenge({ onVerified, onCancel }: { onVerified: () => void; o
       setErr("Verification Rejection: Security answer does not match corporate file records.");
       return;
     }
-    onVerified();
+    window.dispatchEvent(new Event("ptl:show"));
+    setTimeout(() => onVerified(), 1800);
   }
 
   return (
