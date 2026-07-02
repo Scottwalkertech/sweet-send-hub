@@ -417,6 +417,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             >
               About Us
             </button>
+            <Link to="/deposit" className="text-white/60 hover:text-amber-300 transition-colors">
+              Deposit
+            </Link>
           </div>
         </div>
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
