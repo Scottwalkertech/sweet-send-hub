@@ -196,6 +196,10 @@ function Login({ onAuth }: { onAuth: () => void }) {
           <div className="text-xs text-slate-500 text-center pt-2 border-t border-slate-100">
             🔒 256-bit TLS encryption · FDIC Insured
           </div>
+          <div className="text-xs text-center text-slate-600">
+            New to Dynamic Bank of West?{" "}
+            <Link to="/signup" className="text-amber-700 hover:text-amber-900 font-medium">Open an account →</Link>
+          </div>
         </form>
       </div>
       <ChatWidget />
