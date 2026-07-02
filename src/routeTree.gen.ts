@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TransferConfirmationRouteImport } from './routes/transfer-confirmation'
 import { Route as TransferRouteImport } from './routes/transfer'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as IndexRouteImport } from './routes/index'
 
 const TransferConfirmationRoute = TransferConfirmationRouteImport.update({
@@ -23,6 +24,11 @@ const TransferRoute = TransferRouteImport.update({
   path: '/transfer',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -31,30 +37,34 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/signup': typeof SignupRoute
   '/transfer': typeof TransferRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/signup': typeof SignupRoute
   '/transfer': typeof TransferRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/signup': typeof SignupRoute
   '/transfer': typeof TransferRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/transfer' | '/transfer-confirmation'
+  fullPaths: '/' | '/signup' | '/transfer' | '/transfer-confirmation'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/transfer' | '/transfer-confirmation'
-  id: '__root__' | '/' | '/transfer' | '/transfer-confirmation'
+  to: '/' | '/signup' | '/transfer' | '/transfer-confirmation'
+  id: '__root__' | '/' | '/signup' | '/transfer' | '/transfer-confirmation'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SignupRoute: typeof SignupRoute
   TransferRoute: typeof TransferRoute
   TransferConfirmationRoute: typeof TransferConfirmationRoute
 }
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TransferRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SignupRoute: SignupRoute,
   TransferRoute: TransferRoute,
   TransferConfirmationRoute: TransferConfirmationRoute,
 }
