@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
 export const Route = createFileRoute("/")({
@@ -195,6 +195,10 @@ function Login({ onAuth }: { onAuth: () => void }) {
           </button>
           <div className="text-xs text-slate-500 text-center pt-2 border-t border-slate-100">
             🔒 256-bit TLS encryption · FDIC Insured
+          </div>
+          <div className="text-xs text-center text-slate-600">
+            New to Dynamic Bank of West?{" "}
+            <Link to="/signup" className="text-amber-700 hover:text-amber-900 font-medium">Open an account →</Link>
           </div>
         </form>
       </div>
@@ -413,6 +417,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             >
               About Us
             </button>
+            <Link to="/deposit" className="text-white/60 hover:text-amber-300 transition-colors">
+              Deposit
+            </Link>
           </div>
         </div>
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
