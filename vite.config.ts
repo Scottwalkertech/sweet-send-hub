@@ -4,13 +4,14 @@ import tsconfigPaths from "vite-tsconfig-paths";
 import { tanstackBuildConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
-  plugins: [react(), tsconfigPaths()],
+  plugins: [
+    ...tanstackBuildConfig(),
+    react(),
+    tsconfigPaths()
+  ],
   resolve: {
     alias: {
       "@": "/src",
     },
   },
-  nitro: {
-    preset: "static"
-  }
 });
