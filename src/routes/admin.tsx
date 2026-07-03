@@ -1,0 +1,383 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+
+export const Route = createFileRoute("/admin")({
+  head: () => ({
+    meta: [
+      { title: "Admin Console — Dynamic Bank of West" },
+      { name: "description", content: "Internal administration console." },
+      { name: "robots", content: "noindex,nofollow" },
+    ],
+  }),
+  component: AdminPage,
+});
+
+const LS_ADMIN = "mt_admin_auth";
+const LS_USERS = "mt_admin_users";
+const LS_QUEUE = "mt_admin_queue";
+const LS_BAL = "mt_bal";
+const ADMIN_CODE = "DBW-ADMIN-2026";
+
+type AdminUser = {
+  id: string;
+  name: string;
+  email: string;
+  account: string;
+  status: "Active" | "Frozen" | "Review";
+  balance: number;
+};
+
+type PendingTx = {
+  id: string;
+  userId: string;
+  userName: string;
+  method: "Wire" | "ACH" | "Check" | "Crypto";
+  amount: number;
+  submitted: string;
+  status: "Pending" | "Approved" | "Failed";
+  reference: string;
+};
+
+const seedUsers: AdminUser[] = [
+  { id: "u_1001", name: "Marcus Whitfield", email: "m.whitfield@dbwest.com", account: "•••• 4419", status: "Active", balance: 18420.55 },
+  { id: "u_1002", name: "Elena Sokolova", email: "elena.s@dbwest.com", account: "•••• 7832", status: "Active", balance: 42981.10 },
+  { id: "u_1003", name: "David Chen", email: "d.chen@dbwest.com", account: "•••• 2251", status: "Review", balance: 3120.00 },
+  { id: "u_1004", name: "Priya Nair", email: "p.nair@dbwest.com", account: "•••• 9908", status: "Active", balance: 76540.22 },
+  { id: "u_1005", name: "Jonah Blackwood", email: "j.blackwood@dbwest.com", account: "•••• 1145", status: "Frozen", balance: 210.75 },
+];
+
+const seedQueue: PendingTx[] = [
+  { id: "q_9001", userId: "u_1001", userName: "Marcus Whitfield", method: "Wire", amount: 5000, submitted: "2026-07-02", status: "Pending", reference: "DBW-WIRE-88213" },
+  { id: "q_9002", userId: "u_1002", userName: "Elena Sokolova", method: "Crypto", amount: 12500, submitted: "2026-07-02", status: "Pending", reference: "DBW-CRYP-44120" },
+  { id: "q_9003", userId: "u_1004", userName: "Priya Nair", method: "Check", amount: 850.42, submitted: "2026-07-01", status: "Pending", reference: "DBW-CHK-30918" },
+  { id: "q_9004", userId: "u_1003", userName: "David Chen", method: "ACH", amount: 2200, submitted: "2026-07-01", status: "Pending", reference: "DBW-ACH-71204" },
+];
+
+function fmt(n: number) {
+  return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
+function AdminPage() {
+  const [booted, setBooted] = useState(false);
+  const [authed, setAuthed] = useState(false);
+
+  useEffect(() => {
+    setAuthed(localStorage.getItem(LS_ADMIN) === "1");
+    setBooted(true);
+  }, []);
+
+  if (!booted) return null;
+  if (!authed) return <AdminGate onPass={() => { localStorage.setItem(LS_ADMIN, "1"); setAuthed(true); }} />;
+  return <AdminConsole onLogout={() => { localStorage.removeItem(LS_ADMIN); setAuthed(false); }} />;
+}
+
+function AdminGate({ onPass }: { onPass: () => void }) {
+  const [code, setCode] = useState("");
+  const [err, setErr] = useState("");
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (code.trim() === ADMIN_CODE) {
+      window.dispatchEvent(new Event("ptl:show"));
+      setTimeout(onPass, 900);
+    } else {
+      setErr("Access denied. Invalid administrator credential.");
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0a0d14] text-slate-100 flex items-center justify-center px-4">
+      <form onSubmit={submit} className="w-full max-w-md rounded-2xl border border-amber-500/20 bg-[#0f1420] p-8 shadow-2xl">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-black font-black">A</div>
+          <div>
+            <div className="text-xs uppercase tracking-[0.2em] text-amber-400/80">Restricted</div>
+            <h1 className="text-lg font-semibold">Administrator Console</h1>
+          </div>
+        </div>
+        <p className="mt-4 text-xs text-slate-400">This area is monitored. Enter your administrator credential to proceed.</p>
+        <label className="mt-6 block text-xs uppercase tracking-wider text-slate-400">Admin Credential</label>
+        <input
+          type="password"
+          value={code}
+          onChange={(e) => { setCode(e.target.value); setErr(""); }}
+          placeholder="DBW-ADMIN-••••"
+          className="mt-2 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-amber-400 focus:outline-none"
+        />
+        {err && <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
+        <button type="submit" className="mt-6 w-full rounded-md bg-gradient-to-r from-amber-400 to-amber-600 py-2.5 text-sm font-semibold text-black hover:brightness-110">
+          Authenticate
+        </button>
+        <div className="mt-4 text-center">
+          <Link to="/" className="text-xs text-slate-500 hover:text-amber-400">← Return to banking portal</Link>
+        </div>
+        <p className="mt-4 text-[10px] text-slate-600">Hint (demo): {ADMIN_CODE}</p>
+      </form>
+    </div>
+  );
+}
+
+function AdminConsole({ onLogout }: { onLogout: () => void }) {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [queue, setQueue] = useState<PendingTx[]>([]);
+  const [editing, setEditing] = useState<AdminUser | null>(null);
+  const [editVal, setEditVal] = useState("");
+  const [toast, setToast] = useState("");
+
+  useEffect(() => {
+    const u = localStorage.getItem(LS_USERS);
+    const q = localStorage.getItem(LS_QUEUE);
+    setUsers(u ? JSON.parse(u) : seedUsers);
+    setQueue(q ? JSON.parse(q) : seedQueue);
+  }, []);
+
+  function saveUsers(next: AdminUser[]) {
+    setUsers(next);
+    localStorage.setItem(LS_USERS, JSON.stringify(next));
+  }
+  function saveQueue(next: PendingTx[]) {
+    setQueue(next);
+    localStorage.setItem(LS_QUEUE, JSON.stringify(next));
+  }
+  function flash(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2600);
+  }
+
+  function openEdit(u: AdminUser) {
+    setEditing(u);
+    setEditVal(u.balance.toFixed(2));
+  }
+  function saveEdit() {
+    if (!editing) return;
+    const val = Number(editVal);
+    if (Number.isNaN(val)) return;
+    const next = users.map((u) => (u.id === editing.id ? { ...u, balance: val } : u));
+    saveUsers(next);
+    // Also sync primary customer balance for the demo signed-in account
+    if (editing.id === "u_1001") localStorage.setItem(LS_BAL, String(val));
+    flash(`Balance updated for ${editing.name}`);
+    setEditing(null);
+  }
+
+  function approve(tx: PendingTx) {
+    if (tx.status !== "Pending") return;
+    const nextQueue = queue.map((q) => (q.id === tx.id ? { ...q, status: "Approved" as const } : q));
+    const nextUsers = users.map((u) => (u.id === tx.userId ? { ...u, balance: u.balance + tx.amount } : u));
+    saveQueue(nextQueue);
+    saveUsers(nextUsers);
+    if (tx.userId === "u_1001") {
+      const cur = Number(localStorage.getItem(LS_BAL) ?? "0");
+      localStorage.setItem(LS_BAL, String(cur + tx.amount));
+    }
+    flash(`Approved ${fmt(tx.amount)} for ${tx.userName}`);
+  }
+  function fail(tx: PendingTx) {
+    if (tx.status !== "Pending") return;
+    const nextQueue = queue.map((q) => (q.id === tx.id ? { ...q, status: "Failed" as const } : q));
+    saveQueue(nextQueue);
+    flash(`Marked ${tx.reference} as failed`);
+  }
+
+  const pendingCount = queue.filter((q) => q.status === "Pending").length;
+  const totalAum = users.reduce((s, u) => s + u.balance, 0);
+
+  return (
+    <div className="min-h-screen bg-[#0a0d14] text-slate-100">
+      {/* Top bar */}
+      <header className="border-b border-amber-500/20 bg-[#0f1420]">
+        <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-black font-black">A</div>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.2em] text-amber-400/80">Restricted Console</div>
+              <div className="text-sm font-semibold">Dynamic Bank of West · Admin</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link to="/" className="text-xs text-slate-400 hover:text-amber-400">Portal</Link>
+            <button onClick={onLogout} className="rounded border border-white/10 px-3 py-1.5 text-xs hover:bg-white/5">Sign out</button>
+          </div>
+        </div>
+      </header>
+
+      {/* Stats */}
+      <div className="mx-auto max-w-7xl px-4 pt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Stat label="Total Customers" value={String(users.length)} accent="text-amber-400" />
+        <Stat label="Assets Under Management" value={fmt(totalAum)} accent="text-emerald-400" />
+        <Stat label="Pending Deposits" value={String(pendingCount)} accent="text-cyan-400" />
+      </div>
+
+      {/* User Management */}
+      <section className="mx-auto max-w-7xl px-4 mt-8">
+        <SectionHeader title="User Management" subtitle="View and adjust customer account balances." />
+        <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-[#0f1420]">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-white/5 text-xs uppercase tracking-wider text-slate-400">
+                <tr>
+                  <Th>Customer</Th>
+                  <Th>Account</Th>
+                  <Th>Status</Th>
+                  <Th className="text-right">Balance</Th>
+                  <Th className="text-right">Action</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} className="border-t border-white/5 hover:bg-white/[0.03]">
+                    <Td>
+                      <div className="font-medium text-white">{u.name}</div>
+                      <div className="text-xs text-slate-500">{u.email}</div>
+                    </Td>
+                    <Td className="font-mono text-xs text-slate-300">{u.account}</Td>
+                    <Td><StatusPill status={u.status} /></Td>
+                    <Td className="text-right font-mono text-white">{fmt(u.balance)}</Td>
+                    <Td className="text-right">
+                      <button onClick={() => openEdit(u)} className="rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs text-amber-300 hover:bg-amber-400/20">
+                        Edit Balance
+                      </button>
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* Transaction Queue */}
+      <section className="mx-auto max-w-7xl px-4 mt-10 pb-16">
+        <SectionHeader title="Transaction Queue" subtitle="Pending deposit requests awaiting review." />
+        <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-[#0f1420]">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-white/5 text-xs uppercase tracking-wider text-slate-400">
+                <tr>
+                  <Th>Reference</Th>
+                  <Th>Customer</Th>
+                  <Th>Method</Th>
+                  <Th>Submitted</Th>
+                  <Th className="text-right">Amount</Th>
+                  <Th>Status</Th>
+                  <Th className="text-right">Actions</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {queue.map((tx) => (
+                  <tr key={tx.id} className="border-t border-white/5 hover:bg-white/[0.03]">
+                    <Td className="font-mono text-xs text-amber-300">{tx.reference}</Td>
+                    <Td className="text-white">{tx.userName}</Td>
+                    <Td><MethodPill method={tx.method} /></Td>
+                    <Td className="text-slate-400 text-xs">{tx.submitted}</Td>
+                    <Td className="text-right font-mono text-emerald-300">+{fmt(tx.amount)}</Td>
+                    <Td><TxStatus status={tx.status} /></Td>
+                    <Td className="text-right">
+                      <div className="inline-flex gap-2">
+                        <button
+                          disabled={tx.status !== "Pending"}
+                          onClick={() => approve(tx)}
+                          className="rounded border border-emerald-400/40 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300 hover:bg-emerald-400/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          disabled={tx.status !== "Pending"}
+                          onClick={() => fail(tx)}
+                          className="rounded border border-red-400/40 bg-red-400/10 px-3 py-1 text-xs text-red-300 hover:bg-red-400/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          Fail
+                        </button>
+                      </div>
+                    </Td>
+                  </tr>
+                ))}
+                {queue.length === 0 && (
+                  <tr><Td className="text-center text-slate-500 py-8">No transactions in queue.</Td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* Edit modal */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" onClick={() => setEditing(null)}>
+          <div className="w-full max-w-md rounded-2xl border border-amber-400/30 bg-[#0f1420] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-xs uppercase tracking-[0.2em] text-amber-400/80">Balance Adjustment</div>
+            <h3 className="mt-1 text-lg font-semibold text-white">{editing.name}</h3>
+            <div className="text-xs text-slate-400">{editing.account} · Current: {fmt(editing.balance)}</div>
+            <label className="mt-5 block text-xs uppercase tracking-wider text-slate-400">New Balance (USD)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={editVal}
+              onChange={(e) => setEditVal(e.target.value)}
+              className="mt-2 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 font-mono text-white focus:border-amber-400 focus:outline-none"
+            />
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setEditing(null)} className="rounded border border-white/10 px-4 py-2 text-xs hover:bg-white/5">Cancel</button>
+              <button onClick={saveEdit} className="rounded bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 text-xs font-semibold text-black hover:brightness-110">Save Change</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-4 py-2 text-sm text-emerald-200 shadow-lg backdrop-blur">
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stat({ label, value, accent }: { label: string; value: string; accent: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#0f1420] p-4">
+      <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">{label}</div>
+      <div className={`mt-2 text-2xl font-semibold ${accent}`}>{value}</div>
+    </div>
+  );
+}
+
+function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="flex items-end justify-between">
+      <div>
+        <h2 className="text-lg font-semibold text-white">{title}</h2>
+        <p className="text-xs text-slate-400">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <th className={`px-4 py-3 text-left font-medium ${className}`}>{children}</th>;
+}
+function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <td className={`px-4 py-3 align-middle ${className}`}>{children}</td>;
+}
+
+function StatusPill({ status }: { status: AdminUser["status"] }) {
+  const map = {
+    Active: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
+    Frozen: "border-red-400/40 bg-red-400/10 text-red-300",
+    Review: "border-amber-400/40 bg-amber-400/10 text-amber-300",
+  } as const;
+  return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[status]}`}>{status}</span>;
+}
+
+function TxStatus({ status }: { status: PendingTx["status"] }) {
+  const map = {
+    Pending: "border-amber-400/40 bg-amber-400/10 text-amber-300",
+    Approved: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
+    Failed: "border-red-400/40 bg-red-400/10 text-red-300",
+  } as const;
+  return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[status]}`}>{status}</span>;
+}
+
+function MethodPill({ method }: { method: PendingTx["method"] }) {
+  return <span className="inline-block rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">{method}</span>;
+}

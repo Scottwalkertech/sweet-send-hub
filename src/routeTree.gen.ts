@@ -13,6 +13,7 @@ import { Route as TransferConfirmationRouteImport } from './routes/transfer-conf
 import { Route as TransferRouteImport } from './routes/transfer'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as DepositRouteImport } from './routes/deposit'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 
 const TransferConfirmationRoute = TransferConfirmationRouteImport.update({
@@ -35,6 +36,11 @@ const DepositRoute = DepositRouteImport.update({
   path: '/deposit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -43,6 +49,7 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/deposit': typeof DepositRoute
   '/signup': typeof SignupRoute
   '/transfer': typeof TransferRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/deposit': typeof DepositRoute
   '/signup': typeof SignupRoute
   '/transfer': typeof TransferRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/deposit': typeof DepositRoute
   '/signup': typeof SignupRoute
   '/transfer': typeof TransferRoute
@@ -67,15 +76,23 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/deposit'
     | '/signup'
     | '/transfer'
     | '/transfer-confirmation'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/deposit' | '/signup' | '/transfer' | '/transfer-confirmation'
+  to:
+    | '/'
+    | '/admin'
+    | '/deposit'
+    | '/signup'
+    | '/transfer'
+    | '/transfer-confirmation'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/deposit'
     | '/signup'
     | '/transfer'
@@ -84,6 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   DepositRoute: typeof DepositRoute
   SignupRoute: typeof SignupRoute
   TransferRoute: typeof TransferRoute
@@ -120,6 +138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DepositRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -132,6 +157,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   DepositRoute: DepositRoute,
   SignupRoute: SignupRoute,
   TransferRoute: TransferRoute,
