@@ -25,12 +25,16 @@ const ADMIN_ACCOUNTS: Array<{ email: string; password: string; name: string; rol
   { email: "ops@dbw.io", password: "StaffPass99", name: "Operations Support", role: "Support" },
 ];
 
+type AccountTier = "Standard" | "Premier" | "Private" | "Business";
+type AccountStatus = "Active" | "Frozen" | "Review";
+
 type AdminUser = {
   id: string;
   name: string;
   email: string;
   account: string;
-  status: "Active" | "Frozen" | "Review";
+  status: AccountStatus;
+  tier: AccountTier;
   balance: number;
 };
 
@@ -46,11 +50,11 @@ type PendingTx = {
 };
 
 const seedUsers: AdminUser[] = [
-  { id: "u_1001", name: "Marcus Whitfield", email: "m.whitfield@dbwest.com", account: "•••• 4419", status: "Active", balance: 18420.55 },
-  { id: "u_1002", name: "Elena Sokolova", email: "elena.s@dbwest.com", account: "•••• 7832", status: "Active", balance: 42981.10 },
-  { id: "u_1003", name: "David Chen", email: "d.chen@dbwest.com", account: "•••• 2251", status: "Review", balance: 3120.00 },
-  { id: "u_1004", name: "Priya Nair", email: "p.nair@dbwest.com", account: "•••• 9908", status: "Active", balance: 76540.22 },
-  { id: "u_1005", name: "Jonah Blackwood", email: "j.blackwood@dbwest.com", account: "•••• 1145", status: "Frozen", balance: 210.75 },
+  { id: "u_1001", name: "Marcus Whitfield", email: "m.whitfield@dbwest.com", account: "•••• 4419", status: "Active", tier: "Premier", balance: 18420.55 },
+  { id: "u_1002", name: "Elena Sokolova", email: "elena.s@dbwest.com", account: "•••• 7832", status: "Active", tier: "Private", balance: 42981.10 },
+  { id: "u_1003", name: "David Chen", email: "d.chen@dbwest.com", account: "•••• 2251", status: "Review", tier: "Standard", balance: 3120.00 },
+  { id: "u_1004", name: "Priya Nair", email: "p.nair@dbwest.com", account: "•••• 9908", status: "Active", tier: "Business", balance: 76540.22 },
+  { id: "u_1005", name: "Jonah Blackwood", email: "j.blackwood@dbwest.com", account: "•••• 1145", status: "Frozen", tier: "Standard", balance: 210.75 },
 ];
 
 const seedQueue: PendingTx[] = [
