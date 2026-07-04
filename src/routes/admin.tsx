@@ -296,7 +296,17 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
 
       {/* User Management */}
       <section className="mx-auto max-w-7xl px-4 mt-8">
-        <SectionHeader title="User Management" subtitle="View and adjust customer account balances." />
+        <div className="flex items-end justify-between gap-4">
+          <SectionHeader title="User Management" subtitle="View, create, and adjust customer accounts." />
+          <button
+            onClick={openCreate}
+            disabled={!canEditBalance}
+            title={canEditBalance ? "Create a new customer account" : "Support role cannot create accounts"}
+            className="inline-flex items-center gap-2 rounded-md border border-emerald-400/40 bg-gradient-to-b from-emerald-500/20 to-emerald-600/10 px-3.5 py-2 text-xs font-semibold text-emerald-200 hover:from-emerald-500/30 hover:to-emerald-600/20 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <span className="text-base leading-none">+</span> Create Account
+          </button>
+        </div>
         <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-[#0f1420]">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -304,6 +314,7 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
                 <tr>
                   <Th>Customer</Th>
                   <Th>Account</Th>
+                  <Th>Tier</Th>
                   <Th>Status</Th>
                   <Th className="text-right">Balance</Th>
                   <Th className="text-right">Action</Th>
@@ -317,16 +328,17 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
                       <div className="text-xs text-slate-500">{u.email}</div>
                     </Td>
                     <Td className="font-mono text-xs text-slate-300">{u.account}</Td>
+                    <Td><TierPill tier={u.tier} /></Td>
                     <Td><StatusPill status={u.status} /></Td>
                     <Td className="text-right font-mono text-white">{fmt(u.balance)}</Td>
                     <Td className="text-right">
                       <button
                         onClick={() => openEdit(u)}
                         disabled={!canEditBalance}
-                        title={canEditBalance ? "Edit balance" : "Support role cannot edit balances"}
+                        title={canEditBalance ? "Edit customer" : "Support role cannot edit customer profiles"}
                         className="rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs text-amber-300 hover:bg-amber-400/20 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-amber-400/10"
                       >
-                        Edit Balance
+                        Edit
                       </button>
                     </Td>
                   </tr>
@@ -336,6 +348,7 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
           </div>
         </div>
       </section>
+
 
       {/* Transaction Queue */}
       <section className="mx-auto max-w-7xl px-4 mt-10 pb-16">
@@ -395,21 +408,82 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
       {/* Edit modal */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" onClick={() => setEditing(null)}>
-          <div className="w-full max-w-md rounded-2xl border border-amber-400/30 bg-[#0f1420] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="text-xs uppercase tracking-[0.2em] text-amber-400/80">Balance Adjustment</div>
+          <div className="w-full max-w-lg rounded-2xl border border-amber-400/30 bg-[#0f1420] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-xs uppercase tracking-[0.2em] text-amber-400/80">Edit Customer Profile</div>
             <h3 className="mt-1 text-lg font-semibold text-white">{editing.name}</h3>
-            <div className="text-xs text-slate-400">{editing.account} · Current: {fmt(editing.balance)}</div>
-            <label className="mt-5 block text-xs uppercase tracking-wider text-slate-400">New Balance (USD)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={editVal}
-              onChange={(e) => setEditVal(e.target.value)}
-              className="mt-2 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 font-mono text-white focus:border-amber-400 focus:outline-none"
-            />
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="text-xs text-slate-400">{editing.account} · Current balance {fmt(editing.balance)}</div>
+
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Full Name">
+                <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className={inputCls} />
+              </Field>
+              <Field label="Email">
+                <input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className={inputCls} />
+              </Field>
+              <Field label="Tier">
+                <select value={editForm.tier} onChange={(e) => setEditForm({ ...editForm, tier: e.target.value as AccountTier })} className={inputCls}>
+                  {(["Standard", "Premier", "Private", "Business"] as AccountTier[]).map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </Field>
+              <Field label="Status">
+                <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value as AccountStatus })} className={inputCls}>
+                  {(["Active", "Frozen", "Review"] as AccountStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </Field>
+              <div className="sm:col-span-2">
+                <Field label="Balance Override (USD)">
+                  <input type="number" step="0.01" value={editForm.balance} onChange={(e) => setEditForm({ ...editForm, balance: e.target.value })} className={`${inputCls} font-mono`} />
+                </Field>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
               <button onClick={() => setEditing(null)} className="rounded border border-white/10 px-4 py-2 text-xs hover:bg-white/5">Cancel</button>
-              <button onClick={saveEdit} className="rounded bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 text-xs font-semibold text-black hover:brightness-110">Save Change</button>
+              <button onClick={saveEdit} className="rounded bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 text-xs font-semibold text-black hover:brightness-110">Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create modal */}
+      {creating && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" onClick={() => setCreating(false)}>
+          <div className="w-full max-w-lg rounded-2xl border border-emerald-400/30 bg-[#0f1420] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-xs uppercase tracking-[0.2em] text-emerald-300/80">Create Customer Account</div>
+            <h3 className="mt-1 text-lg font-semibold text-white">New Profile</h3>
+            <p className="text-xs text-slate-400">Provisions a new customer record in the directory.</p>
+
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Full Name">
+                <input value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} placeholder="Jane Carter" className={inputCls} />
+              </Field>
+              <Field label="Email">
+                <input value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} placeholder="jane@dbwest.com" className={inputCls} />
+              </Field>
+              <Field label="Tier">
+                <select value={createForm.tier} onChange={(e) => setCreateForm({ ...createForm, tier: e.target.value as AccountTier })} className={inputCls}>
+                  {(["Standard", "Premier", "Private", "Business"] as AccountTier[]).map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </Field>
+              <Field label="Status">
+                <select value={createForm.status} onChange={(e) => setCreateForm({ ...createForm, status: e.target.value as AccountStatus })} className={inputCls}>
+                  {(["Active", "Frozen", "Review"] as AccountStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </Field>
+              <div className="sm:col-span-2">
+                <Field label="Initial Balance (USD)">
+                  <input type="number" step="0.01" value={createForm.balance} onChange={(e) => setCreateForm({ ...createForm, balance: e.target.value })} className={`${inputCls} font-mono`} />
+                </Field>
+              </div>
+            </div>
+
+            {createErr && (
+              <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{createErr}</div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button onClick={() => setCreating(false)} className="rounded border border-white/10 px-4 py-2 text-xs hover:bg-white/5">Cancel</button>
+              <button onClick={saveCreate} className="rounded bg-gradient-to-r from-emerald-400 to-emerald-600 px-4 py-2 text-xs font-semibold text-black hover:brightness-110">Create Account</button>
             </div>
           </div>
         </div>
@@ -422,6 +496,27 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
       )}
     </div>
   );
+}
+
+const inputCls = "mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none";
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block text-xs uppercase tracking-wider text-slate-400">
+      {label}
+      {children}
+    </label>
+  );
+}
+
+function TierPill({ tier }: { tier: AccountTier }) {
+  const map: Record<AccountTier, string> = {
+    Standard: "border-slate-400/30 bg-slate-400/10 text-slate-300",
+    Premier: "border-amber-400/40 bg-amber-400/10 text-amber-300",
+    Private: "border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300",
+    Business: "border-cyan-400/40 bg-cyan-400/10 text-cyan-300",
+  };
+  return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[tier]}`}>{tier}</span>;
 }
 
 function Stat({ label, value, accent }: { label: string; value: string; accent: string }) {
