@@ -12,11 +12,18 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-const LS_ADMIN = "mt_admin_auth";
+const SS_ADMIN = "mt_admin_session";
 const LS_USERS = "mt_admin_users";
 const LS_QUEUE = "mt_admin_queue";
 const LS_BAL = "mt_bal";
-const ADMIN_CODE = "DBW-ADMIN-2026";
+
+type AdminRole = "SuperAdmin" | "Support";
+type AdminSession = { email: string; name: string; role: AdminRole };
+
+const ADMIN_ACCOUNTS: Array<{ email: string; password: string; name: string; role: AdminRole }> = [
+  { email: "root@dbw.io", password: "Admin2026!", name: "Root Administrator", role: "SuperAdmin" },
+  { email: "ops@dbw.io", password: "StaffPass99", name: "Operations Support", role: "Support" },
+];
 
 type AdminUser = {
   id: string;
@@ -59,29 +66,45 @@ function fmt(n: number) {
 
 function AdminPage() {
   const [booted, setBooted] = useState(false);
-  const [authed, setAuthed] = useState(false);
+  const [session, setSession] = useState<AdminSession | null>(null);
 
   useEffect(() => {
-    setAuthed(localStorage.getItem(LS_ADMIN) === "1");
+    const raw = sessionStorage.getItem(SS_ADMIN);
+    if (raw) {
+      try { setSession(JSON.parse(raw) as AdminSession); } catch { /* ignore */ }
+    }
     setBooted(true);
   }, []);
 
+  function handleLogin(s: AdminSession) {
+    sessionStorage.setItem(SS_ADMIN, JSON.stringify(s));
+    setSession(s);
+  }
+  function handleLogout() {
+    sessionStorage.removeItem(SS_ADMIN);
+    setSession(null);
+  }
+
   if (!booted) return null;
-  if (!authed) return <AdminGate onPass={() => { localStorage.setItem(LS_ADMIN, "1"); setAuthed(true); }} />;
-  return <AdminConsole onLogout={() => { localStorage.removeItem(LS_ADMIN); setAuthed(false); }} />;
+  if (!session) return <AdminGate onPass={handleLogin} />;
+  return <AdminConsole session={session} onLogout={handleLogout} />;
 }
 
-function AdminGate({ onPass }: { onPass: () => void }) {
-  const [code, setCode] = useState("");
+function AdminGate({ onPass }: { onPass: (s: AdminSession) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (code.trim() === ADMIN_CODE) {
+    const match = ADMIN_ACCOUNTS.find(
+      (a) => a.email.toLowerCase() === email.trim().toLowerCase() && a.password === password,
+    );
+    if (match) {
       window.dispatchEvent(new Event("ptl:show"));
-      setTimeout(onPass, 900);
+      setTimeout(() => onPass({ email: match.email, name: match.name, role: match.role }), 900);
     } else {
-      setErr("Access denied. Invalid administrator credential.");
+      setErr("Access denied. Invalid administrator credentials.");
     }
   }
 
@@ -92,32 +115,50 @@ function AdminGate({ onPass }: { onPass: () => void }) {
           <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-black font-black">A</div>
           <div>
             <div className="text-xs uppercase tracking-[0.2em] text-amber-400/80">Restricted</div>
-            <h1 className="text-lg font-semibold">Administrator Console</h1>
+            <h1 className="text-lg font-semibold">Administrator Sign-in</h1>
           </div>
         </div>
-        <p className="mt-4 text-xs text-slate-400">This area is monitored. Enter your administrator credential to proceed.</p>
-        <label className="mt-6 block text-xs uppercase tracking-wider text-slate-400">Admin Credential</label>
+        <p className="mt-4 text-xs text-slate-400">Role-based access. Sign in with your administrator email and password.</p>
+
+        <label className="mt-6 block text-xs uppercase tracking-wider text-slate-400">Email</label>
         <input
-          type="password"
-          value={code}
-          onChange={(e) => { setCode(e.target.value); setErr(""); }}
-          placeholder="DBW-ADMIN-••••"
+          type="email"
+          autoComplete="username"
+          value={email}
+          onChange={(e) => { setEmail(e.target.value); setErr(""); }}
+          placeholder="you@dbw.io"
           className="mt-2 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-amber-400 focus:outline-none"
         />
+
+        <label className="mt-4 block text-xs uppercase tracking-wider text-slate-400">Password</label>
+        <input
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => { setPassword(e.target.value); setErr(""); }}
+          placeholder="••••••••"
+          className="mt-2 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-amber-400 focus:outline-none"
+        />
+
         {err && <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
         <button type="submit" className="mt-6 w-full rounded-md bg-gradient-to-r from-amber-400 to-amber-600 py-2.5 text-sm font-semibold text-black hover:brightness-110">
-          Authenticate
+          Sign in
         </button>
         <div className="mt-4 text-center">
           <Link to="/" className="text-xs text-slate-500 hover:text-amber-400">← Return to banking portal</Link>
         </div>
-        <p className="mt-4 text-[10px] text-slate-600">Hint (demo): {ADMIN_CODE}</p>
+        <div className="mt-5 rounded border border-white/5 bg-black/30 p-3 text-[10px] leading-relaxed text-slate-500">
+          <div className="uppercase tracking-wider text-slate-400 mb-1">Test accounts</div>
+          <div>SuperAdmin — root@dbw.io / Admin2026!</div>
+          <div>Support — ops@dbw.io / StaffPass99</div>
+        </div>
       </form>
     </div>
   );
 }
 
-function AdminConsole({ onLogout }: { onLogout: () => void }) {
+function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: () => void }) {
+  const canEditBalance = session.role === "SuperAdmin";
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [queue, setQueue] = useState<PendingTx[]>([]);
   const [editing, setEditing] = useState<AdminUser | null>(null);
@@ -145,11 +186,15 @@ function AdminConsole({ onLogout }: { onLogout: () => void }) {
   }
 
   function openEdit(u: AdminUser) {
+    if (!canEditBalance) {
+      flash("Support role cannot edit balances.");
+      return;
+    }
     setEditing(u);
     setEditVal(u.balance.toFixed(2));
   }
   function saveEdit() {
-    if (!editing) return;
+    if (!editing || !canEditBalance) return;
     const val = Number(editVal);
     if (Number.isNaN(val)) return;
     const next = users.map((u) => (u.id === editing.id ? { ...u, balance: val } : u));
@@ -195,6 +240,11 @@ function AdminConsole({ onLogout }: { onLogout: () => void }) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <div className="hidden sm:flex flex-col items-end leading-tight">
+              <span className="text-xs font-medium text-white">{session.name}</span>
+              <span className="text-[10px] text-slate-500">{session.email}</span>
+            </div>
+            <RoleBadge role={session.role} />
             <Link to="/" className="text-xs text-slate-400 hover:text-amber-400">Portal</Link>
             <button onClick={onLogout} className="rounded border border-white/10 px-3 py-1.5 text-xs hover:bg-white/5">Sign out</button>
           </div>
@@ -234,7 +284,12 @@ function AdminConsole({ onLogout }: { onLogout: () => void }) {
                     <Td><StatusPill status={u.status} /></Td>
                     <Td className="text-right font-mono text-white">{fmt(u.balance)}</Td>
                     <Td className="text-right">
-                      <button onClick={() => openEdit(u)} className="rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs text-amber-300 hover:bg-amber-400/20">
+                      <button
+                        onClick={() => openEdit(u)}
+                        disabled={!canEditBalance}
+                        title={canEditBalance ? "Edit balance" : "Support role cannot edit balances"}
+                        className="rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs text-amber-300 hover:bg-amber-400/20 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-amber-400/10"
+                      >
                         Edit Balance
                       </button>
                     </Td>
@@ -380,4 +435,17 @@ function TxStatus({ status }: { status: PendingTx["status"] }) {
 
 function MethodPill({ method }: { method: PendingTx["method"] }) {
   return <span className="inline-block rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">{method}</span>;
+}
+
+function RoleBadge({ role }: { role: AdminRole }) {
+  const cls =
+    role === "SuperAdmin"
+      ? "border-amber-400/50 bg-amber-400/15 text-amber-300"
+      : "border-cyan-400/50 bg-cyan-400/10 text-cyan-300";
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${cls}`}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      {role}
+    </span>
+  );
 }
