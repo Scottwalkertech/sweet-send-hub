@@ -186,11 +186,15 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
   }
 
   function openEdit(u: AdminUser) {
+    if (!canEditBalance) {
+      flash("Support role cannot edit balances.");
+      return;
+    }
     setEditing(u);
     setEditVal(u.balance.toFixed(2));
   }
   function saveEdit() {
-    if (!editing) return;
+    if (!editing || !canEditBalance) return;
     const val = Number(editVal);
     if (Number.isNaN(val)) return;
     const next = users.map((u) => (u.id === editing.id ? { ...u, balance: val } : u));
