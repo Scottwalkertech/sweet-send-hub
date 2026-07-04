@@ -112,11 +112,6 @@ function TransferPage() {
     setStage({ kind: "success", txId: mkTxId() });
   }
 
-  function resetAll() {
-    setStage({ kind: "form" });
-    setStep(1);
-    setErrors({});
-  }
 
 
   return (
@@ -449,37 +444,6 @@ function TransferPage() {
   );
 }
 
-function DevBtn({
-  active,
-  onClick,
-  label,
-  tone,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  tone?: "emerald" | "amber" | "red";
-}) {
-  const toneRing =
-    tone === "emerald"
-      ? "ring-emerald-400/60"
-      : tone === "amber"
-      ? "ring-amber-400/60"
-      : tone === "red"
-      ? "ring-red-400/60"
-      : "ring-white/40";
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-2.5 h-7 rounded-md text-[11px] font-semibold transition ${
-        active ? `bg-white text-slate-900 ring-2 ${toneRing}` : "bg-white/5 text-slate-300 hover:bg-white/10"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
 
 function Stepper({ step }: { step: 1 | 2 | 3 }) {
   const items = [
