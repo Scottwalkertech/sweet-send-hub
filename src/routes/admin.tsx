@@ -12,11 +12,18 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-const LS_ADMIN = "mt_admin_auth";
+const SS_ADMIN = "mt_admin_session";
 const LS_USERS = "mt_admin_users";
 const LS_QUEUE = "mt_admin_queue";
 const LS_BAL = "mt_bal";
-const ADMIN_CODE = "DBW-ADMIN-2026";
+
+type AdminRole = "SuperAdmin" | "Support";
+type AdminSession = { email: string; name: string; role: AdminRole };
+
+const ADMIN_ACCOUNTS: Array<{ email: string; password: string; name: string; role: AdminRole }> = [
+  { email: "root@dbw.io", password: "Admin2026!", name: "Root Administrator", role: "SuperAdmin" },
+  { email: "ops@dbw.io", password: "StaffPass99", name: "Operations Support", role: "Support" },
+];
 
 type AdminUser = {
   id: string;
