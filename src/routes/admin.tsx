@@ -436,3 +436,16 @@ function TxStatus({ status }: { status: PendingTx["status"] }) {
 function MethodPill({ method }: { method: PendingTx["method"] }) {
   return <span className="inline-block rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">{method}</span>;
 }
+
+function RoleBadge({ role }: { role: AdminRole }) {
+  const cls =
+    role === "SuperAdmin"
+      ? "border-amber-400/50 bg-amber-400/15 text-amber-300"
+      : "border-cyan-400/50 bg-cyan-400/10 text-cyan-300";
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${cls}`}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      {role}
+    </span>
+  );
+}
