@@ -240,6 +240,11 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <div className="hidden sm:flex flex-col items-end leading-tight">
+              <span className="text-xs font-medium text-white">{session.name}</span>
+              <span className="text-[10px] text-slate-500">{session.email}</span>
+            </div>
+            <RoleBadge role={session.role} />
             <Link to="/" className="text-xs text-slate-400 hover:text-amber-400">Portal</Link>
             <button onClick={onLogout} className="rounded border border-white/10 px-3 py-1.5 text-xs hover:bg-white/5">Sign out</button>
           </div>
