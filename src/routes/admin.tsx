@@ -166,7 +166,10 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [queue, setQueue] = useState<PendingTx[]>([]);
   const [editing, setEditing] = useState<AdminUser | null>(null);
-  const [editVal, setEditVal] = useState("");
+  const [editForm, setEditForm] = useState<{ name: string; email: string; tier: AccountTier; status: AccountStatus; balance: string }>({ name: "", email: "", tier: "Standard", status: "Active", balance: "0" });
+  const [creating, setCreating] = useState(false);
+  const [createForm, setCreateForm] = useState<{ name: string; email: string; tier: AccountTier; status: AccountStatus; balance: string }>({ name: "", email: "", tier: "Standard", status: "Active", balance: "0" });
+  const [createErr, setCreateErr] = useState("");
   const [toast, setToast] = useState("");
 
   useEffect(() => {
@@ -191,22 +194,51 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
 
   function openEdit(u: AdminUser) {
     if (!canEditBalance) {
-      flash("Support role cannot edit balances.");
+      flash("Support role cannot edit customer profiles.");
       return;
     }
     setEditing(u);
-    setEditVal(u.balance.toFixed(2));
+    setEditForm({ name: u.name, email: u.email, tier: u.tier, status: u.status, balance: u.balance.toFixed(2) });
   }
   function saveEdit() {
     if (!editing || !canEditBalance) return;
-    const val = Number(editVal);
-    if (Number.isNaN(val)) return;
-    const next = users.map((u) => (u.id === editing.id ? { ...u, balance: val } : u));
+    const bal = Number(editForm.balance);
+    if (Number.isNaN(bal)) return;
+    if (!editForm.name.trim() || !editForm.email.trim()) return;
+    const next = users.map((u) =>
+      u.id === editing.id
+        ? { ...u, name: editForm.name.trim(), email: editForm.email.trim(), tier: editForm.tier, status: editForm.status, balance: bal }
+        : u,
+    );
     saveUsers(next);
-    // Also sync primary customer balance for the demo signed-in account
-    if (editing.id === "u_1001") localStorage.setItem(LS_BAL, String(val));
-    flash(`Balance updated for ${editing.name}`);
+    if (editing.id === "u_1001") localStorage.setItem(LS_BAL, String(bal));
+    flash(`Profile updated for ${editForm.name}`);
     setEditing(null);
+  }
+
+  function openCreate() {
+    if (!canEditBalance) {
+      flash("Support role cannot create accounts.");
+      return;
+    }
+    setCreateForm({ name: "", email: "", tier: "Standard", status: "Active", balance: "0" });
+    setCreateErr("");
+    setCreating(true);
+  }
+  function saveCreate() {
+    if (!canEditBalance) return;
+    const name = createForm.name.trim();
+    const email = createForm.email.trim();
+    const bal = Number(createForm.balance);
+    if (!name || !email) { setCreateErr("Full name and email are required."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setCreateErr("Enter a valid email address."); return; }
+    if (Number.isNaN(bal) || bal < 0) { setCreateErr("Initial balance must be a non-negative number."); return; }
+    const id = "u_" + Math.floor(1000 + Math.random() * 9000);
+    const mask = "•••• " + String(Math.floor(1000 + Math.random() * 9000));
+    const newUser: AdminUser = { id, name, email, account: mask, status: createForm.status, tier: createForm.tier, balance: bal };
+    saveUsers([newUser, ...users]);
+    flash(`Account created for ${name}`);
+    setCreating(false);
   }
 
   function approve(tx: PendingTx) {
