@@ -284,7 +284,12 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
                     <Td><StatusPill status={u.status} /></Td>
                     <Td className="text-right font-mono text-white">{fmt(u.balance)}</Td>
                     <Td className="text-right">
-                      <button onClick={() => openEdit(u)} className="rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs text-amber-300 hover:bg-amber-400/20">
+                      <button
+                        onClick={() => openEdit(u)}
+                        disabled={!canEditBalance}
+                        title={canEditBalance ? "Edit balance" : "Support role cannot edit balances"}
+                        className="rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs text-amber-300 hover:bg-amber-400/20 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-amber-400/10"
+                      >
                         Edit Balance
                       </button>
                     </Td>
