@@ -417,9 +417,6 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             >
               About Us
             </button>
-            <Link to="/deposit" className="text-white/60 hover:text-amber-300 transition-colors">
-              Deposit
-            </Link>
           </div>
         </div>
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -495,6 +492,19 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 onClick={() => openSegmentAccount("secondary")}
               />
             </section>
+
+            <section className="flex justify-end">
+              <Link
+                to="/deposit"
+                className="group inline-flex items-center gap-2.5 rounded-lg border border-emerald-600/40 bg-gradient-to-b from-slate-900 to-slate-800 px-5 py-2.5 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-white/5 hover:from-slate-800 hover:to-slate-700 hover:border-emerald-400/60 transition-all"
+              >
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500/15 text-emerald-300 text-base leading-none group-hover:bg-emerald-500/25">+</span>
+                <span className="tracking-wide">Deposit Funds</span>
+                <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-300/80 border-l border-white/10 pl-2.5 ml-1">Secure</span>
+              </Link>
+            </section>
+
+
 
 
             <section className="bg-white border border-slate-200 rounded-xl">

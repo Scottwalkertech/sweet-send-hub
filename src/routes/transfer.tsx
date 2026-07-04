@@ -118,35 +118,9 @@ function TransferPage() {
     setErrors({});
   }
 
-  // Dev-only state simulator
-  function devSimulate(k: "success" | "pending" | "failed") {
-    if (!recipientName) setRecipientName("Jane Carter");
-    if (!recipientBank) setRecipientBank("Chase Bank");
-    if (!recipientAcct) setRecipientAcct("44210000");
-    if (!routingCode) setRoutingCode("121000248");
-    if (!amount) setAmount("250.00");
-    if (k === "success") setStage({ kind: "success", txId: mkTxId() });
-    if (k === "pending") setStage({ kind: "pending", trackingId: mkTrk(), eta: "1–2 business days" });
-    if (k === "failed")
-      setStage({ kind: "failed", code: "ERR_INSUFFICIENT_FUNDS_402", message: "Insufficient Funds — your account balance is lower than the requested amount." });
-  }
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Dev preview state toggles */}
-      <div className="bg-slate-950 border-b border-amber-600/30">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2 flex items-center justify-between gap-3 flex-wrap">
-          <div className="text-[10px] uppercase tracking-[0.25em] text-amber-300/80 font-semibold">
-            Dev Preview · Switch State
-          </div>
-          <div className="flex items-center gap-1.5">
-            <DevBtn active={stage.kind === "form" || stage.kind === "review"} onClick={resetAll} label="Form" />
-            <DevBtn active={stage.kind === "success"} onClick={() => devSimulate("success")} label="Success" tone="emerald" />
-            <DevBtn active={stage.kind === "pending"} onClick={() => devSimulate("pending")} label="Pending" tone="amber" />
-            <DevBtn active={stage.kind === "failed"} onClick={() => devSimulate("failed")} label="Failed" tone="red" />
-          </div>
-        </div>
-      </div>
 
       <header className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-amber-600/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
