@@ -1,5 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import {
+  loadUsers, upsertUser, setCurrentUserId, currentUser,
+  loadQueue, onStoreChange, fmtCurrency, readFileAsDataUrl,
+  type MtUser, type PendingTx,
+} from "@/lib/mt-store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -11,147 +16,38 @@ export const Route = createFileRoute("/")({
   component: App,
 });
 
-type Tx = {
-  id: string;
-  date: string;
-  description: string;
-  amount: number; // negative = debit
-  category: string;
-};
-
-type ChatMsg = {
-  id: string;
-  from: "user" | "agent";
-  text: string;
-  ts: number;
-};
-
-const LS_AUTH = "mt_auth";
-const LS_TX = "mt_tx";
-const LS_BAL = "mt_bal";
-const LS_CHAT = "mt_chat";
-
-const seedTx: Tx[] = [
-  { id: "t1", date: "2026-06-26", description: "Direct Deposit — ACME Payroll", amount: 3420.55, category: "Income" },
-  { id: "t2", date: "2026-06-25", description: "Starbucks #4421", amount: -7.85, category: "Dining" },
-  { id: "t3", date: "2026-06-24", description: "Target T-1138", amount: -124.62, category: "Shopping" },
-  { id: "t4", date: "2026-06-22", description: "Starbucks #4421", amount: -6.40, category: "Dining" },
-  { id: "t5", date: "2026-06-20", description: "Direct Deposit — Stripe Payout", amount: 812.10, category: "Income" },
-  { id: "t6", date: "2026-06-18", description: "Target T-0098", amount: -58.19, category: "Shopping" },
-];
-
-function fmt(n: number) {
-  return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
-}
-
-function uid() {
-  return Math.random().toString(36).slice(2, 10);
-}
-
 function App() {
-  const [stage, setStage] = useState<"login" | "challenge" | "authed">("login");
   const [booted, setBooted] = useState(false);
+  const [user, setUser] = useState<MtUser | null>(null);
 
   useEffect(() => {
-    if (localStorage.getItem(LS_AUTH) === "1") setStage("authed");
+    setUser(currentUser());
     setBooted(true);
+    const off = onStoreChange(() => setUser(currentUser()));
+    return off;
   }, []);
 
   if (!booted) return null;
-  if (stage === "authed") {
-    return <Dashboard onLogout={() => { localStorage.removeItem(LS_AUTH); setStage("login"); }} />;
-  }
-  if (stage === "challenge") {
-    return <SecurityChallenge onVerified={() => { localStorage.setItem(LS_AUTH, "1"); setStage("authed"); }} onCancel={() => setStage("login")} />;
-  }
-  return <Login onAuth={() => setStage("challenge")} />;
+  if (!user) return <Login onAuth={(u) => { setCurrentUserId(u.id); setUser(u); }} />;
+  return <Dashboard user={user} onLogout={() => { setCurrentUserId(null); setUser(null); }} />;
 }
 
-function SecurityChallenge({ onVerified, onCancel }: { onVerified: () => void; onCancel: () => void }) {
-  const [answer, setAnswer] = useState("");
+function Login({ onAuth }: { onAuth: (u: MtUser) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (answer.trim().length < 3) {
-      setErr("Verification Rejection: Security answer does not match corporate file records.");
-      return;
-    }
+    const users = loadUsers();
+    const match = users.find(
+      (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password,
+    );
+    if (!match) { setErr("Invalid credentials. Only registered DBW customer accounts may sign in."); return; }
+    if (!match.verified) { setErr("This account has not completed phone/email verification."); return; }
+    if (match.status === "Frozen") { setErr("This account is frozen. Contact support at 1-800-DBW-BANK."); return; }
     window.dispatchEvent(new Event("ptl:show"));
-    setTimeout(() => onVerified(), 1800);
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 px-4">
-      <div className="w-full max-w-md">
-        <div className="flex items-center gap-3 justify-center mb-6">
-          <div className="h-10 w-10 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-[11px] tracking-wide">DBW</div>
-          <div>
-            <div className="text-xl font-semibold text-slate-900">DYNAMIC BANK OF WEST</div>
-            <div className="text-xs text-slate-500">Official Security Gateway</div>
-          </div>
-        </div>
-        <form onSubmit={submit} className="bg-white border-2 border-amber-400/60 rounded-xl p-8 shadow-lg space-y-5">
-          <div className="flex items-center gap-2 text-amber-700 text-xs font-semibold uppercase tracking-wider">
-            <span className="inline-block h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-            Step 2 of 2 · Identity Verification
-          </div>
-          <h1 className="text-lg font-semibold text-slate-900 leading-snug">
-            Security Challenge: What was the name of your first childhood pet?
-          </h1>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Your secure answer</label>
-            <input
-              type="text"
-              autoFocus
-              value={answer}
-              onChange={(e) => { setAnswer(e.target.value); setErr(""); }}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-              placeholder="Enter answer"
-            />
-            <p className="mt-1 text-xs text-slate-500">Case-insensitive. Stored encrypted on file.</p>
-          </div>
-          {err && (
-            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-              {err}
-            </div>
-          )}
-          <button
-            type="submit"
-            className="w-full bg-gradient-to-b from-amber-300 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-700 text-slate-900 text-sm font-bold py-2.5 rounded-md shadow-md border border-amber-700/40"
-          >
-            Verify Identity
-          </button>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="w-full text-xs text-slate-500 hover:text-slate-900"
-          >
-            ← Return to sign-in
-          </button>
-          <div className="text-xs text-slate-500 text-center pt-2 border-t border-slate-100">
-            🔒 Verified via FFIEC multi-factor protocol
-          </div>
-        </form>
-      </div>
-      <ChatWidget />
-    </div>
-  );
-}
-
-function Login({ onAuth }: { onAuth: () => void }) {
-  const [u, setU] = useState("");
-  const [p, setP] = useState("");
-  const [err, setErr] = useState("");
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (u.trim().length < 3 || p.length < 4) {
-      setErr("Enter your username and password to continue.");
-      return;
-    }
-    window.dispatchEvent(new Event("ptl:show"));
-    setTimeout(() => onAuth(), 1800);
+    setTimeout(() => onAuth(match), 900);
   }
 
   return (
@@ -167,29 +63,16 @@ function Login({ onAuth }: { onAuth: () => void }) {
         <form onSubmit={submit} className="bg-white border border-slate-200 rounded-xl p-8 shadow-sm space-y-5">
           <h1 className="text-lg font-semibold text-slate-900">Sign in to your account</h1>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Username</label>
-            <input
-              type="text"
-              autoComplete="username"
-              value={u}
-              onChange={(e) => setU(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-              placeholder="your.username"
-            />
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+            <input type="email" autoComplete="username" value={email} onChange={(e) => { setEmail(e.target.value); setErr(""); }}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" placeholder="you@email.com" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={p}
-              onChange={(e) => setP(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 tracking-widest"
-              placeholder="••••••••"
-            />
-            <p className="mt-1 text-xs text-slate-500">Password input is masked.</p>
+            <input type="password" autoComplete="current-password" value={password} onChange={(e) => { setPassword(e.target.value); setErr(""); }}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 tracking-widest" placeholder="••••••••" />
           </div>
-          {err && <div className="text-sm text-red-600">{err}</div>}
+          {err && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{err}</div>}
           <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium py-2.5 rounded-md">
             Sign in securely
           </button>
@@ -202,1008 +85,242 @@ function Login({ onAuth }: { onAuth: () => void }) {
           </div>
         </form>
       </div>
-      <ChatWidget />
     </div>
   );
 }
 
-type Segment = "personal" | "business" | "commercial" | "wire";
-const SEGMENTS: Record<Segment, { label: string; sub: string; primary: { name: string; number: string; balance: number }; secondary: { name: string; number: string; balance: number } }> = {
-  personal: {
-    label: "Personal Banking", sub: "Personal Banking",
-    primary: { name: "Everyday Checking", number: "••••4421", balance: 12480.33 },
-    secondary: { name: "Way2Save Savings", number: "••••9087", balance: 48210.00 },
-  },
-  business: {
-    label: "Small Business", sub: "Small Business",
-    primary: { name: "Business Checking", number: "••••7702", balance: 8420.55 },
-    secondary: { name: "Business Reserve", number: "••••3310", balance: 15200.00 },
-  },
-  commercial: {
-    label: "Commercial Accounts", sub: "Commercial Accounts",
-    primary: { name: "Commercial Operating", number: "••••8821", balance: 25000.00 },
-    secondary: { name: "Commercial Money Market", number: "••••2244", balance: 142500.00 },
-  },
-  wire: {
-    label: "Wire Services", sub: "Wire Services",
-    primary: { name: "Wire Settlement", number: "••••0001", balance: 5000.00 },
-    secondary: { name: "FX Reserve", number: "••••0002", balance: 22000.00 },
-  },
-};
-
-const LS_CHK_BAL = "mt_chk_bal";
-const LS_SAV_BAL = "mt_sav_bal";
-const LS_CHK_TX = "mt_chk_tx";
-const LS_SAV_TX = "mt_sav_tx";
-
-const seedCheckingTx: Tx[] = [
-  { id: "c1", date: "2026-06-26", description: "Employer Direct Deposit", amount: 2450.00, category: "Income" },
-  { id: "c2", date: "2026-06-25", description: "Starbucks Coffee", amount: -6.75, category: "Dining" },
-  { id: "c3", date: "2026-06-24", description: "Target Superstore", amount: -84.22, category: "Shopping" },
-];
-const seedSavingsTx: Tx[] = [
-  { id: "s1", date: "2026-06-20", description: "Quarterly Interest Credit", amount: 42.50, category: "Interest" },
-  { id: "s2", date: "2026-06-15", description: "Automated Smart Save", amount: 50.00, category: "Auto-Save" },
-];
-
-const segmentSeedTx: Record<Segment, { primary: Tx[]; secondary: Tx[] }> = {
-  personal: { primary: seedCheckingTx, secondary: seedSavingsTx },
-  business: {
-    primary: [
-      { id: "bp1", date: "2026-06-26", description: "Stripe Payout — Invoice #2241", amount: 4820.00, category: "Income" },
-      { id: "bp2", date: "2026-06-24", description: "AWS Cloud Services", amount: -312.44, category: "Software" },
-      { id: "bp3", date: "2026-06-22", description: "Office Lease — June", amount: -1850.00, category: "Operating" },
-    ],
-    secondary: [
-      { id: "bs1", date: "2026-06-20", description: "Reserve Sweep", amount: 1500.00, category: "Transfer" },
-      { id: "bs2", date: "2026-06-12", description: "Quarterly Interest", amount: 18.40, category: "Interest" },
-    ],
-  },
-  commercial: {
-    primary: [
-      { id: "cp1", date: "2026-06-26", description: "Wholesale Receivable — Acme Co", amount: 18200.00, category: "Income" },
-      { id: "cp2", date: "2026-06-23", description: "Vendor Payment — Globex Mfg", amount: -7420.55, category: "AP" },
-      { id: "cp3", date: "2026-06-21", description: "Payroll Run #21", amount: -12480.00, category: "Payroll" },
-    ],
-    secondary: [
-      { id: "cs1", date: "2026-06-18", description: "Money Market Yield", amount: 412.88, category: "Interest" },
-      { id: "cs2", date: "2026-06-10", description: "Treasury Sweep", amount: 25000.00, category: "Transfer" },
-    ],
-  },
-  wire: {
-    primary: [
-      { id: "wp1", date: "2026-06-26", description: "Outbound Wire — Settlement #88421", amount: -4200.00, category: "Wire Out" },
-      { id: "wp2", date: "2026-06-25", description: "Inbound Wire — Counterparty MERIDIAN", amount: 9500.00, category: "Wire In" },
-    ],
-    secondary: [
-      { id: "ws1", date: "2026-06-22", description: "FX Conversion EUR→USD", amount: 1180.40, category: "FX" },
-      { id: "ws2", date: "2026-06-19", description: "Correspondent Bank Fee", amount: -25.00, category: "Fee" },
-    ],
-  },
-};
-
-type DashView = "dashboard" | "profile" | "card" | "checking" | "savings" | "about" | "segment-account";
-
-function Dashboard({ onLogout }: { onLogout: () => void }) {
-  const [checkingBal, setCheckingBal] = useState(12480.33);
-  const [savingsBal, setSavingsBal] = useState(48210.00);
-  const [checkingTx, setCheckingTx] = useState<Tx[]>(seedCheckingTx);
-  const [savingsTx, setSavingsTx] = useState<Tx[]>(seedSavingsTx);
-  const [view, setView] = useState<DashView>("dashboard");
-  const [segment, setSegment] = useState<Segment>("personal");
-  const [routingOpen, setRoutingOpen] = useState(false);
+function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
+  const navigate = useNavigate();
+  const [activePending, setActivePending] = useState<PendingTx | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
 
   useEffect(() => {
-    const cb = localStorage.getItem(LS_CHK_BAL);
-    const sb = localStorage.getItem(LS_SAV_BAL);
-    const ct = localStorage.getItem(LS_CHK_TX);
-    const st = localStorage.getItem(LS_SAV_TX);
-    if (cb) setCheckingBal(parseFloat(cb));
-    if (sb) setSavingsBal(parseFloat(sb));
-    if (ct) { try { setCheckingTx(JSON.parse(ct)); } catch {} }
-    if (st) { try { setSavingsTx(JSON.parse(st)); } catch {} }
-  }, []);
-
-  const [segAcc, setSegAcc] = useState<"primary" | "secondary" | null>(null);
-
-  function openSegmentAccount(slot: "primary" | "secondary") {
-    if (segment === "personal") {
-      setView(slot === "primary" ? "checking" : "savings");
-    } else {
-      setSegAcc(slot);
-      setView("segment-account");
+    function refresh() {
+      const q = loadQueue().filter((t) => t.userId === user.id);
+      const pending = q.find((t) => t.status === "Pending" && t.method === "Transfer");
+      setActivePending(pending ?? null);
     }
-  }
+    refresh();
+    const off = onStoreChange(refresh);
+    const i = setInterval(refresh, 1200);
+    return () => { off(); clearInterval(i); };
+  }, [user.id]);
 
-
-
-
-  useEffect(() => { localStorage.setItem(LS_CHK_BAL, String(checkingBal)); }, [checkingBal]);
-  useEffect(() => { localStorage.setItem(LS_SAV_BAL, String(savingsBal)); }, [savingsBal]);
-  useEffect(() => { localStorage.setItem(LS_CHK_TX, JSON.stringify(checkingTx)); }, [checkingTx]);
-  useEffect(() => { localStorage.setItem(LS_SAV_TX, JSON.stringify(savingsTx)); }, [savingsTx]);
-
-  useEffect(() => {
-    const onProfile = () => setView("profile");
-    const onCard = () => setView("card");
-    const onRouting = () => setRoutingOpen(true);
-    window.addEventListener("mt:view-profile", onProfile);
-    window.addEventListener("mt:view-card", onCard);
-    window.addEventListener("mt:open-routing", onRouting);
-    return () => {
-      window.removeEventListener("mt:view-profile", onProfile);
-      window.removeEventListener("mt:view-card", onCard);
-      window.removeEventListener("mt:open-routing", onRouting);
-    };
-  }, []);
-
-  const [recipient, setRecipient] = useState("");
-  const [routing, setRouting] = useState("");
-  const [amount, setAmount] = useState("");
-  const [memo, setMemo] = useState("");
-  const [flash, setFlash] = useState<string | null>(null);
-
-  function settle(e: React.FormEvent) {
-    e.preventDefault();
-    const amt = parseFloat(amount);
-    if (!recipient.trim() || !routing.trim() || !amt || amt <= 0) {
-      setFlash("Please complete all fields with a valid amount.");
-      return;
-    }
-    if (amt > checkingBal) {
-      setFlash("Insufficient funds in primary balance.");
-      return;
-    }
-    const newTx: Tx = {
-      id: uid(),
-      date: new Date().toISOString().slice(0, 10),
-      description: `Transfer to ${recipient}${memo ? ` — ${memo}` : ""}`,
-      amount: -amt,
-      category: "Transfer",
-    };
-    setCheckingTx([newTx, ...checkingTx]);
-    setCheckingBal((b) => +(b - amt).toFixed(2));
-    setRecipient(""); setRouting(""); setAmount(""); setMemo("");
-    setFlash(`Settled ${fmt(amt)} to ${newTx.description.replace("Transfer to ", "")}.`);
-    setTimeout(() => setFlash(null), 4000);
-  }
-
-  function internalTransfer(from: "checking" | "savings", to: "checking" | "savings", amt: number): string | null {
-    if (from === to) return "Source and destination must differ.";
-    if (!amt || amt <= 0) return "Enter a positive amount.";
-    const srcBal = from === "checking" ? checkingBal : savingsBal;
-    if (amt > srcBal) return "Insufficient funds in source account.";
-    const date = new Date().toISOString().slice(0, 10);
-    const outTx: Tx = { id: uid(), date, description: `Internal Transfer to ${to === "checking" ? "Everyday Checking" : "Way2Save Savings"}`, amount: -amt, category: "Transfer" };
-    const inTx: Tx = { id: uid(), date, description: `Internal Transfer from ${from === "checking" ? "Everyday Checking" : "Way2Save Savings"}`, amount: amt, category: "Transfer" };
-    if (from === "checking") {
-      setCheckingBal((b) => +(b - amt).toFixed(2));
-      setCheckingTx((t) => [outTx, ...t]);
-      setSavingsBal((b) => +(b + amt).toFixed(2));
-      setSavingsTx((t) => [inTx, ...t]);
-    } else {
-      setSavingsBal((b) => +(b - amt).toFixed(2));
-      setSavingsTx((t) => [outTx, ...t]);
-      setCheckingBal((b) => +(b + amt).toFixed(2));
-      setCheckingTx((t) => [inTx, ...t]);
-    }
-    return null;
-  }
-
-  const seg = SEGMENTS[segment];
-  const isPersonal = segment === "personal";
-  const primaryBal = isPersonal ? checkingBal : seg.primary.balance;
-  const secondaryBal = isPersonal ? savingsBal : seg.secondary.balance;
-  const combinedTx = [...checkingTx, ...savingsTx].sort((a, b) => b.date.localeCompare(a.date));
-  const displayTx = isPersonal ? combinedTx : seedTx;
+  const userHistory = loadQueue()
+    .filter((t) => t.userId === user.id && t.status !== "Pending")
+    .slice(0, 20);
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Header */}
       <header className="bg-white border-b border-slate-200">
         <div className="bg-slate-900">
           <div className="max-w-6xl mx-auto px-6 py-1.5 flex items-center justify-end gap-6 text-[11px] tracking-wide uppercase">
-            {(["personal", "business", "commercial", "wire"] as Segment[]).map((k) => (
-              <button
-                key={k}
-                onClick={() => { setSegment(k); setView("dashboard"); }}
-                className={`transition-colors ${segment === k && view !== "about" ? "text-white" : "text-white/60 hover:text-white"}`}
-              >
-                {SEGMENTS[k].label}
-              </button>
-            ))}
-            <button
-              onClick={() => setView("about")}
-              className={`transition-colors ${view === "about" ? "text-amber-300" : "text-white/60 hover:text-white"}`}
-            >
-              About Us
-            </button>
+            <span className="text-white/60">Personal Banking</span>
+            <span className="text-white/60">·</span>
+            <span className="text-amber-300">Member FDIC</span>
           </div>
         </div>
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <button onClick={() => setView("dashboard")} className="flex items-center gap-3 text-left">
+          <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-[10px] tracking-wide">DBW</div>
             <div>
               <div className="text-sm font-semibold text-slate-900 tracking-wide">DYNAMIC BANK OF WEST</div>
-              <div className="text-xs text-slate-500">{view === "about" ? "Institutional Overview" : seg.sub}</div>
+              <div className="text-xs text-slate-500">Personal Banking</div>
             </div>
-          </button>
+          </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-slate-600 hidden sm:inline">Hello, Customer</span>
-            <DbwMenu />
+            <span className="text-sm text-slate-600 hidden sm:inline">Hello, {user.name.split(" ")[0]}</span>
+            <button onClick={() => setShowProfile(true)} className="h-9 w-9 rounded-full overflow-hidden bg-slate-200 border border-slate-300 hover:ring-2 hover:ring-amber-400 transition">
+              {user.profilePicture
+                ? <img src={user.profilePicture} alt="Profile" className="h-full w-full object-cover" />
+                : <div className="h-full w-full flex items-center justify-center text-sm text-slate-600 font-semibold">{user.name.slice(0, 1)}</div>}
+            </button>
             <button onClick={onLogout} className="text-sm text-slate-600 hover:text-slate-900">Sign out</button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-8 space-y-8">
-        {view === "profile" && <ProfileView onBack={() => setView("dashboard")} />}
-        {view === "card" && <CardView onBack={() => setView("dashboard")} />}
-        {view === "about" && <AboutView onBack={() => setView("dashboard")} />}
-        {view === "checking" && (
-          <AccountPage
-            kind="checking"
-            name="Everyday Checking"
-            number="••••4421"
-            balance={checkingBal}
-            tx={checkingTx}
-            onBack={() => setView("dashboard")}
-            onTransfer={internalTransfer}
-          />
-        )}
-        {view === "savings" && (
-          <AccountPage
-            kind="savings"
-            name="Way2Save Savings"
-            number="••••9087"
-            balance={savingsBal}
-            tx={savingsTx}
-            onBack={() => setView("dashboard")}
-            onTransfer={internalTransfer}
-          />
-        )}
-        {view === "segment-account" && segAcc && segment !== "personal" && (
-          <SegmentAccountPage
-            segment={segment}
-            slot={segAcc}
-            onBack={() => { setSegAcc(null); setView("dashboard"); }}
-          />
-        )}
-        {view === "dashboard" && (
-          <>
-            <section>
-              <h1 className="text-2xl font-semibold text-slate-900 mb-1">{seg.label}</h1>
-              <p className="text-sm text-slate-500">Here's your portfolio at a glance.</p>
-            </section>
-
-            <section className="grid md:grid-cols-2 gap-4">
-              <AccountCard
-                name={isPersonal ? "Everyday Checking" : seg.primary.name}
-                number={seg.primary.number}
-                routing="121000248"
-                balance={primaryBal}
-                primary
-                onClick={() => openSegmentAccount("primary")}
-              />
-              <AccountCard
-                name={isPersonal ? "Way2Save Savings" : seg.secondary.name}
-                number={seg.secondary.number}
-                routing="121000248"
-                balance={secondaryBal}
-                onClick={() => openSegmentAccount("secondary")}
-              />
-            </section>
-
-            <section className="flex justify-end">
-              <Link
-                to="/deposit"
-                className="group inline-flex items-center gap-2.5 rounded-lg border border-emerald-600/40 bg-gradient-to-b from-slate-900 to-slate-800 px-5 py-2.5 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-white/5 hover:from-slate-800 hover:to-slate-700 hover:border-emerald-400/60 transition-all"
-              >
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500/15 text-emerald-300 text-base leading-none group-hover:bg-emerald-500/25">+</span>
-                <span className="tracking-wide">Deposit Funds</span>
-                <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-300/80 border-l border-white/10 pl-2.5 ml-1">Secure</span>
-              </Link>
-            </section>
-
-
-
-
-            <section className="bg-white border border-slate-200 rounded-xl">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-semibold text-slate-900">Transaction Log</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">{displayTx.length} records · immutable</p>
-                </div>
-                <a
-                  href="/transfer"
-                  className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold"
-                >
-                  Send Money →
-                </a>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
-                    <tr>
-                      <th className="text-left px-6 py-3 font-medium">Date</th>
-                      <th className="text-left px-6 py-3 font-medium">Description</th>
-                      <th className="text-left px-6 py-3 font-medium">Category</th>
-                      <th className="text-right px-6 py-3 font-medium">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displayTx.map((t) => (
-                      <tr key={t.id} className="border-t border-slate-100">
-                        <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.date}</td>
-                        <td className="px-6 py-3 text-slate-900">{t.description}</td>
-                        <td className="px-6 py-3 text-slate-600">{t.category}</td>
-                        <td className={`px-6 py-3 text-right font-medium tabular-nums ${t.amount < 0 ? "text-slate-900" : "text-emerald-600"}`}>
-                          {t.amount < 0 ? "-" : "+"}{fmt(Math.abs(t.amount))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-          </>
-        )}
-      </main>
-
-      {routingOpen && <RoutingModal onClose={() => setRoutingOpen(false)} />}
-      <ChatWidget />
-    </div>
-  );
-}
-
-function AccountPage({
-  kind, name, number, balance, tx, onBack, onTransfer,
-}: {
-  kind: "checking" | "savings";
-  name: string;
-  number: string;
-  balance: number;
-  tx: Tx[];
-  onBack: () => void;
-  onTransfer: (from: "checking" | "savings", to: "checking" | "savings", amt: number) => string | null;
-}) {
-  const [dest, setDest] = useState<"checking" | "savings">(kind === "checking" ? "savings" : "checking");
-  const [amt, setAmt] = useState("");
-  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const n = parseFloat(amt);
-    const err = onTransfer(kind, dest, n);
-    if (err) {
-      setMsg({ kind: "err", text: err });
-      return;
-    }
-    setMsg({ kind: "ok", text: `Transferred ${fmt(n)} to ${dest === "checking" ? "Everyday Checking" : "Way2Save Savings"}.` });
-    setAmt("");
-    setTimeout(() => setMsg(null), 4000);
-  }
-
-  return (
-    <section className="space-y-6">
-      <button onClick={onBack} className="text-sm text-amber-200 hover:text-amber-100">← Back to portfolio</button>
-
-      <div className="rounded-2xl overflow-hidden shadow-2xl border border-amber-700/40">
-        <div className="bg-gradient-to-br from-red-900 via-red-950 to-black text-white px-8 py-10 relative">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.15),transparent_60%)]" />
-          <div className="relative flex items-start justify-between flex-wrap gap-6">
-            <div>
-              <div className="flex items-center gap-2 text-amber-300 text-xs uppercase tracking-[0.2em] font-semibold">
-                <span className="h-px w-8 bg-amber-400" />
-                {kind === "checking" ? "Personal Checking Profile" : "Personal Savings Profile"}
-              </div>
-              <h1 className="text-3xl font-semibold mt-3 tracking-wide">{name}</h1>
-              <div className="text-xs text-amber-200/80 mt-1 tabular-nums">Account {number} · Routing 121000248</div>
-            </div>
-            <div className="text-right">
-              <div className="text-xs uppercase tracking-wider text-amber-200/80">Available Balance</div>
-              <div className="text-4xl font-semibold tabular-nums mt-1 bg-gradient-to-b from-amber-200 to-amber-400 bg-clip-text text-transparent">
-                {fmt(balance)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-0 bg-white">
-          <div className="lg:col-span-2 border-r border-slate-100">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-red-50 to-transparent">
-              <h2 className="text-sm font-semibold text-red-900">{kind === "checking" ? "Checking" : "Savings"} Ledger</h2>
-              <span className="text-xs text-slate-500">{tx.length} records</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th className="text-left px-6 py-3 font-medium">Date</th>
-                    <th className="text-left px-6 py-3 font-medium">Description</th>
-                    <th className="text-right px-6 py-3 font-medium">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tx.map((t) => (
-                    <tr key={t.id} className="border-t border-slate-100">
-                      <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.date}</td>
-                      <td className="px-6 py-3 text-slate-900">{t.description}</td>
-                      <td className={`px-6 py-3 text-right font-medium tabular-nums ${t.amount < 0 ? "text-red-800" : "text-emerald-600"}`}>
-                        {t.amount < 0 ? "-" : "+"}{fmt(Math.abs(t.amount))}
-                      </td>
-                    </tr>
-                  ))}
-                  {tx.length === 0 && (
-                    <tr><td colSpan={3} className="px-6 py-8 text-center text-slate-400 text-sm">No activity yet.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="p-6 bg-gradient-to-b from-amber-50/40 to-white">
-            <h2 className="text-sm font-semibold text-red-900 mb-1">Internal Transfer</h2>
-            <p className="text-xs text-slate-500 mb-4">Move funds instantly between your DBW accounts.</p>
-            <form onSubmit={submit} className="space-y-3">
+      <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+        {/* Balance card */}
+        <section className="rounded-2xl overflow-hidden border border-slate-800 shadow-xl">
+          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white px-8 py-10 relative">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.15),transparent_60%)]" />
+            <div className="relative flex items-start justify-between flex-wrap gap-6">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Destination</label>
-                <select
-                  value={dest}
-                  onChange={(e) => setDest(e.target.value as "checking" | "savings")}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-800"
-                >
-                  <option value="checking">Transfer to Checking</option>
-                  <option value="savings">Transfer to Savings</option>
-                </select>
-              </div>
-              <Field label="Amount (USD)" value={amt} onChange={setAmt} placeholder="0.00" type="number" />
-              {msg && (
-                <div className={`text-xs rounded px-3 py-2 ${msg.kind === "ok" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
-                  {msg.text}
+                <div className="flex items-center gap-2 text-amber-300 text-xs uppercase tracking-[0.2em] font-semibold">
+                  <span className="h-px w-8 bg-amber-400" />
+                  Primary Account
                 </div>
-              )}
-              <button type="submit" className="w-full bg-gradient-to-b from-red-800 to-red-950 hover:from-red-700 hover:to-red-900 text-white text-sm font-semibold py-2.5 rounded-md shadow border border-amber-600/40">
-                Submit Transfer
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function AboutView({ onBack }: { onBack: () => void }) {
-  const images = [
-    { src: "https://images.unsplash.com/photo-1609220136736-443140cffec6?auto=format&fit=crop&w=800&q=80", alt: "Multi-generational family reviewing finances at a table", caption: "Families We Serve" },
-    { src: "https://images.unsplash.com/photo-1447710441604-5bdc41bc6517?auto=format&fit=crop&w=800&q=80", alt: "Active senior citizens enjoying retirement in a park", caption: "A Secure Retirement" },
-    { src: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=800&q=80", alt: "Scenic western landscape representing our roots", caption: "Rooted in the West" },
-  ];
-  return (
-    <section className="max-w-5xl">
-      <button onClick={onBack} className="text-sm text-slate-500 hover:text-slate-900 mb-4">← Back to dashboard</button>
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-8 py-10">
-          <div className="text-xs uppercase tracking-[0.2em] text-amber-300 font-semibold">Institutional Overview</div>
-          <h1 className="text-3xl font-semibold mt-2">About Dynamic Bank of West</h1>
-          <p className="text-slate-300 mt-3 max-w-2xl text-sm leading-relaxed">A community-focused financial institution serving families, retirees, and small businesses across the Western United States since 1998.</p>
-        </div>
-
-        <div className="px-8 py-10 border-b border-slate-100">
-          <div className="text-xs uppercase tracking-[0.18em] text-amber-600 font-semibold">Our Mission</div>
-          <h2 className="text-2xl font-semibold text-slate-900 mt-2">Banking built around the people we serve.</h2>
-          <p className="mt-4 text-slate-700 leading-relaxed max-w-3xl">
-            We believe a bank should be a steady hand for the community it calls home. Every product we build, every account we open, and every dollar we safeguard is in service of the families, neighbors, and local businesses that make the West remarkable. Our mission is simple: deliver dependable, transparent banking with the kind of personal attention you'd expect from a trusted neighbor.
-          </p>
-        </div>
-
-        <div className="px-8 py-10 border-b border-slate-100">
-          <div className="text-xs uppercase tracking-[0.18em] text-amber-600 font-semibold">Community Focus</div>
-          <h2 className="text-2xl font-semibold text-slate-900 mt-2">Invested in the lives behind every account.</h2>
-          <div className="mt-6 grid sm:grid-cols-3 gap-5">
-            {images.map((img) => (
-              <figure key={img.src} className="rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-                <img src={img.src} alt={img.alt} loading="lazy" className="w-full h-48 object-cover" />
-                <figcaption className="px-4 py-3 text-sm font-medium text-slate-900 border-t border-slate-200">
-                  <span className="block text-[10px] uppercase tracking-wider text-amber-600 font-semibold mb-0.5">{img.caption}</span>
-                  {img.alt}
-                </figcaption>
-              </figure>
-            ))}
-          </div>
-        </div>
-
-        <div className="px-8 py-10 border-b border-slate-100">
-          <div className="text-xs uppercase tracking-[0.18em] text-amber-600 font-semibold">Our Story</div>
-          <h2 className="text-2xl font-semibold text-slate-900 mt-2">Three decades of trust, security, and steady growth.</h2>
-          <div className="mt-4 space-y-4 text-slate-700 leading-relaxed max-w-3xl">
-            <p>
-              Dynamic Bank of West was founded in 1998 by a small group of regional bankers who believed the West deserved a financial institution that combined the stability of a national bank with the warmth of a community lender. From a single branch office, we have grown into a multi-state operation safeguarding deposits for hundreds of thousands of households.
-            </p>
-            <p>
-              Security has been the cornerstone of our growth. We operate under FDIC certificate #48291, maintain 24/7 fraud monitoring, multi-factor authentication on every digital channel, and end-to-end encryption across our online and mobile platforms. Independent auditors review our controls annually, and our reserves consistently exceed federal capital requirements.
-            </p>
-            <p>
-              As we look forward, our commitment hasn't changed: protect what our customers have worked hard to build, and help the next generation build something of their own.
-            </p>
-          </div>
-        </div>
-
-        <div className="px-8 py-8 bg-slate-50">
-          <dl className="grid sm:grid-cols-4 gap-x-6 gap-y-4 text-sm">
-            <div><dt className="text-xs uppercase tracking-wide text-slate-500">Founded</dt><dd className="text-slate-900 mt-1 font-medium">1998</dd></div>
-            <div><dt className="text-xs uppercase tracking-wide text-slate-500">FDIC Certificate</dt><dd className="text-slate-900 mt-1 tabular-nums font-medium">#48291</dd></div>
-            <div><dt className="text-xs uppercase tracking-wide text-slate-500">Headquarters</dt><dd className="text-slate-900 mt-1 font-medium">Western U.S.</dd></div>
-            <div><dt className="text-xs uppercase tracking-wide text-slate-500">Branches</dt><dd className="text-slate-900 mt-1 font-medium">Digital & Regional</dd></div>
-          </dl>
-          <p className="text-xs text-slate-500 pt-6 mt-6 border-t border-slate-200">
-            Member FDIC · Equal Housing Lender · © {new Date().getFullYear()} Dynamic Bank of West. All rights reserved.
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ProfileView({ onBack }: { onBack: () => void }) {
-  const [sent, setSent] = useState(false);
-  return (
-    <section className="max-w-2xl">
-      <button onClick={onBack} className="text-sm text-slate-500 hover:text-slate-900 mb-4">← Back to dashboard</button>
-      <div className="bg-white border border-slate-200 rounded-xl p-8">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="h-16 w-16 rounded-full bg-slate-900 text-white flex items-center justify-center text-2xl font-semibold">JD</div>
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900">Jordan Davis</h1>
-            <p className="text-sm text-slate-500">Member since March 2018</p>
-          </div>
-        </div>
-        <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
-          <div><dt className="text-xs uppercase tracking-wide text-slate-500">Mailing Address</dt><dd className="text-slate-900 mt-1">1428 Elm Street<br/>Springfield, IL 62704</dd></div>
-          <div><dt className="text-xs uppercase tracking-wide text-slate-500">Phone</dt><dd className="text-slate-900 mt-1 tabular-nums">(217) 555-0142</dd></div>
-          <div><dt className="text-xs uppercase tracking-wide text-slate-500">Email</dt><dd className="text-slate-900 mt-1">jordan.davis@example.com</dd></div>
-          <div><dt className="text-xs uppercase tracking-wide text-slate-500">2FA</dt><dd className="text-emerald-600 mt-1">Enabled · SMS</dd></div>
-        </dl>
-        <div className="border-t border-slate-100 mt-8 pt-6">
-          <button
-            onClick={() => { setSent(true); setTimeout(() => setSent(false), 4000); }}
-            className="bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium px-5 py-2.5 rounded-md"
-          >
-            🔒 Send secure password reset link
-          </button>
-          {sent && <p className="text-xs text-emerald-600 mt-3">Reset link sent to your verified email.</p>}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function CardView({ onBack }: { onBack: () => void }) {
-  const [frozen, setFrozen] = useState(false);
-  const [limit, setLimit] = useState(500);
-  return (
-    <section className="max-w-2xl">
-      <button onClick={onBack} className="text-sm text-slate-500 hover:text-slate-900 mb-4">← Back to dashboard</button>
-      <div className="bg-white border border-slate-200 rounded-xl p-8 space-y-8">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 mb-1">Debit Card Controls</h1>
-          <p className="text-sm text-slate-500">Manage your physical and virtual card.</p>
-        </div>
-
-        <div className={`relative mx-auto w-full max-w-sm aspect-[1.586] rounded-2xl p-6 text-white shadow-xl bg-gradient-to-br from-red-600 via-red-700 to-red-900 ${frozen ? "opacity-70" : ""}`}>
-          <div className="flex items-start justify-between">
-            <div className="text-xs uppercase tracking-widest opacity-80">DBW · Debit</div>
-            <div className="h-8 w-10 rounded-md bg-gradient-to-br from-amber-300 to-amber-600" />
-          </div>
-          <div className="mt-10 text-lg font-mono tracking-widest">•••• •••• •••• 4421</div>
-          <div className="mt-6 flex items-end justify-between text-xs">
-            <div><div className="opacity-70 uppercase">Cardholder</div><div className="font-semibold tracking-wide">JORDAN DAVIS</div></div>
-            <div><div className="opacity-70 uppercase">Exp</div><div className="font-semibold tabular-nums">08 / 28</div></div>
-          </div>
-          {frozen && (
-            <div className="absolute inset-0 rounded-2xl bg-slate-900/40 flex items-center justify-center backdrop-blur-[2px]">
-              <span className="text-sm font-semibold tracking-widest bg-white/90 text-slate-900 px-3 py-1 rounded">❄ FROZEN</span>
-            </div>
-          )}
-        </div>
-
-        <div className="border-t border-slate-100 pt-6 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-medium text-slate-900">Freeze / Lock Card</div>
-            <div className="text-xs text-slate-500">Instantly block all new transactions.</div>
-          </div>
-          <button
-            onClick={() => setFrozen((f) => !f)}
-            className={`relative h-7 w-12 rounded-full transition-colors ${frozen ? "bg-red-600" : "bg-slate-300"}`}
-            aria-label="Freeze card"
-          >
-            <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${frozen ? "translate-x-5" : "translate-x-0.5"}`} />
-          </button>
-        </div>
-
-        <div className="border-t border-slate-100 pt-6">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-medium text-slate-900">Daily spending limit</div>
-            <div className="text-sm font-semibold tabular-nums text-slate-900">{fmt(limit)}</div>
-          </div>
-          <input
-            type="range" min={100} max={5000} step={50}
-            value={limit} onChange={(e) => setLimit(parseInt(e.target.value))}
-            className="w-full accent-slate-900"
-          />
-          <div className="flex justify-between text-xs text-slate-500 mt-1 tabular-nums">
-            <span>$100</span><span>$5,000</span>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function RoutingModal({ onClose }: { onClose: () => void }) {
-  const [copied, setCopied] = useState<string | null>(null);
-  function copy(label: string, val: string) {
-    navigator.clipboard?.writeText(val);
-    setCopied(label);
-    setTimeout(() => setCopied(null), 1800);
-  }
-  const Row = ({ label, value, copyVal }: { label: string; value: string; copyVal: string }) => (
-    <div className="border border-slate-200 rounded-lg p-4">
-      <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="flex items-center justify-between mt-1">
-        <div className="text-lg font-mono font-semibold text-slate-900 tabular-nums">{value}</div>
-        <button onClick={() => copy(label, copyVal)} className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-md">
-          {copied === label ? "Copied ✓" : "Copy"}
-        </button>
-      </div>
-    </div>
-  );
-  return (
-    <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-          <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded bg-slate-900 text-white text-[9px] font-bold flex items-center justify-center tracking-wide">DBW</div>
-            <div>
-              <div className="text-sm font-semibold text-slate-900">Account & Routing Details</div>
-              <div className="text-[11px] text-slate-500">Official — Dynamic Bank of West</div>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
-        </div>
-        <div className="p-6 space-y-4">
-          <Row label="Routing Number" value="121000248" copyVal="121000248" />
-          <Row label="Checking Account Number" value="•••• 5678" copyVal="000123455678" />
-          <p className="text-[11px] text-slate-500 leading-relaxed pt-2 border-t border-slate-100">
-            Use these numbers for direct deposit and ACH transfers. Never share with unverified parties. Dynamic Bank of West will never ask for your full account number by phone or email.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, value, onChange, placeholder, type = "text" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
-  return (
-    <div>
-      <label className="block text-xs font-medium text-slate-700 mb-1">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-      />
-    </div>
-  );
-}
-
-function AccountCard({ name, number, routing, balance, primary, onClick }: { name: string; number: string; routing: string; balance: number; primary?: boolean; onClick?: () => void }) {
-  const interactive = !!onClick;
-  return (
-    <div
-      onClick={onClick}
-      role={interactive ? "button" : undefined}
-      tabIndex={interactive ? 0 : undefined}
-      onKeyDown={interactive ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick!(); } } : undefined}
-      className={`rounded-xl p-6 border transition ${primary ? "bg-slate-900 text-white border-slate-900" : "bg-white border-slate-200"} ${interactive ? "cursor-pointer hover:ring-2 hover:ring-amber-400 hover:-translate-y-0.5" : ""}`}
-    >
-      <div className="flex items-start justify-between">
-        <div>
-          <div className={`text-xs uppercase tracking-wide ${primary ? "text-slate-300" : "text-slate-500"}`}>{name}</div>
-          <div className={`text-3xl font-semibold mt-2 tabular-nums ${primary ? "text-white" : "text-slate-900"}`}>{fmt(balance)}</div>
-        </div>
-        {primary && <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white">Primary</span>}
-      </div>
-      <div className={`mt-6 flex gap-6 text-xs ${primary ? "text-slate-300" : "text-slate-500"}`}>
-        <div><span className="block uppercase tracking-wide opacity-75">Account</span><span className="tabular-nums">{number}</span></div>
-        <div><span className="block uppercase tracking-wide opacity-75">Routing</span><span className="tabular-nums">{routing}</span></div>
-      </div>
-      {interactive && <div className={`mt-4 text-xs font-medium ${primary ? "text-amber-300" : "text-red-800"}`}>View account →</div>}
-    </div>
-  );
-}
-
-function DbwMenu() {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    function onDoc(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
-  const items = [
-    { icon: "👤", label: "My Profile Settings", action: () => window.dispatchEvent(new CustomEvent("mt:view-profile")) },
-    { icon: "💳", label: "Debit Card Controls", action: () => window.dispatchEvent(new CustomEvent("mt:view-card")) },
-    { icon: "📋", label: "Routing & Account Info", action: () => window.dispatchEvent(new CustomEvent("mt:open-routing")) },
-    { icon: "🔒", label: "Open Secure Messages", action: () => window.dispatchEvent(new CustomEvent("mt:open-chat")) },
-  ];
-  return (
-    <div ref={ref} className="relative" onMouseEnter={() => setOpen(true)}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="h-9 w-9 rounded-md bg-gradient-to-br from-amber-300 via-yellow-500 to-amber-700 text-slate-900 text-[11px] font-bold shadow-md ring-1 ring-amber-600/40 hover:brightness-110 transition"
-        aria-label="DBW menu"
-      >
-        DBW
-      </button>
-      {open && (
-        <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-lg shadow-xl py-1.5 z-50">
-          {items.map((it) => (
-            <button
-              key={it.label}
-              onClick={() => { it.action(); setOpen(false); }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 text-left"
-            >
-              <span className="text-base">{it.icon}</span>
-              <span>{it.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ChatWidget() {
-  const [open, setOpen] = useState(false);
-  const [adminMode, setAdminMode] = useState(false);
-  const [msgs, setMsgs] = useState<ChatMsg[]>([]);
-  const [draft, setDraft] = useState("");
-  const [clicks, setClicks] = useState(0);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(LS_CHAT);
-    if (stored) { try { setMsgs(JSON.parse(stored)); } catch {} }
-    else {
-      setMsgs([{ id: uid(), from: "agent", text: "Hi! I'm Riley from Dynamic Bank of West Support. How can I help today?", ts: Date.now() }]);
-    }
-    // Poll for cross-view updates
-    const i = setInterval(() => {
-      const s = localStorage.getItem(LS_CHAT);
-      if (s) {
-        try {
-          const parsed = JSON.parse(s) as ChatMsg[];
-          setMsgs((cur) => parsed.length !== cur.length ? parsed : cur);
-        } catch {}
-      }
-    }, 800);
-    return () => clearInterval(i);
-  }, []);
-
-  useEffect(() => {
-    function openIt() { setOpen(true); }
-    window.addEventListener("mt:open-chat", openIt);
-    return () => window.removeEventListener("mt:open-chat", openIt);
-  }, []);
-
-  useEffect(() => {
-    if (msgs.length) localStorage.setItem(LS_CHAT, JSON.stringify(msgs));
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [msgs, open]);
-
-  function send(e: React.FormEvent) {
-    e.preventDefault();
-    if (!draft.trim()) return;
-    setMsgs((m) => [...m, { id: uid(), from: adminMode ? "agent" : "user", text: draft.trim(), ts: Date.now() }]);
-    setDraft("");
-  }
-
-  // Hidden admin toggle: click the tiny corner dot 3 times
-  function secretClick() {
-    const n = clicks + 1;
-    setClicks(n);
-    if (n >= 3) {
-      setAdminMode((a) => !a);
-      setClicks(0);
-    }
-    setTimeout(() => setClicks(0), 1500);
-  }
-
-  return (
-    <>
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-slate-900 hover:bg-slate-800 text-white shadow-lg flex items-center justify-center z-50"
-          aria-label="Open support chat"
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        </button>
-      )}
-
-      {open && (
-        <div className="fixed bottom-6 right-6 w-[360px] h-[520px] bg-white rounded-xl shadow-2xl border border-slate-200 flex flex-col z-50 overflow-hidden">
-          <div className={`px-4 py-3 flex items-center justify-between ${adminMode ? "bg-amber-500" : "bg-slate-900"} text-white`}>
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center text-sm font-semibold">R</div>
-              <div>
-                <div className="text-sm font-semibold">{adminMode ? "Admin View" : "Riley · Support"}</div>
-                <div className="text-xs opacity-80">{adminMode ? "Replying as agent" : "Typically replies in seconds"}</div>
-              </div>
-            </div>
-            <button onClick={() => setOpen(false)} className="text-white/80 hover:text-white text-lg leading-none">×</button>
-          </div>
-
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
-            {msgs.map((m) => {
-              const mine = adminMode ? m.from === "agent" : m.from === "user";
-              const isAgent = m.from === "agent";
-              return (
-                <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
-                    mine
-                      ? "bg-slate-900 text-white rounded-br-sm"
-                      : "bg-white border border-slate-200 text-slate-900 rounded-bl-sm"
-                  }`}>
-                    {!mine && (
-                      <div className={`text-[10px] uppercase tracking-wide mb-0.5 ${isAgent ? "text-emerald-600" : "text-slate-500"}`}>
-                        {isAgent ? "Agent" : "Customer"}
-                      </div>
-                    )}
-                    <div className="whitespace-pre-wrap">{m.text}</div>
-                  </div>
+                <h1 className="text-2xl font-semibold mt-3 tracking-wide">Everyday Checking</h1>
+                <div className="text-xs text-amber-200/80 mt-1 tabular-nums">
+                  Account {user.account} · Routing 121000248
                 </div>
-              );
-            })}
+              </div>
+              <div className="text-right">
+                <div className="text-xs uppercase tracking-wider text-amber-200/80">Available Balance</div>
+                <div className="text-4xl font-semibold tabular-nums mt-1 bg-gradient-to-b from-amber-200 to-amber-400 bg-clip-text text-transparent">
+                  {fmtCurrency(user.balance)}
+                </div>
+              </div>
+            </div>
           </div>
+        </section>
 
-          <form onSubmit={send} className="border-t border-slate-200 p-3 flex gap-2 bg-white">
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={adminMode ? "Type agent reply…" : "Type a message…"}
-              className="flex-1 rounded-full border border-slate-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-            />
-            <button type="submit" className="rounded-full bg-slate-900 hover:bg-slate-800 text-white px-4 text-sm font-medium">
-              Send
-            </button>
-          </form>
+        {/* Deposit CTA directly beneath the balance card */}
+        <section className="flex justify-center">
+          <Link
+            to="/deposit"
+            className="group inline-flex items-center gap-3 rounded-xl border border-emerald-600/40 bg-gradient-to-b from-slate-900 to-slate-800 px-8 py-3.5 text-sm font-semibold text-white shadow-md ring-1 ring-inset ring-white/5 hover:from-slate-800 hover:to-slate-700 hover:border-emerald-400/60 transition-all"
+          >
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500/15 text-emerald-300 text-lg leading-none group-hover:bg-emerald-500/25">+</span>
+            <span className="tracking-wide">Deposit Funds</span>
+            <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-300/80 border-l border-white/10 pl-3 ml-1">Enterprise Secure</span>
+          </Link>
+        </section>
 
-          <div className="px-3 pb-2 flex items-center justify-between text-[10px] text-slate-400 bg-white">
-            <span>End-to-end encrypted</span>
-            <button
-              onClick={secretClick}
-              className="h-3 w-3 rounded-full bg-slate-200 hover:bg-slate-300"
-              aria-label="."
-              title=""
-            />
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
+        {/* Quick actions */}
+        <section className="grid sm:grid-cols-3 gap-3">
+          <QuickAction to="/transfer" title="Send money" subtitle="External transfer" />
+          <QuickAction to="/deposit" title="Deposit" subtitle="Wire · ACH · Crypto" />
+          <QuickAction to="/signup" title="Refer a friend" subtitle="Invite to DBW" />
+        </section>
 
-function SegmentAccountPage({ segment, slot, onBack }: { segment: Exclude<Segment, "personal">; slot: "primary" | "secondary"; onBack: () => void }) {
-  const seg = SEGMENTS[segment];
-  const acct = seg[slot];
-  const tx = segmentSeedTx[segment][slot];
-  const [q, setQ] = useState("");
-  const [type, setType] = useState<"all" | "credit" | "debit">("all");
-
-  const filtered = tx.filter((t) => {
-    if (type === "credit" && t.amount < 0) return false;
-    if (type === "debit" && t.amount >= 0) return false;
-    if (q && !t.description.toLowerCase().includes(q.toLowerCase())) return false;
-    return true;
-  });
-
-  function exportCsv() {
-    const rows = [["Date", "Description", "Category", "Amount"], ...filtered.map((t) => [t.date, t.description, t.category, t.amount.toFixed(2)])];
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${acct.name.replace(/\s+/g, "-").toLowerCase()}-history.csv`;
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  return (
-    <section className="space-y-6">
-      <button onClick={onBack} className="text-sm text-amber-700 hover:text-amber-900">← Back to {seg.label}</button>
-
-      <div className="rounded-2xl overflow-hidden shadow-2xl border border-amber-700/40">
-        <div className="bg-gradient-to-br from-red-900 via-red-950 to-black text-white px-8 py-10 relative">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.15),transparent_60%)]" />
-          <div className="relative flex items-start justify-between flex-wrap gap-6">
+        {/* Transaction history (resolved only) */}
+        <section className="bg-white border border-slate-200 rounded-xl">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-2 text-amber-300 text-xs uppercase tracking-[0.2em] font-semibold">
-                <span className="h-px w-8 bg-amber-400" />
-                {seg.label} · {slot === "primary" ? "Primary" : "Reserve"}
-              </div>
-              <h1 className="text-3xl font-semibold mt-3 tracking-wide">{acct.name}</h1>
-              <div className="text-xs text-amber-200/80 mt-1 tabular-nums">Account {acct.number} · Routing 121000248</div>
-            </div>
-            <div className="text-right">
-              <div className="text-xs uppercase tracking-wider text-amber-200/80">Available Balance</div>
-              <div className="text-4xl font-semibold tabular-nums mt-1 bg-gradient-to-b from-amber-200 to-amber-400 bg-clip-text text-transparent">
-                {fmt(acct.balance)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap bg-gradient-to-r from-red-50 to-transparent">
-            <h2 className="text-sm font-semibold text-red-900">Transaction History</h2>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Search…"
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-red-800"
-              />
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value as "all" | "credit" | "debit")}
-                className="rounded-md border border-slate-300 px-2 py-1.5 text-xs bg-white"
-              >
-                <option value="all">All</option>
-                <option value="credit">Credits</option>
-                <option value="debit">Debits</option>
-              </select>
-              <button onClick={exportCsv} className="text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-md">
-                Export CSV
-              </button>
+              <h2 className="text-sm font-semibold text-slate-900">Ledger — Resolved Transactions</h2>
+              <p className="text-xs text-slate-500 mt-0.5">{userHistory.length} entries · pending items stay in review</p>
             </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
                 <tr>
                   <th className="text-left px-6 py-3 font-medium">Date</th>
-                  <th className="text-left px-6 py-3 font-medium">Description</th>
-                  <th className="text-left px-6 py-3 font-medium">Category</th>
+                  <th className="text-left px-6 py-3 font-medium">Reference</th>
+                  <th className="text-left px-6 py-3 font-medium">Type</th>
+                  <th className="text-left px-6 py-3 font-medium">Status</th>
                   <th className="text-right px-6 py-3 font-medium">Amount</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((t) => (
-                  <tr key={t.id} className="border-t border-slate-100">
-                    <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.date}</td>
-                    <td className="px-6 py-3 text-slate-900">{t.description}</td>
-                    <td className="px-6 py-3 text-slate-600">{t.category}</td>
-                    <td className={`px-6 py-3 text-right font-medium tabular-nums ${t.amount < 0 ? "text-red-800" : "text-emerald-600"}`}>
-                      {t.amount < 0 ? "-" : "+"}{fmt(Math.abs(t.amount))}
-                    </td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && (
-                  <tr><td colSpan={4} className="px-6 py-8 text-center text-slate-400 text-sm">No matching activity.</td></tr>
+                {userHistory.length === 0 && (
+                  <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm">No resolved transactions yet.</td></tr>
                 )}
+                {userHistory.map((t) => {
+                  const isCredit = t.direction === "credit" && t.status === "Approved";
+                  const sign = t.status === "Failed" ? "" : (t.direction === "credit" ? "+" : "-");
+                  return (
+                    <tr key={t.id} className="border-t border-slate-100">
+                      <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.submitted}</td>
+                      <td className="px-6 py-3 text-slate-900 font-mono text-xs">{t.reference}</td>
+                      <td className="px-6 py-3 text-slate-600">{t.method}</td>
+                      <td className="px-6 py-3">
+                        <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${
+                          t.status === "Approved" ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-red-300 bg-red-50 text-red-700"
+                        }`}>{t.status}</span>
+                      </td>
+                      <td className={`px-6 py-3 text-right font-medium tabular-nums ${
+                        t.status === "Failed" ? "text-slate-400 line-through" : isCredit ? "text-emerald-600" : "text-slate-900"
+                      }`}>{sign}{fmtCurrency(t.amount)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
+        </section>
+      </main>
+
+      {activePending && <PendingOverlay tx={activePending} onExit={() => navigate({ to: "/transfer" })} />}
+      {showProfile && <ProfileModal user={user} onClose={() => setShowProfile(false)} />}
+    </div>
+  );
+}
+
+function QuickAction({ to, title, subtitle }: { to: string; title: string; subtitle: string }) {
+  return (
+    <Link to={to} className="block bg-white border border-slate-200 rounded-xl px-5 py-4 hover:border-amber-400 hover:shadow-sm transition">
+      <div className="text-sm font-semibold text-slate-900">{title}</div>
+      <div className="text-xs text-slate-500 mt-0.5">{subtitle}</div>
+    </Link>
+  );
+}
+
+function PendingOverlay({ tx, onExit }: { tx: PendingTx; onExit: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center px-4">
+      <div className="w-full max-w-lg bg-slate-900/70 border border-amber-500/40 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="h-1.5 bg-gradient-to-r from-amber-400 to-amber-600" />
+        <div className="px-8 py-8 text-white text-center">
+          <div className="mx-auto relative h-20 w-20 mb-5">
+            <div className="absolute inset-0 rounded-full bg-amber-400/20 animate-ping" />
+            <div className="relative h-20 w-20 rounded-full bg-amber-500/15 border border-amber-400/40 flex items-center justify-center text-3xl">⏳</div>
+          </div>
+          <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300 font-semibold">Pending Verification</div>
+          <h2 className="mt-2 text-xl font-semibold">Your transfer is under compliance review</h2>
+          <p className="mt-2 text-sm text-slate-300">
+            Reference <span className="font-mono">{tx.reference}</span> for {fmtCurrency(tx.amount)} to {tx.recipient} is awaiting administrator approval. Your dashboard is locked on this screen until it resolves.
+          </p>
+          <button onClick={onExit} className="mt-6 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-semibold px-5 py-2">
+            View processing view
+          </button>
         </div>
       </div>
-    </section>
+    </div>
+  );
+}
+
+function ProfileModal({ user, onClose }: { user: MtUser; onClose: () => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [pic, setPic] = useState(user.profilePicture ?? "");
+  async function pickPic(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; if (!f) return;
+    const dataUrl = await readFileAsDataUrl(f);
+    setPic(dataUrl);
+    upsertUser({ ...user, profilePicture: dataUrl });
+  }
+  function removePic() {
+    setPic("");
+    upsertUser({ ...user, profilePicture: undefined });
+  }
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center px-4" onClick={onClose}>
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-5 border-b border-slate-100">
+          <div className="text-xs uppercase tracking-widest text-amber-700 font-semibold">Profile</div>
+          <h3 className="text-lg font-semibold text-slate-900 mt-1">{user.name}</h3>
+          <p className="text-xs text-slate-500">{user.email}</p>
+        </div>
+        <div className="px-6 py-6 flex flex-col items-center gap-3">
+          {pic
+            ? <img src={pic} alt="Profile" className="h-28 w-28 rounded-full object-cover border border-slate-200" />
+            : <div className="h-28 w-28 rounded-full bg-slate-200 text-slate-600 text-2xl flex items-center justify-center">{user.name.slice(0, 1)}</div>}
+          <input ref={fileRef} type="file" accept="image/*" onChange={pickPic} className="hidden" />
+          <button onClick={() => fileRef.current?.click()} className="rounded-md bg-slate-900 text-white text-xs px-4 py-2 hover:bg-slate-800">Upload profile picture</button>
+          {pic && <button onClick={removePic} className="text-[11px] text-red-600 hover:text-red-700">Remove picture</button>}
+        </div>
+        <div className="px-6 py-4 text-xs text-slate-500 border-t border-slate-100 grid grid-cols-2 gap-2">
+          <Kv k="Account" v={user.account} />
+          <Kv k="Tier" v={user.tier} />
+          <Kv k="Status" v={user.status} />
+          <Kv k="Verified" v={user.verified ? "Yes" : "No"} />
+        </div>
+        <div className="px-6 py-4 border-t border-slate-100 flex justify-end">
+          <button onClick={onClose} className="text-sm text-slate-600 hover:text-slate-900">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Kv({ k, v }: { k: string; v: string }) {
+  return (
+    <div>
+      <div className="uppercase tracking-wider text-[10px] text-slate-400">{k}</div>
+      <div className="text-slate-900 font-medium mt-0.5">{v}</div>
+    </div>
   );
 }
