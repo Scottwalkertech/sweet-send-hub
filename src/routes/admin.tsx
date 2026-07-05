@@ -1,5 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  loadUsers, saveUsers, loadQueue, saveQueue,
+  loadDepositSettings, saveDepositSettings,
+  genAccountNumber, maskAccount, readFileAsDataUrl, fmtCurrency, SECURITY_QUESTIONS,
+  type MtUser, type AccountTier, type AccountStatus, type PendingTx, type DepositSettings,
+} from "@/lib/mt-store";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -13,10 +19,6 @@ export const Route = createFileRoute("/admin")({
 });
 
 const SS_ADMIN = "mt_admin_session";
-const LS_USERS = "mt_admin_users";
-const LS_QUEUE = "mt_admin_queue";
-const LS_BAL = "mt_bal";
-
 type AdminRole = "SuperAdmin" | "Support";
 type AdminSession = { email: string; name: string; role: AdminRole };
 
@@ -25,70 +27,16 @@ const ADMIN_ACCOUNTS: Array<{ email: string; password: string; name: string; rol
   { email: "ops@dbw.io", password: "StaffPass99", name: "Operations Support", role: "Support" },
 ];
 
-type AccountTier = "Standard" | "Premier" | "Private" | "Business";
-type AccountStatus = "Active" | "Frozen" | "Review";
-
-type AdminUser = {
-  id: string;
-  name: string;
-  email: string;
-  account: string;
-  status: AccountStatus;
-  tier: AccountTier;
-  balance: number;
-};
-
-type PendingTx = {
-  id: string;
-  userId: string;
-  userName: string;
-  method: "Wire" | "ACH" | "Check" | "Crypto";
-  amount: number;
-  submitted: string;
-  status: "Pending" | "Approved" | "Failed";
-  reference: string;
-};
-
-const seedUsers: AdminUser[] = [
-  { id: "u_1001", name: "Marcus Whitfield", email: "m.whitfield@dbwest.com", account: "•••• 4419", status: "Active", tier: "Premier", balance: 18420.55 },
-  { id: "u_1002", name: "Elena Sokolova", email: "elena.s@dbwest.com", account: "•••• 7832", status: "Active", tier: "Private", balance: 42981.10 },
-  { id: "u_1003", name: "David Chen", email: "d.chen@dbwest.com", account: "•••• 2251", status: "Review", tier: "Standard", balance: 3120.00 },
-  { id: "u_1004", name: "Priya Nair", email: "p.nair@dbwest.com", account: "•••• 9908", status: "Active", tier: "Business", balance: 76540.22 },
-  { id: "u_1005", name: "Jonah Blackwood", email: "j.blackwood@dbwest.com", account: "•••• 1145", status: "Frozen", tier: "Standard", balance: 210.75 },
-];
-
-const seedQueue: PendingTx[] = [
-  { id: "q_9001", userId: "u_1001", userName: "Marcus Whitfield", method: "Wire", amount: 5000, submitted: "2026-07-02", status: "Pending", reference: "DBW-WIRE-88213" },
-  { id: "q_9002", userId: "u_1002", userName: "Elena Sokolova", method: "Crypto", amount: 12500, submitted: "2026-07-02", status: "Pending", reference: "DBW-CRYP-44120" },
-  { id: "q_9003", userId: "u_1004", userName: "Priya Nair", method: "Check", amount: 850.42, submitted: "2026-07-01", status: "Pending", reference: "DBW-CHK-30918" },
-  { id: "q_9004", userId: "u_1003", userName: "David Chen", method: "ACH", amount: 2200, submitted: "2026-07-01", status: "Pending", reference: "DBW-ACH-71204" },
-];
-
-function fmt(n: number) {
-  return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
-}
-
 function AdminPage() {
   const [booted, setBooted] = useState(false);
   const [session, setSession] = useState<AdminSession | null>(null);
-
   useEffect(() => {
     const raw = sessionStorage.getItem(SS_ADMIN);
-    if (raw) {
-      try { setSession(JSON.parse(raw) as AdminSession); } catch { /* ignore */ }
-    }
+    if (raw) { try { setSession(JSON.parse(raw) as AdminSession); } catch { /* */ } }
     setBooted(true);
   }, []);
-
-  function handleLogin(s: AdminSession) {
-    sessionStorage.setItem(SS_ADMIN, JSON.stringify(s));
-    setSession(s);
-  }
-  function handleLogout() {
-    sessionStorage.removeItem(SS_ADMIN);
-    setSession(null);
-  }
-
+  function handleLogin(s: AdminSession) { sessionStorage.setItem(SS_ADMIN, JSON.stringify(s)); setSession(s); }
+  function handleLogout() { sessionStorage.removeItem(SS_ADMIN); setSession(null); }
   if (!booted) return null;
   if (!session) return <AdminGate onPass={handleLogin} />;
   return <AdminConsole session={session} onLogout={handleLogout} />;
@@ -98,20 +46,14 @@ function AdminGate({ onPass }: { onPass: (s: AdminSession) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
-
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    const match = ADMIN_ACCOUNTS.find(
-      (a) => a.email.toLowerCase() === email.trim().toLowerCase() && a.password === password,
-    );
+    const match = ADMIN_ACCOUNTS.find((a) => a.email.toLowerCase() === email.trim().toLowerCase() && a.password === password);
     if (match) {
       window.dispatchEvent(new Event("ptl:show"));
-      setTimeout(() => onPass({ email: match.email, name: match.name, role: match.role }), 900);
-    } else {
-      setErr("Access denied. Invalid administrator credentials.");
-    }
+      setTimeout(() => onPass({ email: match.email, name: match.name, role: match.role }), 700);
+    } else setErr("Access denied. Invalid administrator credentials.");
   }
-
   return (
     <div className="min-h-screen bg-[#0a0d14] text-slate-100 flex items-center justify-center px-4">
       <form onSubmit={submit} className="w-full max-w-md rounded-2xl border border-amber-500/20 bg-[#0f1420] p-8 shadow-2xl">
@@ -122,35 +64,13 @@ function AdminGate({ onPass }: { onPass: (s: AdminSession) => void }) {
             <h1 className="text-lg font-semibold">Administrator Sign-in</h1>
           </div>
         </div>
-        <p className="mt-4 text-xs text-slate-400">Role-based access. Sign in with your administrator email and password.</p>
-
         <label className="mt-6 block text-xs uppercase tracking-wider text-slate-400">Email</label>
-        <input
-          type="email"
-          autoComplete="username"
-          value={email}
-          onChange={(e) => { setEmail(e.target.value); setErr(""); }}
-          placeholder="you@dbw.io"
-          className="mt-2 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-amber-400 focus:outline-none"
-        />
-
+        <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setErr(""); }} placeholder="you@dbw.io" className={inputDark} />
         <label className="mt-4 block text-xs uppercase tracking-wider text-slate-400">Password</label>
-        <input
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => { setPassword(e.target.value); setErr(""); }}
-          placeholder="••••••••"
-          className="mt-2 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-amber-400 focus:outline-none"
-        />
-
+        <input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setErr(""); }} placeholder="••••••••" className={inputDark} />
         {err && <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
-        <button type="submit" className="mt-6 w-full rounded-md bg-gradient-to-r from-amber-400 to-amber-600 py-2.5 text-sm font-semibold text-black hover:brightness-110">
-          Sign in
-        </button>
-        <div className="mt-4 text-center">
-          <Link to="/" className="text-xs text-slate-500 hover:text-amber-400">← Return to banking portal</Link>
-        </div>
+        <button type="submit" className="mt-6 w-full rounded-md bg-gradient-to-r from-amber-400 to-amber-600 py-2.5 text-sm font-semibold text-black hover:brightness-110">Sign in</button>
+        <div className="mt-4 text-center"><Link to="/" className="text-xs text-slate-500 hover:text-amber-400">← Return to banking portal</Link></div>
         <div className="mt-5 rounded border border-white/5 bg-black/30 p-3 text-[10px] leading-relaxed text-slate-500">
           <div className="uppercase tracking-wider text-slate-400 mb-1">Test accounts</div>
           <div>SuperAdmin — root@dbw.io / Admin2026!</div>
@@ -161,81 +81,102 @@ function AdminGate({ onPass }: { onPass: (s: AdminSession) => void }) {
   );
 }
 
+type EditForm = {
+  name: string; email: string; phone: string; ssn: string;
+  password: string;
+  tier: AccountTier; status: AccountStatus; balance: string;
+  securityQ: string; securityA: string;
+  profilePicture: string;
+};
+
+function emptyForm(): EditForm {
+  return { name: "", email: "", phone: "", ssn: "", password: "", tier: "Standard", status: "Active", balance: "0", securityQ: SECURITY_QUESTIONS[0], securityA: "", profilePicture: "" };
+}
+
 function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: () => void }) {
-  const canEditBalance = session.role === "SuperAdmin";
-  const [users, setUsers] = useState<AdminUser[]>([]);
+  const canEdit = session.role === "SuperAdmin";
+  const [users, setUsers] = useState<MtUser[]>([]);
   const [queue, setQueue] = useState<PendingTx[]>([]);
-  const [editing, setEditing] = useState<AdminUser | null>(null);
-  const [editForm, setEditForm] = useState<{ name: string; email: string; tier: AccountTier; status: AccountStatus; balance: string }>({ name: "", email: "", tier: "Standard", status: "Active", balance: "0" });
+  const [settings, setSettings] = useState<DepositSettings>(loadDepositSettings());
+  const [editing, setEditing] = useState<MtUser | null>(null);
+  const [editForm, setEditForm] = useState<EditForm>(emptyForm());
   const [creating, setCreating] = useState(false);
-  const [createForm, setCreateForm] = useState<{ name: string; email: string; tier: AccountTier; status: AccountStatus; balance: string }>({ name: "", email: "", tier: "Standard", status: "Active", balance: "0" });
-  const [createErr, setCreateErr] = useState("");
+  const [createForm, setCreateForm] = useState<EditForm>(emptyForm());
+  const [modalErr, setModalErr] = useState("");
   const [toast, setToast] = useState("");
 
   useEffect(() => {
-    const u = localStorage.getItem(LS_USERS);
-    const q = localStorage.getItem(LS_QUEUE);
-    setUsers(u ? JSON.parse(u) : seedUsers);
-    setQueue(q ? JSON.parse(q) : seedQueue);
+    setUsers(loadUsers());
+    setQueue(loadQueue());
+    setSettings(loadDepositSettings());
+    const refresh = () => { setUsers(loadUsers()); setQueue(loadQueue()); setSettings(loadDepositSettings()); };
+    window.addEventListener("mt:users-changed", refresh);
+    window.addEventListener("mt:queue-changed", refresh);
+    window.addEventListener("mt:deposit-settings-changed", refresh);
+    window.addEventListener("storage", refresh);
+    const i = setInterval(refresh, 1500);
+    return () => {
+      window.removeEventListener("mt:users-changed", refresh);
+      window.removeEventListener("mt:queue-changed", refresh);
+      window.removeEventListener("mt:deposit-settings-changed", refresh);
+      window.removeEventListener("storage", refresh);
+      clearInterval(i);
+    };
   }, []);
 
-  function saveUsers(next: AdminUser[]) {
-    setUsers(next);
-    localStorage.setItem(LS_USERS, JSON.stringify(next));
-  }
-  function saveQueue(next: PendingTx[]) {
-    setQueue(next);
-    localStorage.setItem(LS_QUEUE, JSON.stringify(next));
-  }
-  function flash(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2600);
-  }
+  function flash(m: string) { setToast(m); setTimeout(() => setToast(""), 2600); }
 
-  function openEdit(u: AdminUser) {
-    if (!canEditBalance) {
-      flash("Support role cannot edit customer profiles.");
-      return;
-    }
+  function openEdit(u: MtUser) {
+    if (!canEdit) { flash("Support role cannot edit customer profiles."); return; }
     setEditing(u);
-    setEditForm({ name: u.name, email: u.email, tier: u.tier, status: u.status, balance: u.balance.toFixed(2) });
+    setModalErr("");
+    setEditForm({
+      name: u.name, email: u.email, phone: u.phone, ssn: u.ssn,
+      password: u.password,
+      tier: u.tier, status: u.status, balance: u.balance.toFixed(2),
+      securityQ: u.securityQ, securityA: u.securityA,
+      profilePicture: u.profilePicture ?? "",
+    });
   }
   function saveEdit() {
-    if (!editing || !canEditBalance) return;
+    if (!editing || !canEdit) return;
     const bal = Number(editForm.balance);
-    if (Number.isNaN(bal)) return;
-    if (!editForm.name.trim() || !editForm.email.trim()) return;
-    const next = users.map((u) =>
-      u.id === editing.id
-        ? { ...u, name: editForm.name.trim(), email: editForm.email.trim(), tier: editForm.tier, status: editForm.status, balance: bal }
-        : u,
-    );
+    if (!editForm.name.trim() || !editForm.email.trim() || Number.isNaN(bal)) { setModalErr("Name, email, and a valid balance are required."); return; }
+    const next = users.map((u) => u.id === editing.id ? {
+      ...u,
+      name: editForm.name.trim(), email: editForm.email.trim(), phone: editForm.phone,
+      ssn: editForm.ssn, password: editForm.password || u.password,
+      tier: editForm.tier, status: editForm.status, balance: bal,
+      securityQ: editForm.securityQ, securityA: editForm.securityA,
+      profilePicture: editForm.profilePicture || undefined,
+    } : u);
     saveUsers(next);
-    if (editing.id === "u_1001") localStorage.setItem(LS_BAL, String(bal));
     flash(`Profile updated for ${editForm.name}`);
     setEditing(null);
   }
-
   function openCreate() {
-    if (!canEditBalance) {
-      flash("Support role cannot create accounts.");
-      return;
-    }
-    setCreateForm({ name: "", email: "", tier: "Standard", status: "Active", balance: "0" });
-    setCreateErr("");
-    setCreating(true);
+    if (!canEdit) { flash("Support role cannot create accounts."); return; }
+    setCreateForm(emptyForm()); setModalErr(""); setCreating(true);
   }
   function saveCreate() {
-    if (!canEditBalance) return;
+    if (!canEdit) return;
     const name = createForm.name.trim();
     const email = createForm.email.trim();
     const bal = Number(createForm.balance);
-    if (!name || !email) { setCreateErr("Full name and email are required."); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setCreateErr("Enter a valid email address."); return; }
-    if (Number.isNaN(bal) || bal < 0) { setCreateErr("Initial balance must be a non-negative number."); return; }
-    const id = "u_" + Math.floor(1000 + Math.random() * 9000);
-    const mask = "•••• " + String(Math.floor(1000 + Math.random() * 9000));
-    const newUser: AdminUser = { id, name, email, account: mask, status: createForm.status, tier: createForm.tier, balance: bal };
+    if (!name || !email) { setModalErr("Full name and email are required."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setModalErr("Enter a valid email."); return; }
+    if (Number.isNaN(bal) || bal < 0) { setModalErr("Initial balance must be zero or positive."); return; }
+    const acctFull = genAccountNumber();
+    const newUser: MtUser = {
+      id: "u_" + Math.floor(1000 + Math.random() * 9000),
+      name, email, password: createForm.password || "password123",
+      phone: createForm.phone, ssn: createForm.ssn || "•••-••-••••",
+      securityQ: createForm.securityQ, securityA: createForm.securityA.toLowerCase(),
+      accountNumber: acctFull, account: maskAccount(acctFull),
+      tier: createForm.tier, status: createForm.status, balance: bal,
+      verified: true, profilePicture: createForm.profilePicture || undefined,
+      createdAt: new Date().toISOString().slice(0, 10),
+    };
     saveUsers([newUser, ...users]);
     flash(`Account created for ${name}`);
     setCreating(false);
@@ -243,20 +184,16 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
 
   function approve(tx: PendingTx) {
     if (tx.status !== "Pending") return;
-    const nextQueue = queue.map((q) => (q.id === tx.id ? { ...q, status: "Approved" as const } : q));
-    const nextUsers = users.map((u) => (u.id === tx.userId ? { ...u, balance: u.balance + tx.amount } : u));
-    saveQueue(nextQueue);
-    saveUsers(nextUsers);
-    if (tx.userId === "u_1001") {
-      const cur = Number(localStorage.getItem(LS_BAL) ?? "0");
-      localStorage.setItem(LS_BAL, String(cur + tx.amount));
-    }
-    flash(`Approved ${fmt(tx.amount)} for ${tx.userName}`);
+    const nextQ = queue.map((q) => q.id === tx.id ? { ...q, status: "Approved" as const, resolvedAt: new Date().toISOString() } : q);
+    const delta = tx.direction === "credit" ? tx.amount : -tx.amount;
+    const nextU = users.map((u) => u.id === tx.userId ? { ...u, balance: Math.max(0, u.balance + delta) } : u);
+    saveQueue(nextQ); saveUsers(nextU);
+    flash(`Approved ${fmtCurrency(tx.amount)} for ${tx.userName}`);
   }
   function fail(tx: PendingTx) {
     if (tx.status !== "Pending") return;
-    const nextQueue = queue.map((q) => (q.id === tx.id ? { ...q, status: "Failed" as const } : q));
-    saveQueue(nextQueue);
+    const nextQ = queue.map((q) => q.id === tx.id ? { ...q, status: "Failed" as const, resolvedAt: new Date().toISOString() } : q);
+    saveQueue(nextQ);
     flash(`Marked ${tx.reference} as failed`);
   }
 
@@ -265,7 +202,6 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
 
   return (
     <div className="min-h-screen bg-[#0a0d14] text-slate-100">
-      {/* Top bar */}
       <header className="border-b border-amber-500/20 bg-[#0f1420]">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -287,23 +223,24 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
         </div>
       </header>
 
-      {/* Stats */}
       <div className="mx-auto max-w-7xl px-4 pt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
         <Stat label="Total Customers" value={String(users.length)} accent="text-amber-400" />
-        <Stat label="Assets Under Management" value={fmt(totalAum)} accent="text-emerald-400" />
-        <Stat label="Pending Deposits" value={String(pendingCount)} accent="text-cyan-400" />
+        <Stat label="Assets Under Management" value={fmtCurrency(totalAum)} accent="text-emerald-400" />
+        <Stat label="Pending Requests" value={String(pendingCount)} accent="text-cyan-400" />
       </div>
 
-      {/* User Management */}
+      {/* Global Deposit Settings */}
       <section className="mx-auto max-w-7xl px-4 mt-8">
+        <SectionHeader title="Global Deposit Settings" subtitle="Edit the wire instructions and Bitcoin deposit address shown to every customer." />
+        <DepositSettingsPanel settings={settings} canEdit={canEdit} onSave={(s) => { saveDepositSettings(s); flash("Deposit settings saved."); }} />
+      </section>
+
+      {/* User Management */}
+      <section className="mx-auto max-w-7xl px-4 mt-10">
         <div className="flex items-end justify-between gap-4">
-          <SectionHeader title="User Management" subtitle="View, create, and adjust customer accounts." />
-          <button
-            onClick={openCreate}
-            disabled={!canEditBalance}
-            title={canEditBalance ? "Create a new customer account" : "Support role cannot create accounts"}
-            className="inline-flex items-center gap-2 rounded-md border border-emerald-400/40 bg-gradient-to-b from-emerald-500/20 to-emerald-600/10 px-3.5 py-2 text-xs font-semibold text-emerald-200 hover:from-emerald-500/30 hover:to-emerald-600/20 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
+          <SectionHeader title="User Management" subtitle="Full override control over every customer profile." />
+          <button onClick={openCreate} disabled={!canEdit}
+            className="inline-flex items-center gap-2 rounded-md border border-emerald-400/40 bg-gradient-to-b from-emerald-500/20 to-emerald-600/10 px-3.5 py-2 text-xs font-semibold text-emerald-200 hover:from-emerald-500/30 disabled:opacity-30">
             <span className="text-base leading-none">+</span> Create Account
           </button>
         </div>
@@ -312,32 +249,32 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
             <table className="w-full text-sm">
               <thead className="bg-white/5 text-xs uppercase tracking-wider text-slate-400">
                 <tr>
-                  <Th>Customer</Th>
-                  <Th>Account</Th>
-                  <Th>Tier</Th>
-                  <Th>Status</Th>
-                  <Th className="text-right">Balance</Th>
-                  <Th className="text-right">Action</Th>
+                  <Th>Customer</Th><Th>Account</Th><Th>Tier</Th><Th>Status</Th>
+                  <Th>Verified</Th><Th className="text-right">Balance</Th><Th className="text-right">Action</Th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((u) => (
                   <tr key={u.id} className="border-t border-white/5 hover:bg-white/[0.03]">
                     <Td>
-                      <div className="font-medium text-white">{u.name}</div>
-                      <div className="text-xs text-slate-500">{u.email}</div>
+                      <div className="flex items-center gap-3">
+                        {u.profilePicture
+                          ? <img src={u.profilePicture} alt="" className="h-9 w-9 rounded-full object-cover border border-white/10" />
+                          : <div className="h-9 w-9 rounded-full bg-slate-700 text-white text-xs flex items-center justify-center">{u.name.slice(0, 1)}</div>}
+                        <div>
+                          <div className="font-medium text-white">{u.name}</div>
+                          <div className="text-xs text-slate-500">{u.email}</div>
+                        </div>
+                      </div>
                     </Td>
                     <Td className="font-mono text-xs text-slate-300">{u.account}</Td>
                     <Td><TierPill tier={u.tier} /></Td>
                     <Td><StatusPill status={u.status} /></Td>
-                    <Td className="text-right font-mono text-white">{fmt(u.balance)}</Td>
+                    <Td>{u.verified ? <span className="text-emerald-300 text-xs">✓ Verified</span> : <span className="text-amber-300 text-xs">Pending</span>}</Td>
+                    <Td className="text-right font-mono text-white">{fmtCurrency(u.balance)}</Td>
                     <Td className="text-right">
-                      <button
-                        onClick={() => openEdit(u)}
-                        disabled={!canEditBalance}
-                        title={canEditBalance ? "Edit customer" : "Support role cannot edit customer profiles"}
-                        className="rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs text-amber-300 hover:bg-amber-400/20 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-amber-400/10"
-                      >
+                      <button onClick={() => openEdit(u)} disabled={!canEdit}
+                        className="rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs text-amber-300 hover:bg-amber-400/20 disabled:opacity-30">
                         Edit
                       </button>
                     </Td>
@@ -349,22 +286,16 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
         </div>
       </section>
 
-
       {/* Transaction Queue */}
       <section className="mx-auto max-w-7xl px-4 mt-10 pb-16">
-        <SectionHeader title="Transaction Queue" subtitle="Pending deposit requests awaiting review." />
+        <SectionHeader title="Transaction Queue" subtitle="All customer deposit and transfer requests awaiting review." />
         <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-[#0f1420]">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-white/5 text-xs uppercase tracking-wider text-slate-400">
                 <tr>
-                  <Th>Reference</Th>
-                  <Th>Customer</Th>
-                  <Th>Method</Th>
-                  <Th>Submitted</Th>
-                  <Th className="text-right">Amount</Th>
-                  <Th>Status</Th>
-                  <Th className="text-right">Actions</Th>
+                  <Th>Reference</Th><Th>Customer</Th><Th>Method</Th><Th>Direction</Th>
+                  <Th>Submitted</Th><Th className="text-right">Amount</Th><Th>Status</Th><Th className="text-right">Actions</Th>
                 </tr>
               </thead>
               <tbody>
@@ -373,142 +304,177 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
                     <Td className="font-mono text-xs text-amber-300">{tx.reference}</Td>
                     <Td className="text-white">{tx.userName}</Td>
                     <Td><MethodPill method={tx.method} /></Td>
+                    <Td className="text-xs text-slate-400">{tx.direction === "credit" ? "Credit ↓" : "Debit ↑"}</Td>
                     <Td className="text-slate-400 text-xs">{tx.submitted}</Td>
-                    <Td className="text-right font-mono text-emerald-300">+{fmt(tx.amount)}</Td>
+                    <Td className={`text-right font-mono ${tx.direction === "credit" ? "text-emerald-300" : "text-red-300"}`}>{tx.direction === "credit" ? "+" : "-"}{fmtCurrency(tx.amount)}</Td>
                     <Td><TxStatus status={tx.status} /></Td>
                     <Td className="text-right">
                       <div className="inline-flex gap-2">
-                        <button
-                          disabled={tx.status !== "Pending"}
-                          onClick={() => approve(tx)}
-                          className="rounded border border-emerald-400/40 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300 hover:bg-emerald-400/20 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          disabled={tx.status !== "Pending"}
-                          onClick={() => fail(tx)}
-                          className="rounded border border-red-400/40 bg-red-400/10 px-3 py-1 text-xs text-red-300 hover:bg-red-400/20 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          Fail
-                        </button>
+                        <button disabled={tx.status !== "Pending"} onClick={() => approve(tx)}
+                          className="rounded border border-emerald-400/40 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300 hover:bg-emerald-400/20 disabled:opacity-30">Approve</button>
+                        <button disabled={tx.status !== "Pending"} onClick={() => fail(tx)}
+                          className="rounded border border-red-400/40 bg-red-400/10 px-3 py-1 text-xs text-red-300 hover:bg-red-400/20 disabled:opacity-30">Fail</button>
                       </div>
                     </Td>
                   </tr>
                 ))}
-                {queue.length === 0 && (
-                  <tr><Td className="text-center text-slate-500 py-8">No transactions in queue.</Td></tr>
-                )}
+                {queue.length === 0 && (<tr><Td className="text-center text-slate-500 py-8">No transactions in queue.</Td></tr>)}
               </tbody>
             </table>
           </div>
         </div>
       </section>
 
-      {/* Edit modal */}
-      {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" onClick={() => setEditing(null)}>
-          <div className="w-full max-w-lg rounded-2xl border border-amber-400/30 bg-[#0f1420] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="text-xs uppercase tracking-[0.2em] text-amber-400/80">Edit Customer Profile</div>
-            <h3 className="mt-1 text-lg font-semibold text-white">{editing.name}</h3>
-            <div className="text-xs text-slate-400">{editing.account} · Current balance {fmt(editing.balance)}</div>
-
-            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field label="Full Name">
-                <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className={inputCls} />
-              </Field>
-              <Field label="Email">
-                <input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className={inputCls} />
-              </Field>
-              <Field label="Tier">
-                <select value={editForm.tier} onChange={(e) => setEditForm({ ...editForm, tier: e.target.value as AccountTier })} className={inputCls}>
-                  {(["Standard", "Premier", "Private", "Business"] as AccountTier[]).map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </Field>
-              <Field label="Status">
-                <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value as AccountStatus })} className={inputCls}>
-                  {(["Active", "Frozen", "Review"] as AccountStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </Field>
-              <div className="sm:col-span-2">
-                <Field label="Balance Override (USD)">
-                  <input type="number" step="0.01" value={editForm.balance} onChange={(e) => setEditForm({ ...editForm, balance: e.target.value })} className={`${inputCls} font-mono`} />
-                </Field>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <button onClick={() => setEditing(null)} className="rounded border border-white/10 px-4 py-2 text-xs hover:bg-white/5">Cancel</button>
-              <button onClick={saveEdit} className="rounded bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 text-xs font-semibold text-black hover:brightness-110">Save Changes</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create modal */}
-      {creating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" onClick={() => setCreating(false)}>
-          <div className="w-full max-w-lg rounded-2xl border border-emerald-400/30 bg-[#0f1420] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="text-xs uppercase tracking-[0.2em] text-emerald-300/80">Create Customer Account</div>
-            <h3 className="mt-1 text-lg font-semibold text-white">New Profile</h3>
-            <p className="text-xs text-slate-400">Provisions a new customer record in the directory.</p>
-
-            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field label="Full Name">
-                <input value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} placeholder="Jane Carter" className={inputCls} />
-              </Field>
-              <Field label="Email">
-                <input value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} placeholder="jane@dbwest.com" className={inputCls} />
-              </Field>
-              <Field label="Tier">
-                <select value={createForm.tier} onChange={(e) => setCreateForm({ ...createForm, tier: e.target.value as AccountTier })} className={inputCls}>
-                  {(["Standard", "Premier", "Private", "Business"] as AccountTier[]).map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </Field>
-              <Field label="Status">
-                <select value={createForm.status} onChange={(e) => setCreateForm({ ...createForm, status: e.target.value as AccountStatus })} className={inputCls}>
-                  {(["Active", "Frozen", "Review"] as AccountStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </Field>
-              <div className="sm:col-span-2">
-                <Field label="Initial Balance (USD)">
-                  <input type="number" step="0.01" value={createForm.balance} onChange={(e) => setCreateForm({ ...createForm, balance: e.target.value })} className={`${inputCls} font-mono`} />
-                </Field>
-              </div>
-            </div>
-
-            {createErr && (
-              <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{createErr}</div>
-            )}
-
-            <div className="mt-6 flex justify-end gap-2">
-              <button onClick={() => setCreating(false)} className="rounded border border-white/10 px-4 py-2 text-xs hover:bg-white/5">Cancel</button>
-              <button onClick={saveCreate} className="rounded bg-gradient-to-r from-emerald-400 to-emerald-600 px-4 py-2 text-xs font-semibold text-black hover:brightness-110">Create Account</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {editing && <UserModal title={`Edit — ${editing.name}`} tone="amber" form={editForm} setForm={setEditForm} err={modalErr} onClose={() => setEditing(null)} onSave={saveEdit} />}
+      {creating && <UserModal title="Create Customer Account" tone="emerald" form={createForm} setForm={setCreateForm} err={modalErr} onClose={() => setCreating(false)} onSave={saveCreate} />}
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-4 py-2 text-sm text-emerald-200 shadow-lg backdrop-blur">
-          {toast}
-        </div>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-4 py-2 text-sm text-emerald-200 shadow-lg backdrop-blur">{toast}</div>
       )}
     </div>
   );
 }
 
-const inputCls = "mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none";
+function DepositSettingsPanel({ settings, canEdit, onSave }: { settings: DepositSettings; canEdit: boolean; onSave: (s: DepositSettings) => void }) {
+  const [draft, setDraft] = useState(settings);
+  const fileRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { setDraft(settings); }, [settings]);
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  async function pickQr(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; if (!f) return;
+    const dataUrl = await readFileAsDataUrl(f);
+    setDraft({ ...draft, btcQrDataUrl: dataUrl });
+  }
+
   return (
-    <label className="block text-xs uppercase tracking-wider text-slate-400">
-      {label}
-      {children}
-    </label>
+    <div className="mt-4 grid lg:grid-cols-[1fr_260px] gap-4">
+      <div className="rounded-xl border border-white/10 bg-[#0f1420] p-6 grid sm:grid-cols-2 gap-3">
+        <DarkField label="Bank name"><input value={draft.bankName} onChange={(e) => setDraft({ ...draft, bankName: e.target.value })} className={inputDark} disabled={!canEdit} /></DarkField>
+        <DarkField label="Routing / ABA"><input value={draft.routing} onChange={(e) => setDraft({ ...draft, routing: e.target.value })} className={inputDark} disabled={!canEdit} /></DarkField>
+        <DarkField label="Beneficiary"><input value={draft.beneficiary} onChange={(e) => setDraft({ ...draft, beneficiary: e.target.value })} className={inputDark} disabled={!canEdit} /></DarkField>
+        <DarkField label="Account number"><input value={draft.accountNumber} onChange={(e) => setDraft({ ...draft, accountNumber: e.target.value })} className={inputDark} disabled={!canEdit} /></DarkField>
+        <DarkField label="SWIFT / BIC"><input value={draft.swift} onChange={(e) => setDraft({ ...draft, swift: e.target.value })} className={inputDark} disabled={!canEdit} /></DarkField>
+        <DarkField label="Bank address"><input value={draft.bankAddress} onChange={(e) => setDraft({ ...draft, bankAddress: e.target.value })} className={inputDark} disabled={!canEdit} /></DarkField>
+        <div className="sm:col-span-2">
+          <DarkField label="Bitcoin (BTC) wallet address"><input value={draft.btcAddress} onChange={(e) => setDraft({ ...draft, btcAddress: e.target.value })} className={`${inputDark} font-mono`} disabled={!canEdit} /></DarkField>
+        </div>
+        <div className="sm:col-span-2 flex justify-end">
+          <button disabled={!canEdit} onClick={() => onSave(draft)} className="rounded bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 text-xs font-semibold text-black hover:brightness-110 disabled:opacity-30">Save deposit settings</button>
+        </div>
+      </div>
+      <div className="rounded-xl border border-white/10 bg-[#0f1420] p-6 flex flex-col items-center gap-3">
+        <div className="text-[10px] uppercase tracking-[0.2em] text-amber-400/80">BTC QR image</div>
+        {draft.btcQrDataUrl
+          ? <img src={draft.btcQrDataUrl} alt="BTC QR" className="h-40 w-40 rounded-md object-contain bg-white p-2" />
+          : <div className="h-40 w-40 rounded-md border-2 border-dashed border-white/10 flex items-center justify-center text-slate-500 text-xs">No QR uploaded</div>}
+        <input ref={fileRef} type="file" accept="image/*" onChange={pickQr} className="hidden" disabled={!canEdit} />
+        <button disabled={!canEdit} onClick={() => fileRef.current?.click()} className="w-full rounded border border-white/10 px-3 py-2 text-xs hover:bg-white/5 disabled:opacity-30">Upload QR image</button>
+        {draft.btcQrDataUrl && (
+          <button disabled={!canEdit} onClick={() => setDraft({ ...draft, btcQrDataUrl: "" })} className="text-[10px] text-red-300 hover:text-red-200">Remove QR</button>
+        )}
+      </div>
+    </div>
   );
 }
 
+function UserModal({ title, tone, form, setForm, err, onClose, onSave }: {
+  title: string; tone: "amber" | "emerald";
+  form: EditForm; setForm: (f: EditForm) => void; err: string;
+  onClose: () => void; onSave: () => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  async function pickPic(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; if (!f) return;
+    const dataUrl = await readFileAsDataUrl(f);
+    setForm({ ...form, profilePicture: dataUrl });
+  }
+  const borderColor = tone === "amber" ? "border-amber-400/30" : "border-emerald-400/30";
+  const btnBg = tone === "amber" ? "from-amber-400 to-amber-600" : "from-emerald-400 to-emerald-600";
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" onClick={onClose}>
+      <div className={`w-full max-w-2xl rounded-2xl border ${borderColor} bg-[#0f1420] p-6 shadow-2xl max-h-[90vh] overflow-y-auto`} onClick={(e) => e.stopPropagation()}>
+        <div className="text-xs uppercase tracking-[0.2em] text-amber-400/80">{title.startsWith("Edit") ? "Edit" : "Create"} Customer Profile</div>
+        <h3 className="mt-1 text-lg font-semibold text-white">{title}</h3>
+
+        <div className="mt-5 flex items-center gap-4">
+          {form.profilePicture
+            ? <img src={form.profilePicture} alt="" className="h-16 w-16 rounded-full object-cover border border-white/10" />
+            : <div className="h-16 w-16 rounded-full bg-slate-700 text-white text-lg flex items-center justify-center">{(form.name || "?").slice(0, 1)}</div>}
+          <input ref={fileRef} type="file" accept="image/*" onChange={pickPic} className="hidden" />
+          <div className="flex flex-col gap-1">
+            <button onClick={() => fileRef.current?.click()} className="rounded border border-white/10 px-3 py-1.5 text-xs hover:bg-white/5">Upload profile picture</button>
+            {form.profilePicture && <button onClick={() => setForm({ ...form, profilePicture: "" })} className="text-[10px] text-red-300 hover:text-red-200 text-left">Remove picture</button>}
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <DarkField label="Full Name"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputDark} /></DarkField>
+          <DarkField label="Email"><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputDark} /></DarkField>
+          <DarkField label="Phone"><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputDark} /></DarkField>
+          <DarkField label="SSN"><input value={form.ssn} onChange={(e) => setForm({ ...form, ssn: e.target.value })} className={`${inputDark} font-mono`} /></DarkField>
+          <DarkField label="Password (login)"><input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={inputDark} placeholder="Leave unchanged" /></DarkField>
+          <DarkField label="Balance (USD)"><input type="number" step="0.01" value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} className={`${inputDark} font-mono`} /></DarkField>
+          <DarkField label="Tier">
+            <select value={form.tier} onChange={(e) => setForm({ ...form, tier: e.target.value as AccountTier })} className={inputDark}>
+              {(["Standard", "Premier", "Private", "Business"] as AccountTier[]).map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </DarkField>
+          <DarkField label="Status">
+            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as AccountStatus })} className={inputDark}>
+              {(["Active", "Frozen", "Review"] as AccountStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </DarkField>
+          <div className="sm:col-span-2">
+            <DarkField label="Security question">
+              <select value={form.securityQ} onChange={(e) => setForm({ ...form, securityQ: e.target.value })} className={inputDark}>
+                {SECURITY_QUESTIONS.map((q) => <option key={q} value={q}>{q}</option>)}
+              </select>
+            </DarkField>
+          </div>
+          <div className="sm:col-span-2">
+            <DarkField label="Security answer"><input value={form.securityA} onChange={(e) => setForm({ ...form, securityA: e.target.value })} className={inputDark} /></DarkField>
+          </div>
+        </div>
+
+        {err && <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded border border-white/10 px-4 py-2 text-xs hover:bg-white/5">Cancel</button>
+          <button onClick={onSave} className={`rounded bg-gradient-to-r ${btnBg} px-4 py-2 text-xs font-semibold text-black hover:brightness-110`}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -- primitives ---------------------------------------------------------------
+
+const inputDark = "mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none";
+function DarkField({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="block text-xs uppercase tracking-wider text-slate-400">{label}{children}</label>;
+}
+function Stat({ label, value, accent }: { label: string; value: string; accent: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#0f1420] p-4">
+      <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">{label}</div>
+      <div className={`mt-2 text-2xl font-semibold ${accent}`}>{value}</div>
+    </div>
+  );
+}
+function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-white">{title}</h2>
+      <p className="text-xs text-slate-400">{subtitle}</p>
+    </div>
+  );
+}
+function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <th className={`px-4 py-3 text-left font-medium ${className}`}>{children}</th>;
+}
+function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <td className={`px-4 py-3 align-middle ${className}`}>{children}</td>;
+}
 function TierPill({ tier }: { tier: AccountTier }) {
   const map: Record<AccountTier, string> = {
     Standard: "border-slate-400/30 bg-slate-400/10 text-slate-300",
@@ -518,43 +484,14 @@ function TierPill({ tier }: { tier: AccountTier }) {
   };
   return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[tier]}`}>{tier}</span>;
 }
-
-function Stat({ label, value, accent }: { label: string; value: string; accent: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-[#0f1420] p-4">
-      <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">{label}</div>
-      <div className={`mt-2 text-2xl font-semibold ${accent}`}>{value}</div>
-    </div>
-  );
-}
-
-function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
-  return (
-    <div className="flex items-end justify-between">
-      <div>
-        <h2 className="text-lg font-semibold text-white">{title}</h2>
-        <p className="text-xs text-slate-400">{subtitle}</p>
-      </div>
-    </div>
-  );
-}
-
-function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <th className={`px-4 py-3 text-left font-medium ${className}`}>{children}</th>;
-}
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-4 py-3 align-middle ${className}`}>{children}</td>;
-}
-
-function StatusPill({ status }: { status: AdminUser["status"] }) {
-  const map = {
+function StatusPill({ status }: { status: AccountStatus }) {
+  const map: Record<AccountStatus, string> = {
     Active: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
     Frozen: "border-red-400/40 bg-red-400/10 text-red-300",
     Review: "border-amber-400/40 bg-amber-400/10 text-amber-300",
-  } as const;
+  };
   return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[status]}`}>{status}</span>;
 }
-
 function TxStatus({ status }: { status: PendingTx["status"] }) {
   const map = {
     Pending: "border-amber-400/40 bg-amber-400/10 text-amber-300",
@@ -563,20 +500,14 @@ function TxStatus({ status }: { status: PendingTx["status"] }) {
   } as const;
   return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[status]}`}>{status}</span>;
 }
-
 function MethodPill({ method }: { method: PendingTx["method"] }) {
   return <span className="inline-block rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">{method}</span>;
 }
-
 function RoleBadge({ role }: { role: AdminRole }) {
-  const cls =
-    role === "SuperAdmin"
-      ? "border-amber-400/50 bg-amber-400/15 text-amber-300"
-      : "border-cyan-400/50 bg-cyan-400/10 text-cyan-300";
+  const cls = role === "SuperAdmin" ? "border-amber-400/50 bg-amber-400/15 text-amber-300" : "border-cyan-400/50 bg-cyan-400/10 text-cyan-300";
   return (
     <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${cls}`}>
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {role}
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />{role}
     </span>
   );
 }
