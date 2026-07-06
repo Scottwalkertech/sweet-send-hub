@@ -142,6 +142,8 @@ export function loadUsers(): MtUser[] {
       verified: u.verified ?? true,
       profilePicture: u.profilePicture,
       createdAt: u.createdAt ?? new Date().toISOString().slice(0, 10),
+      enrollments: u.enrollments ?? { smallBusiness: false, commercial: false, wire: false },
+      serviceBalances: u.serviceBalances ?? { smallBusiness: 0, commercial: 0, wire: 0 },
     }));
   } catch {
     return seedUsers;
