@@ -200,6 +200,16 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
       tier: createForm.tier, status: createForm.status, balance: bal,
       verified: true, profilePicture: createForm.profilePicture || undefined,
       createdAt: new Date().toISOString().slice(0, 10),
+      enrollments: {
+        smallBusiness: createForm.enrollSmallBusiness,
+        commercial: createForm.enrollCommercial,
+        wire: createForm.enrollWire,
+      },
+      serviceBalances: {
+        smallBusiness: Number(createForm.balSmallBusiness) || 0,
+        commercial: Number(createForm.balCommercial) || 0,
+        wire: Number(createForm.balWire) || 0,
+      },
     };
     saveUsers([newUser, ...users]);
     flash(`Account created for ${name}`);
