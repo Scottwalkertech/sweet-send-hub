@@ -89,10 +89,32 @@ function Login({ onAuth }: { onAuth: (u: MtUser) => void }) {
   );
 }
 
+type TopNavKey = "personal" | "smallBusiness" | "commercial" | "wire";
+const TOP_NAV: Array<{ key: TopNavKey; label: string }> = [
+  { key: "personal", label: "Personal Banking" },
+  { key: "smallBusiness", label: "Small Business" },
+  { key: "commercial", label: "Commercial Accounts" },
+  { key: "wire", label: "Wire Services" },
+];
+
+function isEnrolled(user: MtUser, key: TopNavKey): boolean {
+  if (key === "personal") return true;
+  const e = user.enrollments ?? {};
+  if (key === "smallBusiness") return !!e.smallBusiness;
+  if (key === "commercial") return !!e.commercial;
+  if (key === "wire") return !!e.wire;
+  return false;
+}
+
 function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
   const navigate = useNavigate();
   const [activePending, setActivePending] = useState<PendingTx | null>(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [dbwOpen, setDbwOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [notEnrolled, setNotEnrolled] = useState<null | { label: string }>(null);
+  const [activeTop, setActiveTop] = useState<TopNavKey>("personal");
+  const dbwRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function refresh() {
@@ -106,6 +128,19 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
     return () => { off(); clearInterval(i); };
   }, [user.id]);
 
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (dbwRef.current && !dbwRef.current.contains(e.target as Node)) setDbwOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  function handleTopNav(item: { key: TopNavKey; label: string }) {
+    if (isEnrolled(user, item.key)) { setActiveTop(item.key); return; }
+    setNotEnrolled({ label: item.label });
+  }
+
   const userHistory = loadQueue()
     .filter((t) => t.userId === user.id && t.status !== "Pending")
     .slice(0, 20);
@@ -114,19 +149,48 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <header className="bg-white border-b border-slate-200">
-        <div className="bg-slate-900">
-          <div className="max-w-6xl mx-auto px-6 py-1.5 flex items-center justify-end gap-6 text-[11px] tracking-wide uppercase">
-            <span className="text-white/60">Personal Banking</span>
-            <span className="text-white/60">·</span>
-            <span className="text-amber-300">Member FDIC</span>
+        {/* Top strip navigation */}
+        <div className="bg-gradient-to-b from-slate-900 to-slate-900/95 backdrop-blur border-b border-white/5">
+          <div className="max-w-6xl mx-auto px-6 py-2 flex items-center justify-between gap-4">
+            <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto">
+              {TOP_NAV.map((item) => {
+                const enrolled = isEnrolled(user, item.key);
+                const active = activeTop === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => handleTopNav(item)}
+                    className={[
+                      "group relative inline-flex items-center gap-1.5 px-3 py-1 text-[11px] uppercase tracking-[0.14em] rounded transition-colors whitespace-nowrap",
+                      enrolled
+                        ? active
+                          ? "text-amber-300 bg-white/[0.06]"
+                          : "text-white/80 hover:text-amber-300 hover:bg-white/[0.04]"
+                        : "text-white/35 hover:text-white/60",
+                    ].join(" ")}
+                    title={enrolled ? item.label : `${item.label} — Not enrolled`}
+                  >
+                    {!enrolled && (
+                      <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="5" y="11" width="14" height="9" rx="2" />
+                        <path d="M8 11V8a4 4 0 118 0v3" />
+                      </svg>
+                    )}
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+            <span className="hidden md:inline text-[10px] uppercase tracking-[0.2em] text-amber-300/90">Member FDIC</span>
           </div>
         </div>
+
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-[10px] tracking-wide">DBW</div>
             <div>
               <div className="text-sm font-semibold text-slate-900 tracking-wide">DYNAMIC BANK OF WEST</div>
-              <div className="text-xs text-slate-500">Personal Banking</div>
+              <div className="text-xs text-slate-500">{TOP_NAV.find((t) => t.key === activeTop)?.label ?? "Personal Banking"}</div>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -136,10 +200,36 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                 ? <img src={user.profilePicture} alt="Profile" className="h-full w-full object-cover" />
                 : <div className="h-full w-full flex items-center justify-center text-sm text-slate-600 font-semibold">{user.name.slice(0, 1)}</div>}
             </button>
+
+            {/* DBW Gold Shield Dropdown */}
+            <div ref={dbwRef} className="relative">
+              <button
+                onClick={() => setDbwOpen((v) => !v)}
+                className="relative inline-flex h-9 w-9 items-center justify-center rounded-md text-black font-black text-[10px] tracking-wider shadow-md ring-1 ring-amber-700/40 bg-gradient-to-br from-amber-300 via-amber-400 to-amber-600 hover:brightness-110 transition"
+                aria-label="DBW quick menu"
+                style={{ clipPath: "polygon(0 0,100% 0,100% 75%,50% 100%,0 75%)" }}
+              >
+                DBW
+              </button>
+              {dbwOpen && (
+                <div className="absolute right-0 mt-2 w-64 rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden z-40">
+                  <div className="px-4 py-3 bg-gradient-to-r from-amber-50 to-white border-b border-slate-100">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-amber-700 font-semibold">DBW Quick Menu</div>
+                    <div className="text-xs text-slate-600 mt-0.5">{user.name}</div>
+                  </div>
+                  <DbwItem icon="👤" label="My Profile Settings" onClick={() => { setDbwOpen(false); setShowProfile(true); }} />
+                  <DbwItem icon="💳" label="Debit Card Controls" onClick={() => { setDbwOpen(false); }} />
+                  <DbwItem icon="📋" label="Routing & Account Info" onClick={() => { setDbwOpen(false); }} />
+                  <DbwItem icon="🔒" label="Open Secure Messages" onClick={() => { setDbwOpen(false); setChatOpen(true); }} />
+                </div>
+              )}
+            </div>
+
             <button onClick={onLogout} className="text-sm text-slate-600 hover:text-slate-900">Sign out</button>
           </div>
         </div>
       </header>
+
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
         {/* Balance card */}
