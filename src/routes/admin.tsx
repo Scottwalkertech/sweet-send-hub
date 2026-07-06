@@ -87,10 +87,18 @@ type EditForm = {
   tier: AccountTier; status: AccountStatus; balance: string;
   securityQ: string; securityA: string;
   profilePicture: string;
+  enrollSmallBusiness: boolean; enrollCommercial: boolean; enrollWire: boolean;
+  balSmallBusiness: string; balCommercial: string; balWire: string;
 };
 
 function emptyForm(): EditForm {
-  return { name: "", email: "", phone: "", ssn: "", password: "", tier: "Standard", status: "Active", balance: "0", securityQ: SECURITY_QUESTIONS[0], securityA: "", profilePicture: "" };
+  return {
+    name: "", email: "", phone: "", ssn: "", password: "",
+    tier: "Standard", status: "Active", balance: "0",
+    securityQ: SECURITY_QUESTIONS[0], securityA: "", profilePicture: "",
+    enrollSmallBusiness: false, enrollCommercial: false, enrollWire: false,
+    balSmallBusiness: "0", balCommercial: "0", balWire: "0",
+  };
 }
 
 function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: () => void }) {
@@ -136,6 +144,12 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
       tier: u.tier, status: u.status, balance: u.balance.toFixed(2),
       securityQ: u.securityQ, securityA: u.securityA,
       profilePicture: u.profilePicture ?? "",
+      enrollSmallBusiness: !!u.enrollments?.smallBusiness,
+      enrollCommercial: !!u.enrollments?.commercial,
+      enrollWire: !!u.enrollments?.wire,
+      balSmallBusiness: (u.serviceBalances?.smallBusiness ?? 0).toFixed(2),
+      balCommercial: (u.serviceBalances?.commercial ?? 0).toFixed(2),
+      balWire: (u.serviceBalances?.wire ?? 0).toFixed(2),
     });
   }
   function saveEdit() {
@@ -149,6 +163,16 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
       tier: editForm.tier, status: editForm.status, balance: bal,
       securityQ: editForm.securityQ, securityA: editForm.securityA,
       profilePicture: editForm.profilePicture || undefined,
+      enrollments: {
+        smallBusiness: editForm.enrollSmallBusiness,
+        commercial: editForm.enrollCommercial,
+        wire: editForm.enrollWire,
+      },
+      serviceBalances: {
+        smallBusiness: Number(editForm.balSmallBusiness) || 0,
+        commercial: Number(editForm.balCommercial) || 0,
+        wire: Number(editForm.balWire) || 0,
+      },
     } : u);
     saveUsers(next);
     flash(`Profile updated for ${editForm.name}`);
@@ -176,6 +200,16 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
       tier: createForm.tier, status: createForm.status, balance: bal,
       verified: true, profilePicture: createForm.profilePicture || undefined,
       createdAt: new Date().toISOString().slice(0, 10),
+      enrollments: {
+        smallBusiness: createForm.enrollSmallBusiness,
+        commercial: createForm.enrollCommercial,
+        wire: createForm.enrollWire,
+      },
+      serviceBalances: {
+        smallBusiness: Number(createForm.balSmallBusiness) || 0,
+        commercial: Number(createForm.balCommercial) || 0,
+        wire: Number(createForm.balWire) || 0,
+      },
     };
     saveUsers([newUser, ...users]);
     flash(`Account created for ${name}`);
@@ -436,6 +470,29 @@ function UserModal({ title, tone, form, setForm, err, onClose, onSave }: {
           </div>
         </div>
 
+        <div className="mt-6 rounded-lg border border-amber-400/20 bg-black/30 p-4">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-amber-400/80 font-semibold">Service Enrollments</div>
+          <p className="text-[11px] text-slate-500 mt-0.5">Toggle to enroll this customer and set a starting balance for each service.</p>
+          <div className="mt-3 space-y-2">
+            <EnrollRow label="Small Business"
+              enrolled={form.enrollSmallBusiness}
+              onToggle={(v) => setForm({ ...form, enrollSmallBusiness: v })}
+              balance={form.balSmallBusiness}
+              onBalance={(b) => setForm({ ...form, balSmallBusiness: b })} />
+            <EnrollRow label="Commercial Accounts"
+              enrolled={form.enrollCommercial}
+              onToggle={(v) => setForm({ ...form, enrollCommercial: v })}
+              balance={form.balCommercial}
+              onBalance={(b) => setForm({ ...form, balCommercial: b })} />
+            <EnrollRow label="Wire Services"
+              enrolled={form.enrollWire}
+              onToggle={(v) => setForm({ ...form, enrollWire: v })}
+              balance={form.balWire}
+              onBalance={(b) => setForm({ ...form, balWire: b })} />
+          </div>
+        </div>
+
+
         {err && <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
 
         <div className="mt-6 flex justify-end gap-2">
@@ -503,6 +560,29 @@ function TxStatus({ status }: { status: PendingTx["status"] }) {
 function MethodPill({ method }: { method: PendingTx["method"] }) {
   return <span className="inline-block rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">{method}</span>;
 }
+function EnrollRow({ label, enrolled, onToggle, balance, onBalance }: {
+  label: string; enrolled: boolean; onToggle: (v: boolean) => void;
+  balance: string; onBalance: (b: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2">
+      <label className="inline-flex items-center gap-2 cursor-pointer select-none min-w-[190px]">
+        <input type="checkbox" checked={enrolled} onChange={(e) => onToggle(e.target.checked)} className="h-4 w-4 accent-amber-500" />
+        <span className="text-sm text-white">{label}</span>
+      </label>
+      <span className={`text-[10px] uppercase tracking-wider rounded-full border px-2 py-0.5 ${enrolled ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300" : "border-slate-500/30 bg-slate-500/10 text-slate-400"}`}>
+        {enrolled ? "Enrolled" : "Not enrolled"}
+      </span>
+      <div className="ml-auto flex items-center gap-2">
+        <span className="text-[10px] uppercase tracking-wider text-slate-500">Balance</span>
+        <input type="number" step="0.01" value={balance} disabled={!enrolled}
+          onChange={(e) => onBalance(e.target.value)}
+          className="w-32 rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs font-mono text-white focus:border-amber-400 focus:outline-none disabled:opacity-40" />
+      </div>
+    </div>
+  );
+}
+
 function RoleBadge({ role }: { role: AdminRole }) {
   const cls = role === "SuperAdmin" ? "border-amber-400/50 bg-amber-400/15 text-amber-300" : "border-cyan-400/50 bg-cyan-400/10 text-cyan-300";
   return (

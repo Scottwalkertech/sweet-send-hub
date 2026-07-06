@@ -89,10 +89,32 @@ function Login({ onAuth }: { onAuth: (u: MtUser) => void }) {
   );
 }
 
+type TopNavKey = "personal" | "smallBusiness" | "commercial" | "wire";
+const TOP_NAV: Array<{ key: TopNavKey; label: string }> = [
+  { key: "personal", label: "Personal Banking" },
+  { key: "smallBusiness", label: "Small Business" },
+  { key: "commercial", label: "Commercial Accounts" },
+  { key: "wire", label: "Wire Services" },
+];
+
+function isEnrolled(user: MtUser, key: TopNavKey): boolean {
+  if (key === "personal") return true;
+  const e = user.enrollments ?? {};
+  if (key === "smallBusiness") return !!e.smallBusiness;
+  if (key === "commercial") return !!e.commercial;
+  if (key === "wire") return !!e.wire;
+  return false;
+}
+
 function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
   const navigate = useNavigate();
   const [activePending, setActivePending] = useState<PendingTx | null>(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [dbwOpen, setDbwOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [notEnrolled, setNotEnrolled] = useState<null | { label: string }>(null);
+  const [activeTop, setActiveTop] = useState<TopNavKey>("personal");
+  const dbwRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function refresh() {
@@ -106,6 +128,19 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
     return () => { off(); clearInterval(i); };
   }, [user.id]);
 
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (dbwRef.current && !dbwRef.current.contains(e.target as Node)) setDbwOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  function handleTopNav(item: { key: TopNavKey; label: string }) {
+    if (isEnrolled(user, item.key)) { setActiveTop(item.key); return; }
+    setNotEnrolled({ label: item.label });
+  }
+
   const userHistory = loadQueue()
     .filter((t) => t.userId === user.id && t.status !== "Pending")
     .slice(0, 20);
@@ -114,19 +149,48 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <header className="bg-white border-b border-slate-200">
-        <div className="bg-slate-900">
-          <div className="max-w-6xl mx-auto px-6 py-1.5 flex items-center justify-end gap-6 text-[11px] tracking-wide uppercase">
-            <span className="text-white/60">Personal Banking</span>
-            <span className="text-white/60">·</span>
-            <span className="text-amber-300">Member FDIC</span>
+        {/* Top strip navigation */}
+        <div className="bg-gradient-to-b from-slate-900 to-slate-900/95 backdrop-blur border-b border-white/5">
+          <div className="max-w-6xl mx-auto px-6 py-2 flex items-center justify-between gap-4">
+            <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto">
+              {TOP_NAV.map((item) => {
+                const enrolled = isEnrolled(user, item.key);
+                const active = activeTop === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => handleTopNav(item)}
+                    className={[
+                      "group relative inline-flex items-center gap-1.5 px-3 py-1 text-[11px] uppercase tracking-[0.14em] rounded transition-colors whitespace-nowrap",
+                      enrolled
+                        ? active
+                          ? "text-amber-300 bg-white/[0.06]"
+                          : "text-white/80 hover:text-amber-300 hover:bg-white/[0.04]"
+                        : "text-white/35 hover:text-white/60",
+                    ].join(" ")}
+                    title={enrolled ? item.label : `${item.label} — Not enrolled`}
+                  >
+                    {!enrolled && (
+                      <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="5" y="11" width="14" height="9" rx="2" />
+                        <path d="M8 11V8a4 4 0 118 0v3" />
+                      </svg>
+                    )}
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+            <span className="hidden md:inline text-[10px] uppercase tracking-[0.2em] text-amber-300/90">Member FDIC</span>
           </div>
         </div>
+
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-[10px] tracking-wide">DBW</div>
             <div>
               <div className="text-sm font-semibold text-slate-900 tracking-wide">DYNAMIC BANK OF WEST</div>
-              <div className="text-xs text-slate-500">Personal Banking</div>
+              <div className="text-xs text-slate-500">{TOP_NAV.find((t) => t.key === activeTop)?.label ?? "Personal Banking"}</div>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -136,10 +200,36 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                 ? <img src={user.profilePicture} alt="Profile" className="h-full w-full object-cover" />
                 : <div className="h-full w-full flex items-center justify-center text-sm text-slate-600 font-semibold">{user.name.slice(0, 1)}</div>}
             </button>
+
+            {/* DBW Gold Shield Dropdown */}
+            <div ref={dbwRef} className="relative">
+              <button
+                onClick={() => setDbwOpen((v) => !v)}
+                className="relative inline-flex h-9 w-9 items-center justify-center rounded-md text-black font-black text-[10px] tracking-wider shadow-md ring-1 ring-amber-700/40 bg-gradient-to-br from-amber-300 via-amber-400 to-amber-600 hover:brightness-110 transition"
+                aria-label="DBW quick menu"
+                style={{ clipPath: "polygon(0 0,100% 0,100% 75%,50% 100%,0 75%)" }}
+              >
+                DBW
+              </button>
+              {dbwOpen && (
+                <div className="absolute right-0 mt-2 w-64 rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden z-40">
+                  <div className="px-4 py-3 bg-gradient-to-r from-amber-50 to-white border-b border-slate-100">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-amber-700 font-semibold">DBW Quick Menu</div>
+                    <div className="text-xs text-slate-600 mt-0.5">{user.name}</div>
+                  </div>
+                  <DbwItem icon="👤" label="My Profile Settings" onClick={() => { setDbwOpen(false); setShowProfile(true); }} />
+                  <DbwItem icon="💳" label="Debit Card Controls" onClick={() => { setDbwOpen(false); }} />
+                  <DbwItem icon="📋" label="Routing & Account Info" onClick={() => { setDbwOpen(false); }} />
+                  <DbwItem icon="🔒" label="Open Secure Messages" onClick={() => { setDbwOpen(false); setChatOpen(true); }} />
+                </div>
+              )}
+            </div>
+
             <button onClick={onLogout} className="text-sm text-slate-600 hover:text-slate-900">Sign out</button>
           </div>
         </div>
       </header>
+
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
         {/* Balance card */}
@@ -236,9 +326,88 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
 
       {activePending && <PendingOverlay tx={activePending} onExit={() => navigate({ to: "/transfer" })} />}
       {showProfile && <ProfileModal user={user} onClose={() => setShowProfile(false)} />}
+      {notEnrolled && <NotEnrolledModal label={notEnrolled.label} onClose={() => setNotEnrolled(null)} />}
+      <ChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} userName={user.name} />
     </div>
   );
 }
+
+function DbwItem({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-amber-50 hover:text-slate-900 transition text-left">
+      <span className="text-base w-5 text-center">{icon}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function NotEnrolledModal({ label, onClose }: { label: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
+        <div className="h-1 bg-gradient-to-r from-amber-400 to-amber-600" />
+        <div className="p-6 text-center">
+          <div className="mx-auto h-14 w-14 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-2xl mb-4">🔒</div>
+          <div className="text-[10px] uppercase tracking-[0.24em] text-amber-700 font-semibold">Not Enrolled Yet</div>
+          <h3 className="mt-2 text-lg font-semibold text-slate-900">{label}</h3>
+          <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+            You are not enrolled in this service yet. Please contact an support to register for this service.
+          </p>
+          <div className="mt-5 flex gap-2 justify-center">
+            <button onClick={onClose} className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Close</button>
+            <a href="mailto:support@dbwest.com" className="rounded-md bg-slate-900 hover:bg-slate-800 text-white text-sm px-4 py-2">Contact Support</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type ChatMsg = { from: "user" | "agent"; text: string; ts: string };
+function ChatDrawer({ open, onClose, userName }: { open: boolean; onClose: () => void; userName: string }) {
+  const [msgs, setMsgs] = useState<ChatMsg[]>([
+    { from: "agent", text: `Hello ${userName.split(" ")[0]}, this channel is encrypted end-to-end. How can our secure messaging team help you today?`, ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) },
+  ]);
+  const [text, setText] = useState("");
+  function send() {
+    const v = text.trim(); if (!v) return;
+    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    setMsgs((m) => [...m, { from: "user", text: v, ts: now }]);
+    setText("");
+    setTimeout(() => {
+      setMsgs((m) => [...m, { from: "agent", text: "Thanks — a secure messaging specialist will respond within one business day.", ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }]);
+    }, 700);
+  }
+  return (
+    <div className={`fixed bottom-6 right-6 z-40 transition-all duration-300 ${open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 translate-y-4 pointer-events-none"}`}>
+      <div className="w-[340px] rounded-2xl border border-slate-800 bg-white shadow-2xl overflow-hidden flex flex-col" style={{ height: 460 }}>
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-4 py-3 flex items-center justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300 font-semibold">🔒 Secure Messages</div>
+            <div className="text-sm font-semibold">DBW Concierge</div>
+          </div>
+          <button onClick={onClose} className="text-white/60 hover:text-white text-xl leading-none">×</button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50">
+          {msgs.map((m, i) => (
+            <div key={i} className={`flex ${m.from === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.from === "user" ? "bg-slate-900 text-white rounded-br-sm" : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"}`}>
+                <div>{m.text}</div>
+                <div className={`text-[10px] mt-1 ${m.from === "user" ? "text-white/50" : "text-slate-400"}`}>{m.ts}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-slate-200 p-2 flex items-center gap-2 bg-white">
+          <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }}
+            placeholder="Write a secure message…" className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          <button onClick={send} className="rounded-md bg-gradient-to-r from-amber-400 to-amber-600 text-black text-xs font-semibold px-3 py-2 hover:brightness-110">Send</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function QuickAction({ to, title, subtitle }: { to: string; title: string; subtitle: string }) {
   return (
