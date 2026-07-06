@@ -326,9 +326,88 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
 
       {activePending && <PendingOverlay tx={activePending} onExit={() => navigate({ to: "/transfer" })} />}
       {showProfile && <ProfileModal user={user} onClose={() => setShowProfile(false)} />}
+      {notEnrolled && <NotEnrolledModal label={notEnrolled.label} onClose={() => setNotEnrolled(null)} />}
+      <ChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} userName={user.name} />
     </div>
   );
 }
+
+function DbwItem({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-amber-50 hover:text-slate-900 transition text-left">
+      <span className="text-base w-5 text-center">{icon}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function NotEnrolledModal({ label, onClose }: { label: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
+        <div className="h-1 bg-gradient-to-r from-amber-400 to-amber-600" />
+        <div className="p-6 text-center">
+          <div className="mx-auto h-14 w-14 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-2xl mb-4">🔒</div>
+          <div className="text-[10px] uppercase tracking-[0.24em] text-amber-700 font-semibold">Not Enrolled Yet</div>
+          <h3 className="mt-2 text-lg font-semibold text-slate-900">{label}</h3>
+          <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+            You are not enrolled in this service yet. Please contact an support to register for this service.
+          </p>
+          <div className="mt-5 flex gap-2 justify-center">
+            <button onClick={onClose} className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Close</button>
+            <a href="mailto:support@dbwest.com" className="rounded-md bg-slate-900 hover:bg-slate-800 text-white text-sm px-4 py-2">Contact Support</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type ChatMsg = { from: "user" | "agent"; text: string; ts: string };
+function ChatDrawer({ open, onClose, userName }: { open: boolean; onClose: () => void; userName: string }) {
+  const [msgs, setMsgs] = useState<ChatMsg[]>([
+    { from: "agent", text: `Hello ${userName.split(" ")[0]}, this channel is encrypted end-to-end. How can our secure messaging team help you today?`, ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) },
+  ]);
+  const [text, setText] = useState("");
+  function send() {
+    const v = text.trim(); if (!v) return;
+    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    setMsgs((m) => [...m, { from: "user", text: v, ts: now }]);
+    setText("");
+    setTimeout(() => {
+      setMsgs((m) => [...m, { from: "agent", text: "Thanks — a secure messaging specialist will respond within one business day.", ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }]);
+    }, 700);
+  }
+  return (
+    <div className={`fixed bottom-6 right-6 z-40 transition-all duration-300 ${open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 translate-y-4 pointer-events-none"}`}>
+      <div className="w-[340px] rounded-2xl border border-slate-800 bg-white shadow-2xl overflow-hidden flex flex-col" style={{ height: 460 }}>
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-4 py-3 flex items-center justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300 font-semibold">🔒 Secure Messages</div>
+            <div className="text-sm font-semibold">DBW Concierge</div>
+          </div>
+          <button onClick={onClose} className="text-white/60 hover:text-white text-xl leading-none">×</button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50">
+          {msgs.map((m, i) => (
+            <div key={i} className={`flex ${m.from === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.from === "user" ? "bg-slate-900 text-white rounded-br-sm" : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"}`}>
+                <div>{m.text}</div>
+                <div className={`text-[10px] mt-1 ${m.from === "user" ? "text-white/50" : "text-slate-400"}`}>{m.ts}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-slate-200 p-2 flex items-center gap-2 bg-white">
+          <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }}
+            placeholder="Write a secure message…" className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          <button onClick={send} className="rounded-md bg-gradient-to-r from-amber-400 to-amber-600 text-black text-xs font-semibold px-3 py-2 hover:brightness-110">Send</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function QuickAction({ to, title, subtitle }: { to: string; title: string; subtitle: string }) {
   return (
