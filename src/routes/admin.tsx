@@ -144,6 +144,12 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
       tier: u.tier, status: u.status, balance: u.balance.toFixed(2),
       securityQ: u.securityQ, securityA: u.securityA,
       profilePicture: u.profilePicture ?? "",
+      enrollSmallBusiness: !!u.enrollments?.smallBusiness,
+      enrollCommercial: !!u.enrollments?.commercial,
+      enrollWire: !!u.enrollments?.wire,
+      balSmallBusiness: (u.serviceBalances?.smallBusiness ?? 0).toFixed(2),
+      balCommercial: (u.serviceBalances?.commercial ?? 0).toFixed(2),
+      balWire: (u.serviceBalances?.wire ?? 0).toFixed(2),
     });
   }
   function saveEdit() {
@@ -157,6 +163,16 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
       tier: editForm.tier, status: editForm.status, balance: bal,
       securityQ: editForm.securityQ, securityA: editForm.securityA,
       profilePicture: editForm.profilePicture || undefined,
+      enrollments: {
+        smallBusiness: editForm.enrollSmallBusiness,
+        commercial: editForm.enrollCommercial,
+        wire: editForm.enrollWire,
+      },
+      serviceBalances: {
+        smallBusiness: Number(editForm.balSmallBusiness) || 0,
+        commercial: Number(editForm.balCommercial) || 0,
+        wire: Number(editForm.balWire) || 0,
+      },
     } : u);
     saveUsers(next);
     flash(`Profile updated for ${editForm.name}`);
