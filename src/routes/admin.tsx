@@ -87,10 +87,18 @@ type EditForm = {
   tier: AccountTier; status: AccountStatus; balance: string;
   securityQ: string; securityA: string;
   profilePicture: string;
+  enrollSmallBusiness: boolean; enrollCommercial: boolean; enrollWire: boolean;
+  balSmallBusiness: string; balCommercial: string; balWire: string;
 };
 
 function emptyForm(): EditForm {
-  return { name: "", email: "", phone: "", ssn: "", password: "", tier: "Standard", status: "Active", balance: "0", securityQ: SECURITY_QUESTIONS[0], securityA: "", profilePicture: "" };
+  return {
+    name: "", email: "", phone: "", ssn: "", password: "",
+    tier: "Standard", status: "Active", balance: "0",
+    securityQ: SECURITY_QUESTIONS[0], securityA: "", profilePicture: "",
+    enrollSmallBusiness: false, enrollCommercial: false, enrollWire: false,
+    balSmallBusiness: "0", balCommercial: "0", balWire: "0",
+  };
 }
 
 function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: () => void }) {
