@@ -470,6 +470,29 @@ function UserModal({ title, tone, form, setForm, err, onClose, onSave }: {
           </div>
         </div>
 
+        <div className="mt-6 rounded-lg border border-amber-400/20 bg-black/30 p-4">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-amber-400/80 font-semibold">Service Enrollments</div>
+          <p className="text-[11px] text-slate-500 mt-0.5">Toggle to enroll this customer and set a starting balance for each service.</p>
+          <div className="mt-3 space-y-2">
+            <EnrollRow label="Small Business"
+              enrolled={form.enrollSmallBusiness}
+              onToggle={(v) => setForm({ ...form, enrollSmallBusiness: v })}
+              balance={form.balSmallBusiness}
+              onBalance={(b) => setForm({ ...form, balSmallBusiness: b })} />
+            <EnrollRow label="Commercial Accounts"
+              enrolled={form.enrollCommercial}
+              onToggle={(v) => setForm({ ...form, enrollCommercial: v })}
+              balance={form.balCommercial}
+              onBalance={(b) => setForm({ ...form, balCommercial: b })} />
+            <EnrollRow label="Wire Services"
+              enrolled={form.enrollWire}
+              onToggle={(v) => setForm({ ...form, enrollWire: v })}
+              balance={form.balWire}
+              onBalance={(b) => setForm({ ...form, balWire: b })} />
+          </div>
+        </div>
+
+
         {err && <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
 
         <div className="mt-6 flex justify-end gap-2">
