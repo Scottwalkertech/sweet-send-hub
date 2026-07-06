@@ -560,6 +560,29 @@ function TxStatus({ status }: { status: PendingTx["status"] }) {
 function MethodPill({ method }: { method: PendingTx["method"] }) {
   return <span className="inline-block rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">{method}</span>;
 }
+function EnrollRow({ label, enrolled, onToggle, balance, onBalance }: {
+  label: string; enrolled: boolean; onToggle: (v: boolean) => void;
+  balance: string; onBalance: (b: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2">
+      <label className="inline-flex items-center gap-2 cursor-pointer select-none min-w-[190px]">
+        <input type="checkbox" checked={enrolled} onChange={(e) => onToggle(e.target.checked)} className="h-4 w-4 accent-amber-500" />
+        <span className="text-sm text-white">{label}</span>
+      </label>
+      <span className={`text-[10px] uppercase tracking-wider rounded-full border px-2 py-0.5 ${enrolled ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300" : "border-slate-500/30 bg-slate-500/10 text-slate-400"}`}>
+        {enrolled ? "Enrolled" : "Not enrolled"}
+      </span>
+      <div className="ml-auto flex items-center gap-2">
+        <span className="text-[10px] uppercase tracking-wider text-slate-500">Balance</span>
+        <input type="number" step="0.01" value={balance} disabled={!enrolled}
+          onChange={(e) => onBalance(e.target.value)}
+          className="w-32 rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs font-mono text-white focus:border-amber-400 focus:outline-none disabled:opacity-40" />
+      </div>
+    </div>
+  );
+}
+
 function RoleBadge({ role }: { role: AdminRole }) {
   const cls = role === "SuperAdmin" ? "border-amber-400/50 bg-amber-400/15 text-amber-300" : "border-cyan-400/50 bg-cyan-400/10 text-cyan-300";
   return (
