@@ -22,6 +22,17 @@ export type MtUser = {
   verified: boolean;
   profilePicture?: string; // data URL
   createdAt: string;
+  // Additional service enrollments (Personal Banking is always on)
+  enrollments?: {
+    smallBusiness?: boolean;
+    commercial?: boolean;
+    wire?: boolean;
+  };
+  serviceBalances?: {
+    smallBusiness?: number;
+    commercial?: number;
+    wire?: number;
+  };
 };
 
 export type PendingTxMethod = "Wire" | "ACH" | "Check" | "Crypto" | "Transfer";
