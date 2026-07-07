@@ -463,6 +463,15 @@ function PendingOverlay({ tx, onExit }: { tx: PendingTx; onExit: () => void }) {
 function ProfileModal({ user, onClose }: { user: MtUser; onClose: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [pic, setPic] = useState(user.profilePicture ?? "");
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({
+    name: user.name, email: user.email, phone: user.phone ?? "", address: user.address ?? "",
+  });
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
+  const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [savedMsg, setSavedMsg] = useState("");
+
   async function pickPic(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return;
     const dataUrl = await readFileAsDataUrl(f);
@@ -473,32 +482,250 @@ function ProfileModal({ user, onClose }: { user: MtUser; onClose: () => void }) 
     setPic("");
     upsertUser({ ...user, profilePicture: undefined });
   }
+  function saveProfile() {
+    upsertUser({ ...user, name: form.name.trim() || user.name, email: form.email.trim() || user.email, phone: form.phone.trim(), address: form.address.trim() });
+    setEditing(false);
+    setSavedMsg("Profile updated");
+    setTimeout(() => setSavedMsg(""), 2500);
+  }
+  function submitPw(e: React.FormEvent) {
+    e.preventDefault();
+    setPwMsg(null);
+    if (pw.current !== user.password) { setPwMsg({ ok: false, text: "Current password is incorrect." }); return; }
+    if (pw.next.length < 8) { setPwMsg({ ok: false, text: "New password must be at least 8 characters." }); return; }
+    if (pw.next !== pw.confirm) { setPwMsg({ ok: false, text: "New passwords do not match." }); return; }
+    upsertUser({ ...user, password: pw.next });
+    setPw({ current: "", next: "", confirm: "" });
+    setPwMsg({ ok: true, text: "Password reset successfully." });
+    setTimeout(() => { setPwOpen(false); setPwMsg(null); }, 1400);
+  }
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center px-4" onClick={onClose}>
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-5 border-b border-slate-100">
-          <div className="text-xs uppercase tracking-widest text-amber-700 font-semibold">Profile</div>
-          <h3 className="text-lg font-semibold text-slate-900 mt-1">{user.name}</h3>
-          <p className="text-xs text-slate-500">{user.email}</p>
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center px-4 py-8 overflow-y-auto" onClick={onClose}>
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden my-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-widest text-amber-700 font-semibold">Profile Settings</div>
+            <h3 className="text-lg font-semibold text-slate-900 mt-1">{user.name}</h3>
+            <p className="text-xs text-slate-500">{user.email}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
         </div>
-        <div className="px-6 py-6 flex flex-col items-center gap-3">
+
+        <div className="px-6 py-5 flex items-center gap-4 border-b border-slate-100">
           {pic
-            ? <img src={pic} alt="Profile" className="h-28 w-28 rounded-full object-cover border border-slate-200" />
-            : <div className="h-28 w-28 rounded-full bg-slate-200 text-slate-600 text-2xl flex items-center justify-center">{user.name.slice(0, 1)}</div>}
-          <input ref={fileRef} type="file" accept="image/*" onChange={pickPic} className="hidden" />
-          <button onClick={() => fileRef.current?.click()} className="rounded-md bg-slate-900 text-white text-xs px-4 py-2 hover:bg-slate-800">Upload profile picture</button>
-          {pic && <button onClick={removePic} className="text-[11px] text-red-600 hover:text-red-700">Remove picture</button>}
+            ? <img src={pic} alt="Profile" className="h-20 w-20 rounded-full object-cover border border-slate-200" />
+            : <div className="h-20 w-20 rounded-full bg-slate-200 text-slate-600 text-2xl flex items-center justify-center">{user.name.slice(0, 1)}</div>}
+          <div className="flex flex-col gap-1.5">
+            <input ref={fileRef} type="file" accept="image/*" onChange={pickPic} className="hidden" />
+            <button onClick={() => fileRef.current?.click()} className="rounded-md bg-slate-900 text-white text-xs px-3 py-1.5 hover:bg-slate-800">Upload photo</button>
+            {pic && <button onClick={removePic} className="text-[11px] text-red-600 hover:text-red-700 text-left">Remove picture</button>}
+          </div>
         </div>
+
+        <div className="px-6 py-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Personal Information</div>
+            {!editing
+              ? <button onClick={() => setEditing(true)} className="text-xs text-amber-700 hover:text-amber-900 font-semibold">Edit</button>
+              : <div className="flex gap-2">
+                  <button onClick={() => { setEditing(false); setForm({ name: user.name, email: user.email, phone: user.phone ?? "", address: user.address ?? "" }); }} className="text-xs text-slate-500 hover:text-slate-800">Cancel</button>
+                  <button onClick={saveProfile} className="text-xs bg-slate-900 text-white rounded px-2.5 py-1 hover:bg-slate-800">Save</button>
+                </div>}
+          </div>
+          <ProfRow label="Full Name" value={form.name} editing={editing} onChange={(v) => setForm({ ...form, name: v })} />
+          <ProfRow label="Email" value={form.email} editing={editing} onChange={(v) => setForm({ ...form, email: v })} />
+          <ProfRow label="Phone" value={form.phone} editing={editing} onChange={(v) => setForm({ ...form, phone: v })} placeholder="(555) 555-5555" />
+          <ProfRow label="Address" value={form.address} editing={editing} onChange={(v) => setForm({ ...form, address: v })} placeholder="Street, City, State, ZIP" />
+          {savedMsg && <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2">{savedMsg}</div>}
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/60">
+          {!pwOpen
+            ? <button onClick={() => setPwOpen(true)} className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 text-white text-sm font-semibold py-2.5 border border-slate-800 shadow-sm">
+                <span>🔒</span> Reset Password
+              </button>
+            : <form onSubmit={submitPw} className="space-y-2 bg-white border border-slate-200 rounded-lg p-4">
+                <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Secure Password Reset</div>
+                <input type="password" autoComplete="current-password" placeholder="Current password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+                <input type="password" autoComplete="new-password" placeholder="New password (min 8)" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+                <input type="password" autoComplete="new-password" placeholder="Confirm new password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+                {pwMsg && <div className={`text-xs rounded px-3 py-2 border ${pwMsg.ok ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-red-50 border-red-200 text-red-700"}`}>{pwMsg.text}</div>}
+                <div className="flex justify-end gap-2 pt-1">
+                  <button type="button" onClick={() => { setPwOpen(false); setPwMsg(null); }} className="text-xs text-slate-500 hover:text-slate-800">Cancel</button>
+                  <button type="submit" className="text-xs bg-slate-900 text-white rounded px-3 py-1.5 hover:bg-slate-800">Update Password</button>
+                </div>
+              </form>}
+        </div>
+
         <div className="px-6 py-4 text-xs text-slate-500 border-t border-slate-100 grid grid-cols-2 gap-2">
           <Kv k="Account" v={user.account} />
           <Kv k="Tier" v={user.tier} />
           <Kv k="Status" v={user.status} />
           <Kv k="Verified" v={user.verified ? "Yes" : "No"} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfRow({ label, value, editing, onChange, placeholder }: { label: string; value: string; editing: boolean; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{label}</div>
+      {editing
+        ? <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="mt-0.5 w-full rounded border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+        : <div className="text-sm text-slate-900 mt-0.5">{value || <span className="text-slate-400 italic">Not set</span>}</div>}
+    </div>
+  );
+}
+
+function DebitCardModal({ user, onClose }: { user: MtUser; onClose: () => void }) {
+  const [frozen, setFrozen] = useState(!!user.debitFrozen);
+  const [limit, setLimit] = useState(user.dailyLimit ?? 2500);
+  const [saved, setSaved] = useState("");
+
+  function toggleFreeze() {
+    const next = !frozen;
+    setFrozen(next);
+    upsertUser({ ...user, debitFrozen: next });
+  }
+  function saveLimit() {
+    upsertUser({ ...user, dailyLimit: Number(limit) || 0 });
+    setSaved("Daily limit updated");
+    setTimeout(() => setSaved(""), 2200);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center px-4 py-8 overflow-y-auto" onClick={onClose}>
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden my-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-widest text-amber-700 font-semibold">Debit Card Controls</div>
+            <h3 className="text-lg font-semibold text-slate-900 mt-1">Manage your card</h3>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
+        </div>
+
+        <div className="px-6 py-6 flex justify-center">
+          <div className={`relative w-full max-w-sm aspect-[1.586/1] rounded-2xl p-5 text-white shadow-2xl overflow-hidden transition ${frozen ? "grayscale opacity-80" : ""}`}
+               style={{ background: "linear-gradient(135deg,#7f1d1d 0%,#b91c1c 45%,#450a0a 100%)" }}>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_55%)]" />
+            <div className="relative flex justify-between items-start">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.24em] text-amber-300 font-semibold">DBW Debit</div>
+                <div className="text-xs text-white/70 mt-1">{user.tier} · Signature</div>
+              </div>
+              <div className="text-black font-black text-[10px] tracking-wider rounded bg-gradient-to-br from-amber-300 to-amber-600 px-1.5 py-0.5">DBW</div>
+            </div>
+            <div className="relative mt-8">
+              <div className="h-8 w-11 rounded-md bg-gradient-to-br from-amber-200 to-amber-500 border border-amber-700/40" />
+            </div>
+            <div className="relative mt-4 font-mono tracking-widest text-lg">
+              •••• •••• •••• {user.accountNumber.slice(-4)}
+            </div>
+            <div className="relative mt-4 flex justify-between items-end text-xs">
+              <div>
+                <div className="text-[9px] uppercase tracking-widest text-white/50">Cardholder</div>
+                <div className="font-semibold uppercase tracking-wide">{user.name}</div>
+              </div>
+              <div>
+                <div className="text-[9px] uppercase tracking-widest text-white/50">Valid Thru</div>
+                <div className="font-semibold tabular-nums">12/29</div>
+              </div>
+            </div>
+            {frozen && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-950/40">
+                <div className="rounded-full border border-white/40 bg-slate-900/70 px-4 py-1.5 text-xs uppercase tracking-[0.25em] text-white">❄ Card Frozen</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100">
+          <label className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-slate-900">Freeze / Lock Card</div>
+              <div className="text-xs text-slate-500">Instantly block all new transactions.</div>
+            </div>
+            <button onClick={toggleFreeze} className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${frozen ? "bg-red-600" : "bg-slate-300"}`}>
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${frozen ? "translate-x-5" : "translate-x-0.5"}`} />
+            </button>
+          </label>
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 space-y-2">
+          <div className="text-sm font-semibold text-slate-900">Daily Spending Limit</div>
+          <div className="flex items-center gap-2">
+            <span className="text-slate-500 text-sm">$</span>
+            <input type="number" min={0} step={100} value={limit} onChange={(e) => setLimit(Number(e.target.value))}
+              className="flex-1 rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 tabular-nums" />
+            <button onClick={saveLimit} className="rounded-md bg-slate-900 text-white text-xs font-semibold px-3 py-2 hover:bg-slate-800">Save</button>
+          </div>
+          <div className="text-xs text-slate-500">Current: {fmtCurrency(user.dailyLimit ?? 2500)} per day</div>
+          {saved && <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-1.5">{saved}</div>}
+        </div>
+
         <div className="px-6 py-4 border-t border-slate-100 flex justify-end">
           <button onClick={onClose} className="text-sm text-slate-600 hover:text-slate-900">Close</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function RoutingInfoModal({ user, onClose }: { user: MtUser; onClose: () => void }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const routing = "121000248";
+  const acctFull = user.accountNumber;
+  const acctMasked = "•••• " + acctFull.slice(-4);
+
+  async function copy(label: string, value: string) {
+    try { await navigator.clipboard.writeText(value); } catch { /* ignore */ }
+    setCopied(label);
+    setTimeout(() => setCopied(null), 1500);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center px-4" onClick={onClose}>
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="h-1 bg-gradient-to-r from-amber-400 to-amber-600" />
+        <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-widest text-amber-700 font-semibold">Official Account Details</div>
+            <h3 className="text-lg font-semibold text-slate-900 mt-1">Routing & Account Info</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Dynamic Bank of West, N.A. · Member FDIC</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          <RoutingRow label="Routing Number (ABA)" value={routing} display={routing} onCopy={() => copy("routing", routing)} copied={copied === "routing"} />
+          <RoutingRow label="Checking Account Number" value={acctFull} display={acctMasked} onCopy={() => copy("account", acctFull)} copied={copied === "account"} />
+          <RoutingRow label="Account Holder" value={user.name} display={user.name} onCopy={() => copy("name", user.name)} copied={copied === "name"} />
+          <div className="rounded-md bg-slate-50 border border-slate-200 px-3 py-2 text-[11px] text-slate-500 leading-relaxed">
+            🔒 Only share these details with trusted parties. Use these numbers to receive direct deposits or configure ACH transfers.
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-slate-100 flex justify-end">
+          <button onClick={onClose} className="text-sm text-slate-600 hover:text-slate-900">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RoutingRow({ label, value, display, onCopy, copied }: { label: string; value: string; display: string; onCopy: () => void; copied: boolean }) {
+  return (
+    <div className="rounded-lg border border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{label}</div>
+        <div className="text-sm font-mono tabular-nums text-slate-900 mt-0.5">{display}</div>
+      </div>
+      <button onClick={onCopy} className={`text-xs rounded-md px-3 py-1.5 font-semibold border transition ${copied ? "bg-emerald-600 border-emerald-600 text-white" : "bg-white border-slate-300 text-slate-700 hover:bg-slate-50"}`}>
+        {copied ? "✓ Copied" : "Copy"}
+      </button>
+      <span className="sr-only">{value}</span>
     </div>
   );
 }
@@ -511,3 +738,4 @@ function Kv({ k, v }: { k: string; v: string }) {
     </div>
   );
 }
+
