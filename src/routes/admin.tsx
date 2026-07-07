@@ -601,3 +601,97 @@ function RoleBadge({ role }: { role: AdminRole }) {
     </span>
   );
 }
+
+function AdminChatPanel({ users, agentName, onClose }: { users: MtUser[]; agentName: string; onClose: () => void }) {
+  const [threads, setThreads] = useState<Record<string, ChatMessage[]>>({});
+  const [activeId, setActiveId] = useState<string | null>(users[0]?.id ?? null);
+  const [text, setText] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function refresh() { setThreads(loadChatThreads()); }
+    refresh();
+    window.addEventListener("mt:chat-changed", refresh);
+    window.addEventListener("storage", refresh);
+    const i = setInterval(refresh, 1200);
+    return () => {
+      window.removeEventListener("mt:chat-changed", refresh);
+      window.removeEventListener("storage", refresh);
+      clearInterval(i);
+    };
+  }, []);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [threads, activeId]);
+
+  function send() {
+    const v = text.trim(); if (!v || !activeId) return;
+    appendChatMessage(activeId, {
+      id: `m_${Date.now()}`, from: "agent", text: v,
+      ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    });
+    setText("");
+  }
+
+  const activeMsgs = activeId ? (threads[activeId] ?? []) : [];
+  const activeUser = users.find((u) => u.id === activeId);
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50 w-[min(720px,calc(100vw-3rem))] h-[520px] rounded-2xl border border-amber-400/40 bg-[#0f1420] shadow-2xl overflow-hidden flex">
+      {/* Thread list */}
+      <aside className="w-52 border-r border-white/10 flex flex-col">
+        <div className="px-3 py-3 border-b border-white/10 bg-black/40">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300 font-semibold">Live Support</div>
+          <div className="text-xs text-slate-300 mt-0.5">Agent: {agentName}</div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {users.map((u) => {
+            const t = threads[u.id] ?? [];
+            const last = t[t.length - 1];
+            const active = activeId === u.id;
+            return (
+              <button key={u.id} onClick={() => setActiveId(u.id)}
+                className={`w-full text-left px-3 py-2.5 border-b border-white/5 transition ${active ? "bg-amber-400/10" : "hover:bg-white/[0.03]"}`}>
+                <div className="text-xs font-medium text-white truncate">{u.name}</div>
+                <div className="text-[10px] text-slate-400 truncate mt-0.5">{last ? `${last.from === "agent" ? "You: " : ""}${last.text}` : "No messages yet"}</div>
+              </button>
+            );
+          })}
+          {users.length === 0 && <div className="p-4 text-xs text-slate-500">No customers.</div>}
+        </div>
+      </aside>
+
+      {/* Conversation */}
+      <div className="flex-1 flex flex-col">
+        <div className="px-4 py-3 border-b border-white/10 bg-black/40 flex items-center justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300 font-semibold">🔒 Secure Channel</div>
+            <div className="text-sm font-semibold text-white">{activeUser?.name ?? "Select a customer"}</div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
+        </div>
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#0a0d14]">
+          {activeMsgs.map((m) => (
+            <div key={m.id} className={`flex ${m.from === "agent" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${m.from === "agent" ? "bg-gradient-to-r from-amber-400 to-amber-600 text-black rounded-br-sm" : "bg-white/10 text-slate-100 rounded-bl-sm border border-white/10"}`}>
+                <div>{m.text}</div>
+                <div className={`text-[10px] mt-1 ${m.from === "agent" ? "text-black/60" : "text-slate-400"}`}>{m.ts}</div>
+              </div>
+            </div>
+          ))}
+          {activeMsgs.length === 0 && activeUser && (
+            <div className="text-center text-xs text-slate-500 py-10">No messages in this thread yet.</div>
+          )}
+        </div>
+        <div className="border-t border-white/10 p-2 flex items-center gap-2 bg-black/40">
+          <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }}
+            disabled={!activeId} placeholder="Type as DBW Concierge…"
+            className="flex-1 rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none disabled:opacity-40" />
+          <button onClick={send} disabled={!activeId}
+            className="rounded-md bg-gradient-to-r from-amber-400 to-amber-600 text-black text-xs font-bold px-3 py-2 hover:brightness-110 disabled:opacity-40">Send</button>
+        </div>
+      </div>
+    </div>
+  );
+}
