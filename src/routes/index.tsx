@@ -251,33 +251,47 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
 
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
-        {/* Balance card */}
-        <section className="rounded-2xl overflow-hidden border border-slate-800 shadow-xl">
-          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white px-8 py-10 relative">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.15),transparent_60%)]" />
-            <div className="relative flex items-start justify-between flex-wrap gap-6">
-              <div>
-                <div className="flex items-center gap-2 text-amber-300 text-xs uppercase tracking-[0.2em] font-semibold">
-                  <span className="h-px w-8 bg-amber-400" />
-                  {serviceMeta[activeTop].label}
+        {activeTop === "personal" ? (
+          <section className="grid md:grid-cols-2 gap-4">
+            <AccountCard
+              to="/account/$type" params={{ type: "checking" }}
+              product="Everyday Checking" tag="DBW Personal · Checking"
+              accountMasked={user.account} balance={user.balance}
+            />
+            <AccountCard
+              to="/account/$type" params={{ type: "savings" }}
+              product="Way2Save Savings" tag="DBW Personal · Savings"
+              accountMasked={"•••• " + (user.savingsAccountNumber ?? user.accountNumber).slice(-4)}
+              balance={user.savingsBalance}
+            />
+          </section>
+        ) : (
+          <section className="rounded-2xl overflow-hidden border border-slate-800 shadow-xl">
+            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white px-8 py-10 relative">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.15),transparent_60%)]" />
+              <div className="relative flex items-start justify-between flex-wrap gap-6">
+                <div>
+                  <div className="flex items-center gap-2 text-amber-300 text-xs uppercase tracking-[0.2em] font-semibold">
+                    <span className="h-px w-8 bg-amber-400" />
+                    {serviceMeta[activeTop].label}
+                  </div>
+                  <h1 className="text-2xl font-semibold mt-3 tracking-wide">{displayedProduct}</h1>
+                  <div className="text-xs text-amber-200/80 mt-1 tabular-nums">
+                    Account {user.account} · Routing 121000248
+                  </div>
                 </div>
-                <h1 className="text-2xl font-semibold mt-3 tracking-wide">{displayedProduct}</h1>
-                <div className="text-xs text-amber-200/80 mt-1 tabular-nums">
-                  Account {user.account} · Routing 121000248
+                <div className="text-right">
+                  <div className="text-xs uppercase tracking-wider text-amber-200/80">Available Balance</div>
+                  <div className="text-4xl font-semibold tabular-nums mt-1 bg-gradient-to-b from-amber-200 to-amber-400 bg-clip-text text-transparent">
+                    {fmtCurrency(displayedBalance)}
+                  </div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-xs uppercase tracking-wider text-amber-200/80">Available Balance</div>
-                <div className="text-4xl font-semibold tabular-nums mt-1 bg-gradient-to-b from-amber-200 to-amber-400 bg-clip-text text-transparent">
-                  {fmtCurrency(displayedBalance)}
-                </div>
-              </div>
-
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
-        {/* Deposit CTA directly beneath the balance card */}
+        {/* Deposit CTA */}
         <section className="flex justify-center">
           <Link
             to="/deposit"
