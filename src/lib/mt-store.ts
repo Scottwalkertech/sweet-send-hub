@@ -136,6 +136,7 @@ export function loadUsers(): MtUser[] {
       email: u.email ?? `customer${i}@dbwest.com`,
       password: u.password ?? "password123",
       phone: u.phone ?? "",
+      address: u.address ?? "",
       ssn: u.ssn ?? "•••-••-••••",
       securityQ: u.securityQ ?? SECURITY_QUESTIONS[0],
       securityA: u.securityA ?? "",
@@ -149,6 +150,9 @@ export function loadUsers(): MtUser[] {
       createdAt: u.createdAt ?? new Date().toISOString().slice(0, 10),
       enrollments: u.enrollments ?? { smallBusiness: false, commercial: false, wire: false },
       serviceBalances: u.serviceBalances ?? { smallBusiness: 0, commercial: 0, wire: 0 },
+      debitFrozen: u.debitFrozen ?? false,
+      dailyLimit: typeof u.dailyLimit === "number" ? u.dailyLimit : 2500,
+
     }));
   } catch {
     return seedUsers;
