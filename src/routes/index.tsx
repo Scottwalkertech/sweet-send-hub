@@ -42,15 +42,65 @@ function Login({ onAuth }: { onAuth: (u: MtUser) => void }) {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+function Login({ onAuth }: { onAuth: (u: MtUser) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr("");
+    const emailLower = email.trim().toLowerCase();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: emailLower,
+      password,
+    });
+    setBusy(false);
+
+    if (error) {
+      if (/email.*not.*confirm/i.test(error.message)) {
+        setErr("Please confirm your email using the secure link we sent you.");
+      } else {
+        setErr("Invalid credentials. Please try again.");
+      }
+      return;
+    }
+
+    // Bridge Supabase auth → local DBW profile store used by the dashboard.
     const users = loadUsers();
-    const match = users.find(
-      (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password,
-    );
-    if (!match) { setErr("Invalid credentials. Only registered DBW customer accounts may sign in."); return; }
-    if (!match.verified) { setErr("This account has not completed phone/email verification."); return; }
+    let match = users.find((u) => u.email.toLowerCase() === emailLower);
+    if (!match) {
+      const acctFull = genAccountNumber();
+      match = {
+        id: data.user?.id ?? "u_" + Math.floor(1000 + Math.random() * 9000),
+        name: (data.user?.user_metadata?.full_name as string) || emailLower.split("@")[0],
+        email: emailLower,
+        password,
+        phone: "",
+        ssn: "",
+        securityQ: "",
+        securityA: "",
+        accountNumber: acctFull,
+        account: maskAccount(acctFull),
+        tier: "Standard",
+        status: "Active",
+        balance: 0,
+        savingsBalance: 0,
+        savingsAccountNumber: genAccountNumber(),
+        verified: true,
+        createdAt: new Date().toISOString().slice(0, 10),
+      };
+      saveUsers([match, ...users]);
+    } else if (!match.verified) {
+      match = { ...match, verified: true };
+      upsertUser(match);
+    }
+
     if (match.status === "Frozen") { setErr("This account is frozen. Contact support at 1-800-DBW-BANK."); return; }
     window.dispatchEvent(new Event("ptl:show"));
-    setTimeout(() => onAuth(match), 900);
+    setTimeout(() => onAuth(match!), 700);
   }
 
   return (
@@ -76,8 +126,8 @@ function Login({ onAuth }: { onAuth: (u: MtUser) => void }) {
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 tracking-widest" placeholder="••••••••" />
           </div>
           {err && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{err}</div>}
-          <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium py-2.5 rounded-md">
-            Sign in securely
+          <button type="submit" disabled={busy} className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white text-sm font-medium py-2.5 rounded-md">
+            {busy ? "Signing in…" : "Sign in securely"}
           </button>
           <div className="text-xs text-slate-500 text-center pt-2 border-t border-slate-100">
             🔒 256-bit TLS encryption · FDIC Insured
