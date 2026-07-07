@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import {
   loadUsers, saveUsers, loadQueue, saveQueue,
   loadDepositSettings, saveDepositSettings,
+  loadChatThreads, appendChatMessage,
   genAccountNumber, maskAccount, readFileAsDataUrl, fmtCurrency, SECURITY_QUESTIONS,
-  type MtUser, type AccountTier, type AccountStatus, type PendingTx, type DepositSettings,
+  type MtUser, type AccountTier, type AccountStatus, type PendingTx, type DepositSettings, type ChatMessage,
 } from "@/lib/mt-store";
 
 export const Route = createFileRoute("/admin")({
