@@ -221,9 +221,10 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                     <div className="text-xs text-slate-600 mt-0.5">{user.name}</div>
                   </div>
                   <DbwItem icon="👤" label="My Profile Settings" onClick={() => { setDbwOpen(false); setShowProfile(true); }} />
-                  <DbwItem icon="💳" label="Debit Card Controls" onClick={() => { setDbwOpen(false); }} />
-                  <DbwItem icon="📋" label="Routing & Account Info" onClick={() => { setDbwOpen(false); }} />
+                  <DbwItem icon="💳" label="Debit Card Controls" onClick={() => { setDbwOpen(false); setShowCard(true); }} />
+                  <DbwItem icon="📋" label="Routing & Account Info" onClick={() => { setDbwOpen(false); setShowRouting(true); }} />
                   <DbwItem icon="🔒" label="Open Secure Messages" onClick={() => { setDbwOpen(false); setChatOpen(true); }} />
+
                 </div>
               )}
             </div>
