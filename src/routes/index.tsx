@@ -400,20 +400,40 @@ function NotEnrolledModal({ label, onClose }: { label: string; onClose: () => vo
   );
 }
 
-type ChatMsg = { from: "user" | "agent"; text: string; ts: string };
-function ChatDrawer({ open, onClose, userName }: { open: boolean; onClose: () => void; userName: string }) {
-  const [msgs, setMsgs] = useState<ChatMsg[]>([
-    { from: "agent", text: `Hello ${userName.split(" ")[0]}, this channel is encrypted end-to-end. How can our secure messaging team help you today?`, ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) },
-  ]);
+function ChatDrawer({ open, onClose, userId, userName }: { open: boolean; onClose: () => void; userId: string; userName: string }) {
+  const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function refresh() {
+      const thread = loadChatThread(userId);
+      if (thread.length === 0) {
+        const greeting: ChatMessage = {
+          id: `m_${Date.now()}`,
+          from: "agent",
+          text: `Hello ${userName.split(" ")[0]}, this channel is encrypted end-to-end. How can our secure messaging team help you today?`,
+          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+        appendChatMessage(userId, greeting);
+        setMsgs([greeting]);
+      } else {
+        setMsgs(thread);
+      }
+    }
+    refresh();
+    return onStoreChange(refresh);
+  }, [userId, userName]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [msgs, open]);
+
   function send() {
     const v = text.trim(); if (!v) return;
     const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    setMsgs((m) => [...m, { from: "user", text: v, ts: now }]);
+    appendChatMessage(userId, { id: `m_${Date.now()}`, from: "user", text: v, ts: now });
     setText("");
-    setTimeout(() => {
-      setMsgs((m) => [...m, { from: "agent", text: "Thanks — a secure messaging specialist will respond within one business day.", ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }]);
-    }, 700);
   }
   return (
     <div className={`fixed bottom-6 right-6 z-40 transition-all duration-300 ${open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 translate-y-4 pointer-events-none"}`}>
@@ -425,9 +445,9 @@ function ChatDrawer({ open, onClose, userName }: { open: boolean; onClose: () =>
           </div>
           <button onClick={onClose} className="text-white/60 hover:text-white text-xl leading-none">×</button>
         </div>
-        <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50">
-          {msgs.map((m, i) => (
-            <div key={i} className={`flex ${m.from === "user" ? "justify-end" : "justify-start"}`}>
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50">
+          {msgs.map((m) => (
+            <div key={m.id} className={`flex ${m.from === "user" ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.from === "user" ? "bg-slate-900 text-white rounded-br-sm" : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"}`}>
                 <div>{m.text}</div>
                 <div className={`text-[10px] mt-1 ${m.from === "user" ? "text-white/50" : "text-slate-400"}`}>{m.ts}</div>
