@@ -19,11 +19,12 @@ export type MtUser = {
   account: string; // masked (•••• ####)
   tier: AccountTier;
   status: AccountStatus;
-  balance: number;
+  balance: number;           // Everyday Checking balance
+  savingsBalance: number;    // Way2Save Savings balance
+  savingsAccountNumber?: string; // full mock savings acct
   verified: boolean;
   profilePicture?: string; // data URL
   createdAt: string;
-  // Additional service enrollments (Personal Banking is always on)
   enrollments?: {
     smallBusiness?: boolean;
     commercial?: boolean;
@@ -34,9 +35,27 @@ export type MtUser = {
     commercial?: number;
     wire?: number;
   };
-  // Debit card controls
   debitFrozen?: boolean;
   dailyLimit?: number;
+};
+
+export type AccountKey = "checking" | "savings";
+
+export type LedgerEntry = {
+  id: string;
+  userId: string;
+  account: AccountKey;
+  date: string;      // ISO
+  description: string;
+  amount: number;    // signed (+credit, -debit)
+  balanceAfter: number;
+};
+
+export type ChatMessage = {
+  id: string;
+  from: "user" | "agent";
+  text: string;
+  ts: string;
 };
 
 
@@ -77,6 +96,8 @@ export const LS = {
   QUEUE: "mt_admin_queue",
   DEPOSIT: "mt_admin_deposit_settings",
   CURRENT: "mt_current_user_id",
+  LEDGER: "mt_account_ledger",
+  CHAT: "mt_chat_threads",
 } as const;
 
 export const SECURITY_QUESTIONS = [
@@ -107,14 +128,16 @@ const seedUsers: MtUser[] = [
     phone: "5551234567", ssn: "•••-••-4419",
     securityQ: "What is your mother's maiden name?", securityA: "smith",
     accountNumber: "778812304419", account: "•••• 4419",
-    tier: "Premier", status: "Active", balance: 0, verified: true, createdAt: "2025-11-02",
+    tier: "Premier", status: "Active", balance: 0, savingsBalance: 0,
+    savingsAccountNumber: "778812309901", verified: true, createdAt: "2025-11-02",
   },
   {
     id: "u_1002", name: "Elena Sokolova", email: "elena.s@dbwest.com", password: "password123",
     phone: "5552341122", ssn: "•••-••-7832",
     securityQ: "What was the name of your first pet?", securityA: "boris",
     accountNumber: "778823017832", account: "•••• 7832",
-    tier: "Private", status: "Active", balance: 0, verified: true, createdAt: "2025-11-11",
+    tier: "Private", status: "Active", balance: 0, savingsBalance: 0,
+    savingsAccountNumber: "778823019902", verified: true, createdAt: "2025-11-11",
   },
 ];
 
@@ -145,6 +168,8 @@ export function loadUsers(): MtUser[] {
       tier: (u.tier as AccountTier) ?? "Standard",
       status: (u.status as AccountStatus) ?? "Active",
       balance: typeof u.balance === "number" ? u.balance : 0,
+      savingsBalance: typeof u.savingsBalance === "number" ? u.savingsBalance : 0,
+      savingsAccountNumber: u.savingsAccountNumber ?? Math.random().toString().slice(2, 14),
       verified: u.verified ?? true,
       profilePicture: u.profilePicture,
       createdAt: u.createdAt ?? new Date().toISOString().slice(0, 10),
@@ -250,10 +275,53 @@ export function fmtCurrency(n: number): string {
 
 // Cross-tab / cross-view live update hook helper.
 export function onStoreChange(cb: () => void): () => void {
-  const evts = ["mt:users-changed", "mt:queue-changed", "mt:deposit-settings-changed", "mt:current-user-changed", "storage"];
+  const evts = ["mt:users-changed", "mt:queue-changed", "mt:deposit-settings-changed", "mt:current-user-changed", "mt:ledger-changed", "mt:chat-changed", "storage"];
   evts.forEach((e) => window.addEventListener(e, cb));
   return () => evts.forEach((e) => window.removeEventListener(e, cb));
 }
+
+// -- Ledger (per-account transaction history) ---------------------------------
+
+export function loadLedger(): LedgerEntry[] {
+  if (typeof window === "undefined") return [];
+  const raw = localStorage.getItem(LS.LEDGER);
+  if (!raw) return [];
+  try { return JSON.parse(raw) as LedgerEntry[]; } catch { return []; }
+}
+export function saveLedger(l: LedgerEntry[]) {
+  localStorage.setItem(LS.LEDGER, JSON.stringify(l));
+  window.dispatchEvent(new CustomEvent("mt:ledger-changed"));
+}
+export function appendLedger(entry: LedgerEntry) {
+  const all = loadLedger();
+  all.unshift(entry);
+  saveLedger(all);
+}
+export function ledgerFor(userId: string, account: AccountKey): LedgerEntry[] {
+  return loadLedger().filter((e) => e.userId === userId && e.account === account);
+}
+
+// -- Chat threads (customer <-> admin) ----------------------------------------
+
+export function loadChatThreads(): Record<string, ChatMessage[]> {
+  if (typeof window === "undefined") return {};
+  const raw = localStorage.getItem(LS.CHAT);
+  if (!raw) return {};
+  try { return JSON.parse(raw) as Record<string, ChatMessage[]>; } catch { return {}; }
+}
+export function saveChatThreads(t: Record<string, ChatMessage[]>) {
+  localStorage.setItem(LS.CHAT, JSON.stringify(t));
+  window.dispatchEvent(new CustomEvent("mt:chat-changed"));
+}
+export function loadChatThread(userId: string): ChatMessage[] {
+  return loadChatThreads()[userId] ?? [];
+}
+export function appendChatMessage(userId: string, msg: ChatMessage) {
+  const all = loadChatThreads();
+  all[userId] = [...(all[userId] ?? []), msg];
+  saveChatThreads(all);
+}
+
 
 // Read file as data URL (for profile pic + BTC QR upload).
 export function readFileAsDataUrl(file: File): Promise<string> {

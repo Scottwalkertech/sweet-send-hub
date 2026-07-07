@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import {
   loadUsers, saveUsers, loadQueue, saveQueue,
   loadDepositSettings, saveDepositSettings,
+  loadChatThreads, appendChatMessage,
   genAccountNumber, maskAccount, readFileAsDataUrl, fmtCurrency, SECURITY_QUESTIONS,
-  type MtUser, type AccountTier, type AccountStatus, type PendingTx, type DepositSettings,
+  type MtUser, type AccountTier, type AccountStatus, type PendingTx, type DepositSettings, type ChatMessage,
 } from "@/lib/mt-store";
 
 export const Route = createFileRoute("/admin")({
@@ -84,7 +85,7 @@ function AdminGate({ onPass }: { onPass: (s: AdminSession) => void }) {
 type EditForm = {
   name: string; email: string; phone: string; ssn: string;
   password: string;
-  tier: AccountTier; status: AccountStatus; balance: string;
+  tier: AccountTier; status: AccountStatus; balance: string; savingsBalance: string;
   securityQ: string; securityA: string;
   profilePicture: string;
   enrollSmallBusiness: boolean; enrollCommercial: boolean; enrollWire: boolean;
@@ -94,7 +95,7 @@ type EditForm = {
 function emptyForm(): EditForm {
   return {
     name: "", email: "", phone: "", ssn: "", password: "",
-    tier: "Standard", status: "Active", balance: "0",
+    tier: "Standard", status: "Active", balance: "0", savingsBalance: "0",
     securityQ: SECURITY_QUESTIONS[0], securityA: "", profilePicture: "",
     enrollSmallBusiness: false, enrollCommercial: false, enrollWire: false,
     balSmallBusiness: "0", balCommercial: "0", balWire: "0",
@@ -112,6 +113,7 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
   const [createForm, setCreateForm] = useState<EditForm>(emptyForm());
   const [modalErr, setModalErr] = useState("");
   const [toast, setToast] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     setUsers(loadUsers());
@@ -141,7 +143,7 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
     setEditForm({
       name: u.name, email: u.email, phone: u.phone, ssn: u.ssn,
       password: u.password,
-      tier: u.tier, status: u.status, balance: u.balance.toFixed(2),
+      tier: u.tier, status: u.status, balance: u.balance.toFixed(2), savingsBalance: (u.savingsBalance ?? 0).toFixed(2),
       securityQ: u.securityQ, securityA: u.securityA,
       profilePicture: u.profilePicture ?? "",
       enrollSmallBusiness: !!u.enrollments?.smallBusiness,
@@ -160,7 +162,7 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
       ...u,
       name: editForm.name.trim(), email: editForm.email.trim(), phone: editForm.phone,
       ssn: editForm.ssn, password: editForm.password || u.password,
-      tier: editForm.tier, status: editForm.status, balance: bal,
+      tier: editForm.tier, status: editForm.status, balance: bal, savingsBalance: Number(editForm.savingsBalance) || 0,
       securityQ: editForm.securityQ, securityA: editForm.securityA,
       profilePicture: editForm.profilePicture || undefined,
       enrollments: {
@@ -198,6 +200,7 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
       securityQ: createForm.securityQ, securityA: createForm.securityA.toLowerCase(),
       accountNumber: acctFull, account: maskAccount(acctFull),
       tier: createForm.tier, status: createForm.status, balance: bal,
+      savingsBalance: Number(createForm.savingsBalance) || 0, savingsAccountNumber: genAccountNumber(),
       verified: true, profilePicture: createForm.profilePicture || undefined,
       createdAt: new Date().toISOString().slice(0, 10),
       enrollments: {
@@ -252,6 +255,10 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
             </div>
             <RoleBadge role={session.role} />
             <Link to="/" className="text-xs text-slate-400 hover:text-amber-400">Portal</Link>
+            <button onClick={() => setChatOpen((v) => !v)}
+              className="rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-400/20">
+              {chatOpen ? "Close Chat" : "Live Chat"}
+            </button>
             <button onClick={onLogout} className="rounded border border-white/10 px-3 py-1.5 text-xs hover:bg-white/5">Sign out</button>
           </div>
         </div>
@@ -362,6 +369,8 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
       {editing && <UserModal title={`Edit — ${editing.name}`} tone="amber" form={editForm} setForm={setEditForm} err={modalErr} onClose={() => setEditing(null)} onSave={saveEdit} />}
       {creating && <UserModal title="Create Customer Account" tone="emerald" form={createForm} setForm={setCreateForm} err={modalErr} onClose={() => setCreating(false)} onSave={saveCreate} />}
 
+      {chatOpen && <AdminChatPanel users={users} agentName={session.name} onClose={() => setChatOpen(false)} />}
+
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-4 py-2 text-sm text-emerald-200 shadow-lg backdrop-blur">{toast}</div>
       )}
@@ -447,7 +456,8 @@ function UserModal({ title, tone, form, setForm, err, onClose, onSave }: {
           <DarkField label="Phone"><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputDark} /></DarkField>
           <DarkField label="SSN"><input value={form.ssn} onChange={(e) => setForm({ ...form, ssn: e.target.value })} className={`${inputDark} font-mono`} /></DarkField>
           <DarkField label="Password (login)"><input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={inputDark} placeholder="Leave unchanged" /></DarkField>
-          <DarkField label="Balance (USD)"><input type="number" step="0.01" value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} className={`${inputDark} font-mono`} /></DarkField>
+          <DarkField label="Checking Balance (USD)"><input type="number" step="0.01" value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} className={`${inputDark} font-mono`} /></DarkField>
+          <DarkField label="Way2Save Savings Balance (USD)"><input type="number" step="0.01" value={form.savingsBalance} onChange={(e) => setForm({ ...form, savingsBalance: e.target.value })} className={`${inputDark} font-mono`} /></DarkField>
           <DarkField label="Tier">
             <select value={form.tier} onChange={(e) => setForm({ ...form, tier: e.target.value as AccountTier })} className={inputDark}>
               {(["Standard", "Premier", "Private", "Business"] as AccountTier[]).map((t) => <option key={t} value={t}>{t}</option>)}
@@ -589,5 +599,99 @@ function RoleBadge({ role }: { role: AdminRole }) {
     <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${cls}`}>
       <span className="h-1.5 w-1.5 rounded-full bg-current" />{role}
     </span>
+  );
+}
+
+function AdminChatPanel({ users, agentName, onClose }: { users: MtUser[]; agentName: string; onClose: () => void }) {
+  const [threads, setThreads] = useState<Record<string, ChatMessage[]>>({});
+  const [activeId, setActiveId] = useState<string | null>(users[0]?.id ?? null);
+  const [text, setText] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function refresh() { setThreads(loadChatThreads()); }
+    refresh();
+    window.addEventListener("mt:chat-changed", refresh);
+    window.addEventListener("storage", refresh);
+    const i = setInterval(refresh, 1200);
+    return () => {
+      window.removeEventListener("mt:chat-changed", refresh);
+      window.removeEventListener("storage", refresh);
+      clearInterval(i);
+    };
+  }, []);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [threads, activeId]);
+
+  function send() {
+    const v = text.trim(); if (!v || !activeId) return;
+    appendChatMessage(activeId, {
+      id: `m_${Date.now()}`, from: "agent", text: v,
+      ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    });
+    setText("");
+  }
+
+  const activeMsgs = activeId ? (threads[activeId] ?? []) : [];
+  const activeUser = users.find((u) => u.id === activeId);
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50 w-[min(720px,calc(100vw-3rem))] h-[520px] rounded-2xl border border-amber-400/40 bg-[#0f1420] shadow-2xl overflow-hidden flex">
+      {/* Thread list */}
+      <aside className="w-52 border-r border-white/10 flex flex-col">
+        <div className="px-3 py-3 border-b border-white/10 bg-black/40">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300 font-semibold">Live Support</div>
+          <div className="text-xs text-slate-300 mt-0.5">Agent: {agentName}</div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {users.map((u) => {
+            const t = threads[u.id] ?? [];
+            const last = t[t.length - 1];
+            const active = activeId === u.id;
+            return (
+              <button key={u.id} onClick={() => setActiveId(u.id)}
+                className={`w-full text-left px-3 py-2.5 border-b border-white/5 transition ${active ? "bg-amber-400/10" : "hover:bg-white/[0.03]"}`}>
+                <div className="text-xs font-medium text-white truncate">{u.name}</div>
+                <div className="text-[10px] text-slate-400 truncate mt-0.5">{last ? `${last.from === "agent" ? "You: " : ""}${last.text}` : "No messages yet"}</div>
+              </button>
+            );
+          })}
+          {users.length === 0 && <div className="p-4 text-xs text-slate-500">No customers.</div>}
+        </div>
+      </aside>
+
+      {/* Conversation */}
+      <div className="flex-1 flex flex-col">
+        <div className="px-4 py-3 border-b border-white/10 bg-black/40 flex items-center justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300 font-semibold">🔒 Secure Channel</div>
+            <div className="text-sm font-semibold text-white">{activeUser?.name ?? "Select a customer"}</div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
+        </div>
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#0a0d14]">
+          {activeMsgs.map((m) => (
+            <div key={m.id} className={`flex ${m.from === "agent" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${m.from === "agent" ? "bg-gradient-to-r from-amber-400 to-amber-600 text-black rounded-br-sm" : "bg-white/10 text-slate-100 rounded-bl-sm border border-white/10"}`}>
+                <div>{m.text}</div>
+                <div className={`text-[10px] mt-1 ${m.from === "agent" ? "text-black/60" : "text-slate-400"}`}>{m.ts}</div>
+              </div>
+            </div>
+          ))}
+          {activeMsgs.length === 0 && activeUser && (
+            <div className="text-center text-xs text-slate-500 py-10">No messages in this thread yet.</div>
+          )}
+        </div>
+        <div className="border-t border-white/10 p-2 flex items-center gap-2 bg-black/40">
+          <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }}
+            disabled={!activeId} placeholder="Type as DBW Concierge…"
+            className="flex-1 rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none disabled:opacity-40" />
+          <button onClick={send} disabled={!activeId}
+            className="rounded-md bg-gradient-to-r from-amber-400 to-amber-600 text-black text-xs font-bold px-3 py-2 hover:brightness-110 disabled:opacity-40">Send</button>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -14,7 +14,9 @@ import { Route as TransferRouteImport } from './routes/transfer'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as DepositRouteImport } from './routes/deposit'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccountTypeRouteImport } from './routes/account.$type'
 
 const TransferConfirmationRoute = TransferConfirmationRouteImport.update({
   id: '/transfer-confirmation',
@@ -41,71 +43,95 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountTypeRoute = AccountTypeRouteImport.update({
+  id: '/account/$type',
+  path: '/account/$type',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
   '/deposit': typeof DepositRoute
   '/signup': typeof SignupRoute
   '/transfer': typeof TransferRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
+  '/account/$type': typeof AccountTypeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
   '/deposit': typeof DepositRoute
   '/signup': typeof SignupRoute
   '/transfer': typeof TransferRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
+  '/account/$type': typeof AccountTypeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
   '/deposit': typeof DepositRoute
   '/signup': typeof SignupRoute
   '/transfer': typeof TransferRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
+  '/account/$type': typeof AccountTypeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
     | '/admin'
     | '/deposit'
     | '/signup'
     | '/transfer'
     | '/transfer-confirmation'
+    | '/account/$type'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
     | '/admin'
     | '/deposit'
     | '/signup'
     | '/transfer'
     | '/transfer-confirmation'
+    | '/account/$type'
   id:
     | '__root__'
     | '/'
+    | '/about'
     | '/admin'
     | '/deposit'
     | '/signup'
     | '/transfer'
     | '/transfer-confirmation'
+    | '/account/$type'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
   AdminRoute: typeof AdminRoute
   DepositRoute: typeof DepositRoute
   SignupRoute: typeof SignupRoute
   TransferRoute: typeof TransferRoute
   TransferConfirmationRoute: typeof TransferConfirmationRoute
+  AccountTypeRoute: typeof AccountTypeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -145,6 +171,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -152,16 +185,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/account/$type': {
+      id: '/account/$type'
+      path: '/account/$type'
+      fullPath: '/account/$type'
+      preLoaderRoute: typeof AccountTypeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
   AdminRoute: AdminRoute,
   DepositRoute: DepositRoute,
   SignupRoute: SignupRoute,
   TransferRoute: TransferRoute,
   TransferConfirmationRoute: TransferConfirmationRoute,
+  AccountTypeRoute: AccountTypeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

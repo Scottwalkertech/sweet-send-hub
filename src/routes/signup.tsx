@@ -78,6 +78,8 @@ function SignupPage() {
       tier: "Standard",
       status: "Active",
       balance: 0,
+      savingsBalance: 0,
+      savingsAccountNumber: genAccountNumber(),
       verified: false,
       createdAt: new Date().toISOString().slice(0, 10),
     };
