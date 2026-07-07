@@ -126,14 +126,16 @@ const seedUsers: MtUser[] = [
     phone: "5551234567", ssn: "•••-••-4419",
     securityQ: "What is your mother's maiden name?", securityA: "smith",
     accountNumber: "778812304419", account: "•••• 4419",
-    tier: "Premier", status: "Active", balance: 0, verified: true, createdAt: "2025-11-02",
+    tier: "Premier", status: "Active", balance: 0, savingsBalance: 0,
+    savingsAccountNumber: "778812309901", verified: true, createdAt: "2025-11-02",
   },
   {
     id: "u_1002", name: "Elena Sokolova", email: "elena.s@dbwest.com", password: "password123",
     phone: "5552341122", ssn: "•••-••-7832",
     securityQ: "What was the name of your first pet?", securityA: "boris",
     accountNumber: "778823017832", account: "•••• 7832",
-    tier: "Private", status: "Active", balance: 0, verified: true, createdAt: "2025-11-11",
+    tier: "Private", status: "Active", balance: 0, savingsBalance: 0,
+    savingsAccountNumber: "778823019902", verified: true, createdAt: "2025-11-11",
   },
 ];
 
