@@ -161,7 +161,7 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
       ...u,
       name: editForm.name.trim(), email: editForm.email.trim(), phone: editForm.phone,
       ssn: editForm.ssn, password: editForm.password || u.password,
-      tier: editForm.tier, status: editForm.status, balance: bal,
+      tier: editForm.tier, status: editForm.status, balance: bal, savingsBalance: Number(editForm.savingsBalance) || 0,
       securityQ: editForm.securityQ, securityA: editForm.securityA,
       profilePicture: editForm.profilePicture || undefined,
       enrollments: {
