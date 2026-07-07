@@ -96,6 +96,8 @@ export const LS = {
   QUEUE: "mt_admin_queue",
   DEPOSIT: "mt_admin_deposit_settings",
   CURRENT: "mt_current_user_id",
+  LEDGER: "mt_account_ledger",
+  CHAT: "mt_chat_threads",
 } as const;
 
 export const SECURITY_QUESTIONS = [
