@@ -11,6 +11,7 @@ export type MtUser = {
   email: string;
   password: string; // mock only
   phone: string;
+  address?: string;
   ssn: string;
   securityQ: string;
   securityA: string;
@@ -33,7 +34,11 @@ export type MtUser = {
     commercial?: number;
     wire?: number;
   };
+  // Debit card controls
+  debitFrozen?: boolean;
+  dailyLimit?: number;
 };
+
 
 export type PendingTxMethod = "Wire" | "ACH" | "Check" | "Crypto" | "Transfer";
 export type PendingTxStatus = "Pending" | "Approved" | "Failed";
