@@ -19,11 +19,12 @@ export type MtUser = {
   account: string; // masked (•••• ####)
   tier: AccountTier;
   status: AccountStatus;
-  balance: number;
+  balance: number;           // Everyday Checking balance
+  savingsBalance: number;    // Way2Save Savings balance
+  savingsAccountNumber?: string; // full mock savings acct
   verified: boolean;
   profilePicture?: string; // data URL
   createdAt: string;
-  // Additional service enrollments (Personal Banking is always on)
   enrollments?: {
     smallBusiness?: boolean;
     commercial?: boolean;
@@ -34,9 +35,27 @@ export type MtUser = {
     commercial?: number;
     wire?: number;
   };
-  // Debit card controls
   debitFrozen?: boolean;
   dailyLimit?: number;
+};
+
+export type AccountKey = "checking" | "savings";
+
+export type LedgerEntry = {
+  id: string;
+  userId: string;
+  account: AccountKey;
+  date: string;      // ISO
+  description: string;
+  amount: number;    // signed (+credit, -debit)
+  balanceAfter: number;
+};
+
+export type ChatMessage = {
+  id: string;
+  from: "user" | "agent";
+  text: string;
+  ts: string;
 };
 
 
