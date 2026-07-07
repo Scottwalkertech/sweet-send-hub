@@ -275,10 +275,53 @@ export function fmtCurrency(n: number): string {
 
 // Cross-tab / cross-view live update hook helper.
 export function onStoreChange(cb: () => void): () => void {
-  const evts = ["mt:users-changed", "mt:queue-changed", "mt:deposit-settings-changed", "mt:current-user-changed", "storage"];
+  const evts = ["mt:users-changed", "mt:queue-changed", "mt:deposit-settings-changed", "mt:current-user-changed", "mt:ledger-changed", "mt:chat-changed", "storage"];
   evts.forEach((e) => window.addEventListener(e, cb));
   return () => evts.forEach((e) => window.removeEventListener(e, cb));
 }
+
+// -- Ledger (per-account transaction history) ---------------------------------
+
+export function loadLedger(): LedgerEntry[] {
+  if (typeof window === "undefined") return [];
+  const raw = localStorage.getItem(LS.LEDGER);
+  if (!raw) return [];
+  try { return JSON.parse(raw) as LedgerEntry[]; } catch { return []; }
+}
+export function saveLedger(l: LedgerEntry[]) {
+  localStorage.setItem(LS.LEDGER, JSON.stringify(l));
+  window.dispatchEvent(new CustomEvent("mt:ledger-changed"));
+}
+export function appendLedger(entry: LedgerEntry) {
+  const all = loadLedger();
+  all.unshift(entry);
+  saveLedger(all);
+}
+export function ledgerFor(userId: string, account: AccountKey): LedgerEntry[] {
+  return loadLedger().filter((e) => e.userId === userId && e.account === account);
+}
+
+// -- Chat threads (customer <-> admin) ----------------------------------------
+
+export function loadChatThreads(): Record<string, ChatMessage[]> {
+  if (typeof window === "undefined") return {};
+  const raw = localStorage.getItem(LS.CHAT);
+  if (!raw) return {};
+  try { return JSON.parse(raw) as Record<string, ChatMessage[]>; } catch { return {}; }
+}
+export function saveChatThreads(t: Record<string, ChatMessage[]>) {
+  localStorage.setItem(LS.CHAT, JSON.stringify(t));
+  window.dispatchEvent(new CustomEvent("mt:chat-changed"));
+}
+export function loadChatThread(userId: string): ChatMessage[] {
+  return loadChatThreads()[userId] ?? [];
+}
+export function appendChatMessage(userId: string, msg: ChatMessage) {
+  const all = loadChatThreads();
+  all[userId] = [...(all[userId] ?? []), msg];
+  saveChatThreads(all);
+}
+
 
 // Read file as data URL (for profile pic + BTC QR upload).
 export function readFileAsDataUrl(file: File): Promise<string> {
