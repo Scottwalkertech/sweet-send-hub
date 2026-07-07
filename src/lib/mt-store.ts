@@ -166,6 +166,8 @@ export function loadUsers(): MtUser[] {
       tier: (u.tier as AccountTier) ?? "Standard",
       status: (u.status as AccountStatus) ?? "Active",
       balance: typeof u.balance === "number" ? u.balance : 0,
+      savingsBalance: typeof u.savingsBalance === "number" ? u.savingsBalance : 0,
+      savingsAccountNumber: u.savingsAccountNumber ?? Math.random().toString().slice(2, 14),
       verified: u.verified ?? true,
       profilePicture: u.profilePicture,
       createdAt: u.createdAt ?? new Date().toISOString().slice(0, 10),
