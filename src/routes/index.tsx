@@ -341,8 +341,11 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
 
       {activePending && <PendingOverlay tx={activePending} onExit={() => navigate({ to: "/transfer" })} />}
       {showProfile && <ProfileModal user={user} onClose={() => setShowProfile(false)} />}
+      {showCard && <DebitCardModal user={user} onClose={() => setShowCard(false)} />}
+      {showRouting && <RoutingInfoModal user={user} onClose={() => setShowRouting(false)} />}
       {notEnrolled && <NotEnrolledModal label={notEnrolled.label} onClose={() => setNotEnrolled(null)} />}
       <ChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} userName={user.name} />
+
     </div>
   );
 }
