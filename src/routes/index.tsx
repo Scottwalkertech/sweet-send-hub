@@ -455,6 +455,38 @@ function QuickAction({ to, title, subtitle }: { to: string; title: string; subti
   );
 }
 
+function AccountCard({ to, params, product, tag, accountMasked, balance }: {
+  to: "/account/$type"; params: { type: "checking" | "savings" };
+  product: string; tag: string; accountMasked: string; balance: number;
+}) {
+  return (
+    <Link to={to} params={params}
+      className="group block rounded-2xl overflow-hidden border border-amber-500/25 shadow-xl hover:border-amber-400 hover:shadow-2xl transition-all">
+      <div className="relative px-7 py-8 text-white bg-gradient-to-br from-[#5a0d10] via-[#3b0507] to-[#1a0304]">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.22),transparent_55%)]" />
+        <div className="relative flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-amber-300 text-[10px] uppercase tracking-[0.24em] font-semibold">
+              <span className="h-px w-6 bg-amber-400" />{tag}
+            </div>
+            <div className="mt-2 text-xl font-semibold tracking-wide">{product}</div>
+            <div className="text-[11px] text-amber-200/80 mt-1 tabular-nums">Account {accountMasked} · Routing 121000248</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] uppercase tracking-widest text-amber-200/80">Balance</div>
+            <div className="text-3xl font-semibold tabular-nums mt-1 bg-gradient-to-b from-amber-200 to-amber-500 bg-clip-text text-transparent">
+              {fmtCurrency(balance)}
+            </div>
+          </div>
+        </div>
+        <div className="relative mt-6 flex justify-end text-[11px] uppercase tracking-[0.22em] text-amber-300/80 group-hover:text-amber-200">
+          Open account →
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 function PendingOverlay({ tx, onExit }: { tx: PendingTx; onExit: () => void }) {
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center px-4">
