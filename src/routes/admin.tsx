@@ -255,6 +255,10 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
             </div>
             <RoleBadge role={session.role} />
             <Link to="/" className="text-xs text-slate-400 hover:text-amber-400">Portal</Link>
+            <button onClick={() => setChatOpen((v) => !v)}
+              className="rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-400/20">
+              {chatOpen ? "Close Chat" : "Live Chat"}
+            </button>
             <button onClick={onLogout} className="rounded border border-white/10 px-3 py-1.5 text-xs hover:bg-white/5">Sign out</button>
           </div>
         </div>
