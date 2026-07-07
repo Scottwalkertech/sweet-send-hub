@@ -254,9 +254,9 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
               <div>
                 <div className="flex items-center gap-2 text-amber-300 text-xs uppercase tracking-[0.2em] font-semibold">
                   <span className="h-px w-8 bg-amber-400" />
-                  Primary Account
+                  {serviceMeta[activeTop].label}
                 </div>
-                <h1 className="text-2xl font-semibold mt-3 tracking-wide">Everyday Checking</h1>
+                <h1 className="text-2xl font-semibold mt-3 tracking-wide">{displayedProduct}</h1>
                 <div className="text-xs text-amber-200/80 mt-1 tabular-nums">
                   Account {user.account} · Routing 121000248
                 </div>
@@ -264,9 +264,10 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
               <div className="text-right">
                 <div className="text-xs uppercase tracking-wider text-amber-200/80">Available Balance</div>
                 <div className="text-4xl font-semibold tabular-nums mt-1 bg-gradient-to-b from-amber-200 to-amber-400 bg-clip-text text-transparent">
-                  {fmtCurrency(user.balance)}
+                  {fmtCurrency(displayedBalance)}
                 </div>
               </div>
+
             </div>
           </div>
         </section>
