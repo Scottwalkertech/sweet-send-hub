@@ -113,6 +113,7 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
   const [createForm, setCreateForm] = useState<EditForm>(emptyForm());
   const [modalErr, setModalErr] = useState("");
   const [toast, setToast] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     setUsers(loadUsers());
