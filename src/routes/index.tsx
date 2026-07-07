@@ -194,6 +194,10 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                   </button>
                 );
               })}
+              <Link to="/about"
+                className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] uppercase tracking-[0.14em] rounded transition-colors whitespace-nowrap text-white/80 hover:text-amber-300 hover:bg-white/[0.04]">
+                About Us
+              </Link>
             </nav>
             <span className="hidden md:inline text-[10px] uppercase tracking-[0.2em] text-amber-300/90">Member FDIC</span>
           </div>
