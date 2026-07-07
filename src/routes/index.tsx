@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import {
   loadUsers, upsertUser, setCurrentUserId, currentUser,
   loadQueue, onStoreChange, fmtCurrency, readFileAsDataUrl,
-  type MtUser, type PendingTx,
+  loadChatThread, appendChatMessage,
+  type MtUser, type PendingTx, type ChatMessage,
 } from "@/lib/mt-store";
 
 export const Route = createFileRoute("/")({
