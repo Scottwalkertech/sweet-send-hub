@@ -148,6 +148,16 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
     .filter((t) => t.userId === user.id && t.status !== "Pending")
     .slice(0, 20);
 
+  const serviceMeta: Record<TopNavKey, { label: string; product: string; getBal: () => number }> = {
+    personal:      { label: "Personal Banking",     product: "Everyday Checking",      getBal: () => user.balance },
+    smallBusiness: { label: "Small Business",       product: "Business Checking",      getBal: () => user.serviceBalances?.smallBusiness ?? 0 },
+    commercial:    { label: "Commercial Accounts",  product: "Commercial Operating",   getBal: () => user.serviceBalances?.commercial ?? 0 },
+    wire:          { label: "Wire Services",        product: "Wire Settlement",        getBal: () => user.serviceBalances?.wire ?? 0 },
+  };
+  const displayedBalance = serviceMeta[activeTop].getBal();
+  const displayedProduct = serviceMeta[activeTop].product;
+
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
