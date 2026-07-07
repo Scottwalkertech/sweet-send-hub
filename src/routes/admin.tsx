@@ -199,7 +199,7 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
       securityQ: createForm.securityQ, securityA: createForm.securityA.toLowerCase(),
       accountNumber: acctFull, account: maskAccount(acctFull),
       tier: createForm.tier, status: createForm.status, balance: bal,
-      savingsBalance: 0, savingsAccountNumber: genAccountNumber(),
+      savingsBalance: Number(createForm.savingsBalance) || 0, savingsAccountNumber: genAccountNumber(),
       verified: true, profilePicture: createForm.profilePicture || undefined,
       createdAt: new Date().toISOString().slice(0, 10),
       enrollments: {
