@@ -1,11 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
-  loadUsers, upsertUser, setCurrentUserId, currentUser,
+  loadUsers, upsertUser, saveUsers, setCurrentUserId, currentUser,
   loadQueue, onStoreChange, fmtCurrency, readFileAsDataUrl,
   loadChatThread, appendChatMessage,
+  genAccountNumber, maskAccount,
   type MtUser, type PendingTx, type ChatMessage,
 } from "@/lib/mt-store";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
