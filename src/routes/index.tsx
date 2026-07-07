@@ -39,13 +39,6 @@ function Login({ onAuth }: { onAuth: (u: MtUser) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-function Login({ onAuth }: { onAuth: (u: MtUser) => void }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
