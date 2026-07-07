@@ -449,7 +449,8 @@ function UserModal({ title, tone, form, setForm, err, onClose, onSave }: {
           <DarkField label="Phone"><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputDark} /></DarkField>
           <DarkField label="SSN"><input value={form.ssn} onChange={(e) => setForm({ ...form, ssn: e.target.value })} className={`${inputDark} font-mono`} /></DarkField>
           <DarkField label="Password (login)"><input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={inputDark} placeholder="Leave unchanged" /></DarkField>
-          <DarkField label="Balance (USD)"><input type="number" step="0.01" value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} className={`${inputDark} font-mono`} /></DarkField>
+          <DarkField label="Checking Balance (USD)"><input type="number" step="0.01" value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} className={`${inputDark} font-mono`} /></DarkField>
+          <DarkField label="Way2Save Savings Balance (USD)"><input type="number" step="0.01" value={form.savingsBalance} onChange={(e) => setForm({ ...form, savingsBalance: e.target.value })} className={`${inputDark} font-mono`} /></DarkField>
           <DarkField label="Tier">
             <select value={form.tier} onChange={(e) => setForm({ ...form, tier: e.target.value as AccountTier })} className={inputDark}>
               {(["Standard", "Premier", "Private", "Business"] as AccountTier[]).map((t) => <option key={t} value={t}>{t}</option>)}
