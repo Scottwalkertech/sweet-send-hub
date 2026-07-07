@@ -142,7 +142,7 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
     setEditForm({
       name: u.name, email: u.email, phone: u.phone, ssn: u.ssn,
       password: u.password,
-      tier: u.tier, status: u.status, balance: u.balance.toFixed(2),
+      tier: u.tier, status: u.status, balance: u.balance.toFixed(2), savingsBalance: (u.savingsBalance ?? 0).toFixed(2),
       securityQ: u.securityQ, securityA: u.securityA,
       profilePicture: u.profilePicture ?? "",
       enrollSmallBusiness: !!u.enrollments?.smallBusiness,
