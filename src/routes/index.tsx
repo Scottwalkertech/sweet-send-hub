@@ -110,11 +110,14 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
   const navigate = useNavigate();
   const [activePending, setActivePending] = useState<PendingTx | null>(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [showCard, setShowCard] = useState(false);
+  const [showRouting, setShowRouting] = useState(false);
   const [dbwOpen, setDbwOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [notEnrolled, setNotEnrolled] = useState<null | { label: string }>(null);
   const [activeTop, setActiveTop] = useState<TopNavKey>("personal");
   const dbwRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     function refresh() {
