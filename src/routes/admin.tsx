@@ -85,7 +85,7 @@ function AdminGate({ onPass }: { onPass: (s: AdminSession) => void }) {
 type EditForm = {
   name: string; email: string; phone: string; ssn: string;
   password: string;
-  tier: AccountTier; status: AccountStatus; balance: string;
+  tier: AccountTier; status: AccountStatus; balance: string; savingsBalance: string;
   securityQ: string; securityA: string;
   profilePicture: string;
   enrollSmallBusiness: boolean; enrollCommercial: boolean; enrollWire: boolean;
@@ -95,7 +95,7 @@ type EditForm = {
 function emptyForm(): EditForm {
   return {
     name: "", email: "", phone: "", ssn: "", password: "",
-    tier: "Standard", status: "Active", balance: "0",
+    tier: "Standard", status: "Active", balance: "0", savingsBalance: "0",
     securityQ: SECURITY_QUESTIONS[0], securityA: "", profilePicture: "",
     enrollSmallBusiness: false, enrollCommercial: false, enrollWire: false,
     balSmallBusiness: "0", balCommercial: "0", balWire: "0",
