@@ -363,7 +363,7 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
       {showCard && <DebitCardModal user={user} onClose={() => setShowCard(false)} />}
       {showRouting && <RoutingInfoModal user={user} onClose={() => setShowRouting(false)} />}
       {notEnrolled && <NotEnrolledModal label={notEnrolled.label} onClose={() => setNotEnrolled(null)} />}
-      <ChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} userName={user.name} />
+      <ChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} userId={user.id} userName={user.name} />
 
     </div>
   );
