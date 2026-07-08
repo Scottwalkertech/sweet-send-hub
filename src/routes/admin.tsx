@@ -328,6 +328,11 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
         </div>
       </section>
 
+      {/* Transaction Template Repository (admin-only) */}
+      <section className="mx-auto max-w-7xl px-4 mt-10">
+        <TemplateRepositoryPanel users={users} canEdit={canEdit} flash={flash} />
+      </section>
+
       {/* Transaction Queue */}
       <section className="mx-auto max-w-7xl px-4 mt-10 pb-16">
         <SectionHeader title="Transaction Queue" subtitle="All customer deposit and transfer requests awaiting review." />
