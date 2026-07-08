@@ -73,11 +73,6 @@ function AdminGate({ onPass }: { onPass: (s: AdminSession) => void }) {
         {err && <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
         <button type="submit" className="mt-6 w-full rounded-md bg-gradient-to-r from-amber-400 to-amber-600 py-2.5 text-sm font-semibold text-black hover:brightness-110">Sign in</button>
         <div className="mt-4 text-center"><Link to="/" className="text-xs text-slate-500 hover:text-amber-400">← Return to banking portal</Link></div>
-        <div className="mt-5 rounded border border-white/5 bg-black/30 p-3 text-[10px] leading-relaxed text-slate-500">
-          <div className="uppercase tracking-wider text-slate-400 mb-1">Test accounts</div>
-          <div>SuperAdmin — root@dbw.io / Admin2026!</div>
-          <div>Support — ops@dbw.io / StaffPass99</div>
-        </div>
       </form>
     </div>
   );
