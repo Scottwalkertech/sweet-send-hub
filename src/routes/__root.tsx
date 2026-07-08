@@ -122,13 +122,13 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
 
-  // Hidden Operations Console toggle: Ctrl/Cmd + Shift + A
+  // Hidden Operations Console toggle: Ctrl/Cmd + Shift + A (desktop)
+  // Mobile equivalent: 5 rapid taps on the invisible corner target below.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "A" || e.key === "a")) {
         e.preventDefault();
-        try { sessionStorage.setItem("mt_admin_unlocked", "1"); } catch { /* */ }
-        router.navigate({ to: "/admin" });
+        unlockAdmin(router);
       }
     }
     window.addEventListener("keydown", onKey);
@@ -140,7 +140,50 @@ function RootComponent() {
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
       <PageTransitionLoader />
+      <AdminUnlockCorner onUnlock={() => unlockAdmin(router)} />
     </QueryClientProvider>
   );
 }
+
+function unlockAdmin(router: ReturnType<typeof useRouter>) {
+  try { sessionStorage.setItem("mt_admin_unlocked", "1"); } catch { /* */ }
+  router.navigate({ to: "/admin" });
+}
+
+// Invisible 44×44 hit target pinned to the bottom-right corner.
+// Five taps within 1.5s unlocks the Operations Console. No visible UI,
+// no cursor change, no aria label — completely opaque to public users.
+function AdminUnlockCorner({ onUnlock }: { onUnlock: () => void }) {
+  const tapsRef = (globalThis as unknown as { __dbwTapState?: { count: number; first: number } });
+  function handleTap() {
+    const now = Date.now();
+    const state = tapsRef.__dbwTapState;
+    if (!state || now - state.first > 1500) {
+      tapsRef.__dbwTapState = { count: 1, first: now };
+      return;
+    }
+    state.count += 1;
+    if (state.count >= 5) {
+      tapsRef.__dbwTapState = undefined;
+      onUnlock();
+    }
+  }
+  return (
+    <div
+      onClick={handleTap}
+      onTouchEnd={handleTap}
+      style={{
+        position: "fixed",
+        right: 0,
+        bottom: 0,
+        width: 44,
+        height: 44,
+        zIndex: 9999,
+        background: "transparent",
+        WebkitTapHighlightColor: "transparent",
+      }}
+    />
+  );
+}
+
 
