@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Loader2, Shield, Users, DollarSign } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Shield, Users, DollarSign } from "lucide-react";
 import {
-  currentUser, loadQueue, pushToQueue, genRef, fmtCurrency, onStoreChange,
+  currentUser, pushToQueue, genRef, fmtCurrency, onStoreChange,
   type MtUser, type PendingTx,
 } from "@/lib/mt-store";
 
