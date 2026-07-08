@@ -137,11 +137,28 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <GlobalBanner />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
       <PageTransitionLoader />
       <AdminUnlockCorner onUnlock={() => unlockAdmin(router)} />
     </QueryClientProvider>
+  );
+}
+
+function GlobalBanner() {
+  const banner = useSystemSetting("banner");
+  if (!banner || !banner.enabled || !banner.message.trim()) return null;
+  const tone = banner.tone;
+  const cls =
+    tone === "danger" ? "bg-red-600 text-white" :
+    tone === "warning" ? "bg-amber-500 text-black" :
+    tone === "success" ? "bg-emerald-600 text-white" :
+    "bg-sky-600 text-white";
+  return (
+    <div className={`w-full ${cls} text-center text-xs sm:text-sm font-medium px-4 py-2 shadow-sm`}>
+      {banner.message}
+    </div>
   );
 }
 
