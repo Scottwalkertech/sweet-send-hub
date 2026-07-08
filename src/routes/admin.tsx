@@ -12,7 +12,7 @@ export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
       { title: "Treasury Management Console — Dynamic Bank of West" },
-      { name: "description", content: "Internal Treasury Management Internal administration console. Operations Console." },
+      { name: "description", content: "Internal Treasury Management & Operations Console." },
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
