@@ -557,29 +557,8 @@ function AccountCard({ to, params, product, tag, accountMasked, balance }: {
   );
 }
 
-function PendingOverlay({ tx, onExit }: { tx: PendingTx; onExit: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center px-4">
-      <div className="w-full max-w-lg bg-slate-900/70 border border-amber-500/40 rounded-2xl shadow-2xl overflow-hidden">
-        <div className="h-1.5 bg-gradient-to-r from-amber-400 to-amber-600" />
-        <div className="px-8 py-8 text-white text-center">
-          <div className="mx-auto relative h-20 w-20 mb-5">
-            <div className="absolute inset-0 rounded-full bg-amber-400/20 animate-ping" />
-            <div className="relative h-20 w-20 rounded-full bg-amber-500/15 border border-amber-400/40 flex items-center justify-center text-3xl">⏳</div>
-          </div>
-          <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300 font-semibold">Pending Verification</div>
-          <h2 className="mt-2 text-xl font-semibold">Your transfer is under compliance review</h2>
-          <p className="mt-2 text-sm text-slate-300">
-            Reference <span className="font-mono">{tx.reference}</span> for {fmtCurrency(tx.amount)} to {tx.recipient} is awaiting Treasury Operations approval. Your request is being processed by our Treasury Operations team.
-          </p>
-          <button onClick={onExit} className="mt-6 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-semibold px-5 py-2">
-            View processing view
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+
+
 
 function ProfileModal({ user, onClose }: { user: MtUser; onClose: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
