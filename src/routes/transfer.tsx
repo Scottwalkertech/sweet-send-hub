@@ -244,6 +244,82 @@ function TransferInitiated({ tx, onDone }: { tx: PendingTx; onDone: () => void }
   );
 }
 
+function downloadTransferReceiptPdf(tx: PendingTx) {
+  const doc = new jsPDF({ unit: "pt", format: "letter" });
+  const w = doc.internal.pageSize.getWidth();
+
+  // Header band
+  doc.setFillColor(10, 37, 64);
+  doc.rect(0, 0, w, 90, "F");
+  doc.setFillColor(245, 191, 66);
+  doc.rect(0, 90, w, 4, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("DYNAMIC BANK OF WEST", 48, 46);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(245, 191, 66);
+  doc.text("Transfer Receipt · Treasury Operations", 48, 66);
+
+  // Body
+  doc.setTextColor(20, 30, 48);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Transfer Initiated", 48, 140);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(60, 60, 60);
+  const wrapped = doc.splitTextToSize(
+    "Your transfer request has been successfully queued. Please note that processing standard external or non-instant pipeline transfers generally takes 1 to 2 business days to settle.",
+    w - 96,
+  );
+  doc.text(wrapped, 48, 164);
+
+  // Detail table
+  const rows: Array<[string, string]> = [
+    ["Reference", tx.reference],
+    ["Amount (USD)", fmtCurrency(tx.amount)],
+    ["Recipient", tx.recipient ?? "—"],
+    ["Recipient Bank", tx.recipientBank ?? "—"],
+    ["Routing", tx.routing ?? "—"],
+    ["Account", tx.recipientAcct ? `•••• ${tx.recipientAcct.slice(-4)}` : "—"],
+    ["Submitted", tx.submitted],
+    ["Status", "Pending — 1–2 business days"],
+  ];
+  let y = 230;
+  doc.setDrawColor(220, 226, 236);
+  doc.setLineWidth(0.5);
+  doc.rect(48, y - 18, w - 96, rows.length * 26 + 8);
+  rows.forEach((r, i) => {
+    if (i > 0) doc.line(48, y - 8, w - 48, y - 8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 58, 138);
+    doc.setFontSize(9);
+    doc.text(r[0].toUpperCase(), 60, y + 4);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(20, 30, 48);
+    doc.setFontSize(11);
+    doc.text(r[1], w - 60, y + 4, { align: "right" });
+    y += 26;
+  });
+
+  // Footer
+  doc.setFontSize(9);
+  doc.setTextColor(120, 120, 120);
+  doc.text(
+    "Dynamic Bank of West, N.A. · Member FDIC · Keep this receipt for your records.",
+    w / 2,
+    doc.internal.pageSize.getHeight() - 40,
+    { align: "center" },
+  );
+
+  doc.save(`DBW-Transfer-Receipt-${tx.reference}.pdf`);
+}
+
+
 
 // -- small primitives ---------------------------------------------------------
 
