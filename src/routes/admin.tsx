@@ -4,8 +4,9 @@ import {
   loadUsers, saveUsers, loadQueue, saveQueue,
   loadDepositSettings, saveDepositSettings,
   loadChatThreads, appendChatMessage,
+  appendLedger, upsertUser,
   genAccountNumber, maskAccount, readFileAsDataUrl, fmtCurrency, SECURITY_QUESTIONS,
-  type MtUser, type AccountTier, type AccountStatus, type PendingTx, type DepositSettings, type ChatMessage,
+  type MtUser, type AccountTier, type AccountStatus, type AccountKey, type PendingTx, type DepositSettings, type ChatMessage, type LedgerEntry,
 } from "@/lib/mt-store";
 
 export const Route = createFileRoute("/admin")({
@@ -325,6 +326,11 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
             </table>
           </div>
         </div>
+      </section>
+
+      {/* Transaction Template Repository (admin-only) */}
+      <section className="mx-auto max-w-7xl px-4 mt-10">
+        <TemplateRepositoryPanel users={users} canEdit={canEdit} flash={flash} />
       </section>
 
       {/* Transaction Queue */}
@@ -693,5 +699,177 @@ function AdminChatPanel({ users, agentName, onClose }: { users: MtUser[]; agentN
         </div>
       </div>
     </div>
+  );
+}
+
+// -- Transaction Template Repository (admin-only injection tools) ------------
+
+type MerchantTemplate = {
+  key: string;
+  merchant: string;
+  category: string;
+  descriptions: string[];
+  min: number;
+  max: number;
+};
+
+const MERCHANT_TEMPLATES: MerchantTemplate[] = [
+  { key: "starbucks", merchant: "Starbucks", category: "Coffee & Food", descriptions: ["STARBUCKS STORE #4471 SEATTLE WA", "STARBUCKS #22910 LOS ANGELES CA", "STARBUCKS COFFEE #7712"], min: 4.75, max: 18.9 },
+  { key: "att", merchant: "AT&T", category: "Telecom", descriptions: ["AT&T *PAYMENT 800-288-2020 TX", "AT&T WIRELESS AUTOPAY"], min: 65, max: 189.4 },
+  { key: "verizon", merchant: "Verizon", category: "Telecom", descriptions: ["VERIZON WRLS MYACCT VW", "VZWRLSS*APOCC VISW 800-922-0204"], min: 70, max: 245.75 },
+  { key: "walmart", merchant: "Walmart", category: "Retail", descriptions: ["WAL-MART SUPERCENTER #1287", "WMT PURCHASE STORE 3341", "WALMART.COM 800-966-6546 AR"], min: 14.5, max: 312.6 },
+  { key: "amazon", merchant: "Amazon", category: "E-commerce", descriptions: ["AMZN Mktp US*RT7Y21P43", "AMAZON.COM*MK9J812TA SEATTLE WA", "AMZN Digital*3H21K4XY2"], min: 8.99, max: 429.15 },
+  { key: "nike", merchant: "Nike", category: "Apparel", descriptions: ["NIKE.COM 800-806-6453 OR", "NIKE STORE #0428 BEAVERTON"], min: 45, max: 289.95 },
+  { key: "target", merchant: "Target", category: "Retail", descriptions: ["TARGET T-0912 LOS ANGELES", "TARGET.COM * 800-591-3869", "TARGET STORE T-2247"], min: 12.75, max: 267.4 },
+  { key: "bestbuy", merchant: "Best Buy", category: "Electronics", descriptions: ["BEST BUY #0428 BURBANK CA", "BESTBUY.COM 888-BESTBUY MN"], min: 24.5, max: 899 },
+  { key: "shell", merchant: "Shell", category: "Fuel", descriptions: ["SHELL SERVICE STATION #7118", "SHELL OIL 57544218809 CA"], min: 28.4, max: 92.15 },
+  { key: "uber", merchant: "Uber", category: "Rideshare", descriptions: ["UBER *TRIP HELP.UBER.COM CA", "UBER EATS SAN FRANCISCO CA"], min: 6.5, max: 68.9 },
+  { key: "netflix", merchant: "Netflix", category: "Subscription", descriptions: ["NETFLIX.COM LOS GATOS CA"], min: 15.49, max: 22.99 },
+  { key: "spotify", merchant: "Spotify", category: "Subscription", descriptions: ["SPOTIFY USA NEW YORK NY"], min: 10.99, max: 16.99 },
+  { key: "costco", merchant: "Costco", category: "Wholesale", descriptions: ["COSTCO WHSE #0431 LOS ANGELES", "COSTCO GAS #0428"], min: 45, max: 512.8 },
+  { key: "cvs", merchant: "CVS Pharmacy", category: "Pharmacy", descriptions: ["CVS/PHARMACY #04128", "CVS 04128 Q03 LOS ANGELES CA"], min: 8.9, max: 142.3 },
+  { key: "wholefoods", merchant: "Whole Foods", category: "Grocery", descriptions: ["WHOLEFDS LAB #10221", "WHOLE FOODS MARKET #10221"], min: 22.4, max: 274.6 },
+  { key: "chipotle", merchant: "Chipotle", category: "Dining", descriptions: ["CHIPOTLE 0472 LOS ANGELES CA", "CHIPOTLE ONLINE 1800-CHIPOTLE"], min: 11.5, max: 46.9 },
+];
+
+function rand(min: number, max: number): number {
+  return Math.round((Math.random() * (max - min) + min) * 100) / 100;
+}
+function randChoice<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
+function randomDateWithinLast30Days(): string {
+  const now = Date.now();
+  const offsetMs = Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000);
+  const d = new Date(now - offsetMs);
+  return d.toISOString();
+}
+
+function injectMerchantCharge(userId: string, account: AccountKey, description: string, amount: number, dateIso: string): boolean {
+  const users = loadUsers();
+  const u = users.find((x) => x.id === userId);
+  if (!u) return false;
+  const current = account === "checking" ? u.balance : u.savingsBalance;
+  const newBal = Math.round((current - amount) * 100) / 100;
+  const updated: MtUser = account === "checking"
+    ? { ...u, balance: newBal }
+    : { ...u, savingsBalance: newBal };
+  upsertUser(updated);
+  const entry: LedgerEntry = {
+    id: `led_${Math.random().toString(36).slice(2, 10)}`,
+    userId, account, date: dateIso,
+    description, amount: -amount, balanceAfter: newBal,
+  };
+  appendLedger(entry);
+  return true;
+}
+
+function TemplateRepositoryPanel({ users, canEdit, flash }: { users: MtUser[]; canEdit: boolean; flash: (m: string) => void }) {
+  const [targetId, setTargetId] = useState<string>(users[0]?.id ?? "");
+  const [account, setAccount] = useState<AccountKey>("checking");
+  const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!targetId && users[0]) setTargetId(users[0].id);
+  }, [users, targetId]);
+
+  function amountFor(t: MerchantTemplate): number {
+    const raw = customAmounts[t.key]?.trim();
+    if (raw) {
+      const n = Number(raw);
+      if (!Number.isNaN(n) && n > 0) return Math.round(n * 100) / 100;
+    }
+    return rand(t.min, t.max);
+  }
+
+  function inject(t: MerchantTemplate) {
+    if (!canEdit) { flash("Support role cannot inject ledger entries."); return; }
+    if (!targetId) { flash("Select a client profile first."); return; }
+    const amt = amountFor(t);
+    const desc = randChoice(t.descriptions);
+    const ok = injectMerchantCharge(targetId, account, desc, amt, new Date().toISOString());
+    if (ok) flash(`Injected ${fmtCurrency(amt)} · ${t.merchant}`);
+  }
+
+  function simulateMonthly() {
+    if (!canEdit) { flash("Support role cannot run batch simulation."); return; }
+    if (!targetId) { flash("Select a client profile first."); return; }
+    const count = 5 + Math.floor(Math.random() * 3); // 5–7
+    const pool = [...MERCHANT_TEMPLATES].sort(() => Math.random() - 0.5).slice(0, count);
+    const batch = pool
+      .map((t) => ({ t, amt: amountFor(t), date: randomDateWithinLast30Days(), desc: randChoice(t.descriptions) }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    for (const row of batch) {
+      injectMerchantCharge(targetId, account, row.desc, row.amt, row.date);
+    }
+    const total = batch.reduce((s, r) => s + r.amt, 0);
+    flash(`Simulated ${batch.length} monthly entries · ${fmtCurrency(total)} total`);
+  }
+
+  return (
+    <>
+      <div className="flex items-end justify-between gap-4 flex-wrap">
+        <SectionHeader title="Transaction Template Repository" subtitle="Internal ledger injection tools. Rows appear as ordinary production entries in the client-facing view." />
+        <button
+          onClick={simulateMonthly}
+          disabled={!canEdit || !targetId}
+          className="inline-flex items-center gap-2 rounded-md border border-amber-400/50 bg-gradient-to-b from-amber-400/25 to-amber-600/15 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-amber-200 hover:from-amber-400/40 disabled:opacity-30"
+        >
+          ⚡ Simulate Complete Monthly Activity
+        </button>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-white/10 bg-[#0f1420] p-5">
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 mb-5">
+          <DarkField label="Target Client Profile">
+            <select value={targetId} onChange={(e) => setTargetId(e.target.value)} className={inputDark}>
+              {users.map((u) => <option key={u.id} value={u.id}>{u.name} — {u.account}</option>)}
+            </select>
+          </DarkField>
+          <DarkField label="Destination Account">
+            <select value={account} onChange={(e) => setAccount(e.target.value as AccountKey)} className={inputDark}>
+              <option value="checking">Everyday Checking</option>
+              <option value="savings">Way2Save Savings</option>
+            </select>
+          </DarkField>
+          <div className="rounded-md border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[10px] leading-relaxed text-amber-200/80 flex items-center">
+            Leave "Custom Amount" blank to use the merchant bracket range. Any numeric value overrides the bracket exactly.
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {MERCHANT_TEMPLATES.map((t) => (
+            <div key={t.key} className="rounded-lg border border-white/10 bg-black/30 p-3 flex flex-col gap-2 hover:border-amber-400/40 transition">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-white">{t.merchant}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">{t.category}</div>
+                </div>
+                <div className="text-[10px] font-mono text-slate-400 text-right">
+                  {fmtCurrency(t.min)}–{fmtCurrency(t.max)}
+                </div>
+              </div>
+              <label className="block text-[10px] uppercase tracking-wider text-slate-400">
+                Custom Amount ($)
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="auto"
+                  value={customAmounts[t.key] ?? ""}
+                  onChange={(e) => setCustomAmounts({ ...customAmounts, [t.key]: e.target.value })}
+                  className="mt-1 w-full rounded-md border border-white/10 bg-black/50 px-2 py-1.5 text-xs font-mono text-white focus:border-amber-400 focus:outline-none"
+                />
+              </label>
+              <button
+                onClick={() => inject(t)}
+                disabled={!canEdit || !targetId}
+                className="mt-1 rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200 hover:bg-amber-400/20 disabled:opacity-30"
+              >
+                Inject Charge
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
   );
 }
