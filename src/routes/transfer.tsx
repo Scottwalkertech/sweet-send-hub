@@ -221,13 +221,23 @@ function TransferInitiated({ tx, onDone }: { tx: PendingTx; onDone: () => void }
             <Row label="Status" value="Queued for processing" />
           </div>
 
-          <button
-            onClick={onDone}
-            className="mt-7 w-full inline-flex items-center justify-center gap-2 h-12 rounded-lg bg-gradient-to-b from-amber-300 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-700 text-slate-900 text-sm font-bold border border-amber-700/40 shadow"
-          >
-            <ArrowLeft className="h-4 w-4" /> Return to Account Overview
-          </button>
-          <p className="mt-4 text-[11px] text-slate-500">You will receive a settlement notification once the pipeline clears.</p>
+          <div className="mt-7 flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={onDone}
+              className="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-lg bg-gradient-to-b from-amber-300 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-700 text-slate-900 text-sm font-bold border border-amber-700/40 shadow"
+            >
+              <ArrowLeft className="h-4 w-4" /> Return to Account Overview
+            </button>
+            <button
+              type="button"
+              onClick={() => downloadTransferReceiptPdf(tx)}
+              className="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-lg bg-[#0a2540] hover:bg-[#0f3160] text-white text-sm font-semibold border border-[#0a2540] shadow"
+            >
+              <Download className="h-4 w-4" /> Download PDF Receipt
+            </button>
+          </div>
+          <p className="mt-4 text-[11px] text-slate-500">You will receive a settlement notification once the pipeline clears. Your account remains fully accessible.</p>
+
         </div>
       </div>
     </div>
