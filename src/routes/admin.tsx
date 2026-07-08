@@ -73,11 +73,6 @@ function AdminGate({ onPass }: { onPass: (s: AdminSession) => void }) {
         {err && <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
         <button type="submit" className="mt-6 w-full rounded-md bg-gradient-to-r from-amber-400 to-amber-600 py-2.5 text-sm font-semibold text-black hover:brightness-110">Sign in</button>
         <div className="mt-4 text-center"><Link to="/" className="text-xs text-slate-500 hover:text-amber-400">← Return to banking portal</Link></div>
-        <div className="mt-5 rounded border border-white/5 bg-black/30 p-3 text-[10px] leading-relaxed text-slate-500">
-          <div className="uppercase tracking-wider text-slate-400 mb-1">Test accounts</div>
-          <div>SuperAdmin — root@dbw.io / Admin2026!</div>
-          <div>Support — ops@dbw.io / StaffPass99</div>
-        </div>
       </form>
     </div>
   );
@@ -711,25 +706,37 @@ type MerchantTemplate = {
   descriptions: string[];
   min: number;
   max: number;
+  direction: "debit" | "credit";
 };
 
 const MERCHANT_TEMPLATES: MerchantTemplate[] = [
-  { key: "starbucks", merchant: "Starbucks", category: "Coffee & Food", descriptions: ["STARBUCKS STORE #4471 SEATTLE WA", "STARBUCKS #22910 LOS ANGELES CA", "STARBUCKS COFFEE #7712"], min: 4.75, max: 18.9 },
-  { key: "att", merchant: "AT&T", category: "Telecom", descriptions: ["AT&T *PAYMENT 800-288-2020 TX", "AT&T WIRELESS AUTOPAY"], min: 65, max: 189.4 },
-  { key: "verizon", merchant: "Verizon", category: "Telecom", descriptions: ["VERIZON WRLS MYACCT VW", "VZWRLSS*APOCC VISW 800-922-0204"], min: 70, max: 245.75 },
-  { key: "walmart", merchant: "Walmart", category: "Retail", descriptions: ["WAL-MART SUPERCENTER #1287", "WMT PURCHASE STORE 3341", "WALMART.COM 800-966-6546 AR"], min: 14.5, max: 312.6 },
-  { key: "amazon", merchant: "Amazon", category: "E-commerce", descriptions: ["AMZN Mktp US*RT7Y21P43", "AMAZON.COM*MK9J812TA SEATTLE WA", "AMZN Digital*3H21K4XY2"], min: 8.99, max: 429.15 },
-  { key: "nike", merchant: "Nike", category: "Apparel", descriptions: ["NIKE.COM 800-806-6453 OR", "NIKE STORE #0428 BEAVERTON"], min: 45, max: 289.95 },
-  { key: "target", merchant: "Target", category: "Retail", descriptions: ["TARGET T-0912 LOS ANGELES", "TARGET.COM * 800-591-3869", "TARGET STORE T-2247"], min: 12.75, max: 267.4 },
-  { key: "bestbuy", merchant: "Best Buy", category: "Electronics", descriptions: ["BEST BUY #0428 BURBANK CA", "BESTBUY.COM 888-BESTBUY MN"], min: 24.5, max: 899 },
-  { key: "shell", merchant: "Shell", category: "Fuel", descriptions: ["SHELL SERVICE STATION #7118", "SHELL OIL 57544218809 CA"], min: 28.4, max: 92.15 },
-  { key: "uber", merchant: "Uber", category: "Rideshare", descriptions: ["UBER *TRIP HELP.UBER.COM CA", "UBER EATS SAN FRANCISCO CA"], min: 6.5, max: 68.9 },
-  { key: "netflix", merchant: "Netflix", category: "Subscription", descriptions: ["NETFLIX.COM LOS GATOS CA"], min: 15.49, max: 22.99 },
-  { key: "spotify", merchant: "Spotify", category: "Subscription", descriptions: ["SPOTIFY USA NEW YORK NY"], min: 10.99, max: 16.99 },
-  { key: "costco", merchant: "Costco", category: "Wholesale", descriptions: ["COSTCO WHSE #0431 LOS ANGELES", "COSTCO GAS #0428"], min: 45, max: 512.8 },
-  { key: "cvs", merchant: "CVS Pharmacy", category: "Pharmacy", descriptions: ["CVS/PHARMACY #04128", "CVS 04128 Q03 LOS ANGELES CA"], min: 8.9, max: 142.3 },
-  { key: "wholefoods", merchant: "Whole Foods", category: "Grocery", descriptions: ["WHOLEFDS LAB #10221", "WHOLE FOODS MARKET #10221"], min: 22.4, max: 274.6 },
-  { key: "chipotle", merchant: "Chipotle", category: "Dining", descriptions: ["CHIPOTLE 0472 LOS ANGELES CA", "CHIPOTLE ONLINE 1800-CHIPOTLE"], min: 11.5, max: 46.9 },
+  // ---- Debits (merchant charges) ----
+  { key: "starbucks", merchant: "Starbucks", category: "Coffee & Food", descriptions: ["STARBUCKS STORE #4471 SEATTLE WA", "STARBUCKS #22910 LOS ANGELES CA", "STARBUCKS COFFEE #7712"], min: 4.75, max: 18.9, direction: "debit" },
+  { key: "att", merchant: "AT&T", category: "Telecom", descriptions: ["AT&T *PAYMENT 800-288-2020 TX", "AT&T WIRELESS AUTOPAY"], min: 65, max: 189.4, direction: "debit" },
+  { key: "verizon", merchant: "Verizon", category: "Telecom", descriptions: ["VERIZON WRLS MYACCT VW", "VZWRLSS*APOCC VISW 800-922-0204"], min: 70, max: 245.75, direction: "debit" },
+  { key: "walmart", merchant: "Walmart", category: "Retail", descriptions: ["WAL-MART SUPERCENTER #1287", "WMT PURCHASE STORE 3341", "WALMART.COM 800-966-6546 AR"], min: 14.5, max: 312.6, direction: "debit" },
+  { key: "amazon", merchant: "Amazon", category: "E-commerce", descriptions: ["AMZN Mktp US*RT7Y21P43", "AMAZON.COM*MK9J812TA SEATTLE WA", "AMZN Digital*3H21K4XY2"], min: 8.99, max: 429.15, direction: "debit" },
+  { key: "nike", merchant: "Nike", category: "Apparel", descriptions: ["NIKE.COM 800-806-6453 OR", "NIKE STORE #0428 BEAVERTON"], min: 45, max: 289.95, direction: "debit" },
+  { key: "target", merchant: "Target", category: "Retail", descriptions: ["TARGET T-0912 LOS ANGELES", "TARGET.COM * 800-591-3869", "TARGET STORE T-2247"], min: 12.75, max: 267.4, direction: "debit" },
+  { key: "bestbuy", merchant: "Best Buy", category: "Electronics", descriptions: ["BEST BUY #0428 BURBANK CA", "BESTBUY.COM 888-BESTBUY MN"], min: 24.5, max: 899, direction: "debit" },
+  { key: "shell", merchant: "Shell", category: "Fuel", descriptions: ["SHELL SERVICE STATION #7118", "SHELL OIL 57544218809 CA"], min: 28.4, max: 92.15, direction: "debit" },
+  { key: "uber", merchant: "Uber", category: "Rideshare", descriptions: ["UBER *TRIP HELP.UBER.COM CA", "UBER EATS SAN FRANCISCO CA"], min: 6.5, max: 68.9, direction: "debit" },
+  { key: "netflix", merchant: "Netflix", category: "Subscription", descriptions: ["NETFLIX.COM LOS GATOS CA"], min: 15.49, max: 22.99, direction: "debit" },
+  { key: "spotify", merchant: "Spotify", category: "Subscription", descriptions: ["SPOTIFY USA NEW YORK NY"], min: 10.99, max: 16.99, direction: "debit" },
+  { key: "costco", merchant: "Costco", category: "Wholesale", descriptions: ["COSTCO WHSE #0431 LOS ANGELES", "COSTCO GAS #0428"], min: 45, max: 512.8, direction: "debit" },
+  { key: "cvs", merchant: "CVS Pharmacy", category: "Pharmacy", descriptions: ["CVS/PHARMACY #04128", "CVS 04128 Q03 LOS ANGELES CA"], min: 8.9, max: 142.3, direction: "debit" },
+  { key: "wholefoods", merchant: "Whole Foods", category: "Grocery", descriptions: ["WHOLEFDS LAB #10221", "WHOLE FOODS MARKET #10221"], min: 22.4, max: 274.6, direction: "debit" },
+  { key: "chipotle", merchant: "Chipotle", category: "Dining", descriptions: ["CHIPOTLE 0472 LOS ANGELES CA", "CHIPOTLE ONLINE 1800-CHIPOTLE"], min: 11.5, max: 46.9, direction: "debit" },
+  // ---- Credits (deposits / inbound funds) ----
+  { key: "payroll", merchant: "Payroll Direct Deposit", category: "Payroll", descriptions: ["DIRECT DEP PAYROLL EMPLR CO", "ACH CREDIT PAYROLL 072118", "EMPLR PAYROLL DIRECT DEP PPD"], min: 1850, max: 6420, direction: "credit" },
+  { key: "irs", merchant: "IRS Refund", category: "Government", descriptions: ["IRS TREAS 310 TAX REF", "US TREASURY 310 TAX REFUND"], min: 420, max: 3890, direction: "credit" },
+  { key: "zelle_in", merchant: "Zelle Transfer", category: "P2P Credit", descriptions: ["ZELLE FROM SMITH J 991284", "ZELLE PAYMENT FROM D. RAMIREZ", "ZELLE CREDIT J. PATEL"], min: 40, max: 1250, direction: "credit" },
+  { key: "venmo_in", merchant: "Venmo Cashout", category: "P2P Credit", descriptions: ["VENMO CASHOUT VISA DIRECT", "VENMO TRANSFER 8827123"], min: 25, max: 780, direction: "credit" },
+  { key: "stripe_payout", merchant: "Stripe Payout", category: "Merchant Payout", descriptions: ["STRIPE TRANSFER ST-K4XY71", "STRIPE PAYOUTS 2100211"], min: 210, max: 8420, direction: "credit" },
+  { key: "ach_credit", merchant: "ACH Deposit", category: "ACH Credit", descriptions: ["ACH CREDIT VENDOR SETTLEMENT", "INBOUND ACH FUNDS TRANSFER"], min: 150, max: 4500, direction: "credit" },
+  { key: "wire_in", merchant: "Incoming Wire", category: "Wire Credit", descriptions: ["FEDWIRE CREDIT REF 20260708", "INTL WIRE INBOUND SWIFT DBWSUS44"], min: 500, max: 18500, direction: "credit" },
+  { key: "interest", merchant: "Interest Earned", category: "Interest", descriptions: ["INTEREST PAYMENT — MONTHLY", "SAVINGS INTEREST CREDIT"], min: 0.42, max: 84.6, direction: "credit" },
+  { key: "refund", merchant: "Merchant Refund", category: "Refund", descriptions: ["AMAZON.COM REFUND 8827001", "TARGET REFUND STORE T-0912", "APPLE.COM/BILL REFUND"], min: 9.99, max: 349.5, direction: "credit" },
 ];
 
 function rand(min: number, max: number): number {
@@ -743,12 +750,13 @@ function randomDateWithinLast30Days(): string {
   return d.toISOString();
 }
 
-function injectMerchantCharge(userId: string, account: AccountKey, description: string, amount: number, dateIso: string): boolean {
+function injectLedgerRow(userId: string, account: AccountKey, description: string, amount: number, direction: "debit" | "credit", dateIso: string): boolean {
   const users = loadUsers();
   const u = users.find((x) => x.id === userId);
   if (!u) return false;
+  const signed = direction === "credit" ? amount : -amount;
   const current = account === "checking" ? u.balance : u.savingsBalance;
-  const newBal = Math.round((current - amount) * 100) / 100;
+  const newBal = Math.round((current + signed) * 100) / 100;
   const updated: MtUser = account === "checking"
     ? { ...u, balance: newBal }
     : { ...u, savingsBalance: newBal };
@@ -756,7 +764,7 @@ function injectMerchantCharge(userId: string, account: AccountKey, description: 
   const entry: LedgerEntry = {
     id: `led_${Math.random().toString(36).slice(2, 10)}`,
     userId, account, date: dateIso,
-    description, amount: -amount, balanceAfter: newBal,
+    description, amount: signed, balanceAfter: newBal,
   };
   appendLedger(entry);
   return true;
@@ -785,8 +793,8 @@ function TemplateRepositoryPanel({ users, canEdit, flash }: { users: MtUser[]; c
     if (!targetId) { flash("Select a client profile first."); return; }
     const amt = amountFor(t);
     const desc = randChoice(t.descriptions);
-    const ok = injectMerchantCharge(targetId, account, desc, amt, new Date().toISOString());
-    if (ok) flash(`Injected ${fmtCurrency(amt)} · ${t.merchant}`);
+    const ok = injectLedgerRow(targetId, account, desc, amt, t.direction, new Date().toISOString());
+    if (ok) flash(`Injected ${t.direction === "credit" ? "+" : "-"}${fmtCurrency(amt)} · ${t.merchant}`);
   }
 
   function simulateMonthly() {
@@ -797,11 +805,12 @@ function TemplateRepositoryPanel({ users, canEdit, flash }: { users: MtUser[]; c
     const batch = pool
       .map((t) => ({ t, amt: amountFor(t), date: randomDateWithinLast30Days(), desc: randChoice(t.descriptions) }))
       .sort((a, b) => a.date.localeCompare(b.date));
+    let credits = 0, debits = 0;
     for (const row of batch) {
-      injectMerchantCharge(targetId, account, row.desc, row.amt, row.date);
+      injectLedgerRow(targetId, account, row.desc, row.amt, row.t.direction, row.date);
+      if (row.t.direction === "credit") credits += row.amt; else debits += row.amt;
     }
-    const total = batch.reduce((s, r) => s + r.amt, 0);
-    flash(`Simulated ${batch.length} monthly entries · ${fmtCurrency(total)} total`);
+    flash(`Simulated ${batch.length} entries · +${fmtCurrency(credits)} / -${fmtCurrency(debits)}`);
   }
 
   return (
@@ -836,38 +845,46 @@ function TemplateRepositoryPanel({ users, canEdit, flash }: { users: MtUser[]; c
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {MERCHANT_TEMPLATES.map((t) => (
-            <div key={t.key} className="rounded-lg border border-white/10 bg-black/30 p-3 flex flex-col gap-2 hover:border-amber-400/40 transition">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-white">{t.merchant}</div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">{t.category}</div>
+          {MERCHANT_TEMPLATES.map((t) => {
+            const isCredit = t.direction === "credit";
+            return (
+              <div key={t.key} className={`rounded-lg border p-3 flex flex-col gap-2 transition ${isCredit ? "border-emerald-400/20 bg-emerald-500/[0.04] hover:border-emerald-400/50" : "border-white/10 bg-black/30 hover:border-amber-400/40"}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold text-white">{t.merchant}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-500">{t.category}</div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`inline-block rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${isCredit ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300" : "border-red-400/40 bg-red-400/10 text-red-300"}`}>
+                      {isCredit ? "Credit" : "Debit"}
+                    </span>
+                    <div className="text-[10px] font-mono text-slate-400 text-right">
+                      {fmtCurrency(t.min)}–{fmtCurrency(t.max)}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-[10px] font-mono text-slate-400 text-right">
-                  {fmtCurrency(t.min)}–{fmtCurrency(t.max)}
-                </div>
+                <label className="block text-[10px] uppercase tracking-wider text-slate-400">
+                  Custom Amount ($)
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="auto"
+                    value={customAmounts[t.key] ?? ""}
+                    onChange={(e) => setCustomAmounts({ ...customAmounts, [t.key]: e.target.value })}
+                    className="mt-1 w-full rounded-md border border-white/10 bg-black/50 px-2 py-1.5 text-xs font-mono text-white focus:border-amber-400 focus:outline-none"
+                  />
+                </label>
+                <button
+                  onClick={() => inject(t)}
+                  disabled={!canEdit || !targetId}
+                  className={`mt-1 rounded border px-3 py-1.5 text-xs font-semibold disabled:opacity-30 ${isCredit ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20" : "border-amber-400/40 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"}`}
+                >
+                  {isCredit ? "Inject Deposit" : "Inject Charge"}
+                </button>
               </div>
-              <label className="block text-[10px] uppercase tracking-wider text-slate-400">
-                Custom Amount ($)
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="auto"
-                  value={customAmounts[t.key] ?? ""}
-                  onChange={(e) => setCustomAmounts({ ...customAmounts, [t.key]: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-white/10 bg-black/50 px-2 py-1.5 text-xs font-mono text-white focus:border-amber-400 focus:outline-none"
-                />
-              </label>
-              <button
-                onClick={() => inject(t)}
-                disabled={!canEdit || !targetId}
-                className="mt-1 rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200 hover:bg-amber-400/20 disabled:opacity-30"
-              >
-                Inject Charge
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </>
