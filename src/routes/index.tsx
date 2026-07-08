@@ -5,7 +5,7 @@ import {
   loadQueue, onStoreChange, fmtCurrency, readFileAsDataUrl,
   loadChatThread, appendChatMessage,
   genAccountNumber, maskAccount,
-  type MtUser, type PendingTx, type ChatMessage,
+  type MtUser, type ChatMessage,
 } from "@/lib/mt-store";
 import { supabase } from "@/integrations/supabase/client";
 
