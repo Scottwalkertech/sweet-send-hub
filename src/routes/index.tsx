@@ -154,7 +154,6 @@ function isEnrolled(user: MtUser, key: TopNavKey): boolean {
 
 function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
   const navigate = useNavigate();
-  const [activePending, setActivePending] = useState<PendingTx | null>(null);
   const [showProfile, setShowProfile] = useState(false);
   const [showCard, setShowCard] = useState(false);
   const [showRouting, setShowRouting] = useState(false);
@@ -162,20 +161,15 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [notEnrolled, setNotEnrolled] = useState<null | { label: string }>(null);
   const [activeTop, setActiveTop] = useState<TopNavKey>("personal");
+  const [, forceTick] = useState(0);
   const dbwRef = useRef<HTMLDivElement>(null);
 
 
   useEffect(() => {
-    function refresh() {
-      const q = loadQueue().filter((t) => t.userId === user.id);
-      const pending = q.find((t) => t.status === "Pending" && t.method === "Transfer");
-      setActivePending(pending ?? null);
-    }
-    refresh();
-    const off = onStoreChange(refresh);
-    const i = setInterval(refresh, 1200);
-    return () => { off(); clearInterval(i); };
+    const off = onStoreChange(() => forceTick((n) => n + 1));
+    return off;
   }, [user.id]);
+
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
