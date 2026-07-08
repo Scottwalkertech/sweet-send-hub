@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PageTransitionLoader } from "../components/PageTransitionLoader";
+import { useSystemSetting } from "../lib/mt-db";
 
 function NotFoundComponent() {
   return (
