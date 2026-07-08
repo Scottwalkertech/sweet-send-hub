@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, CheckCircle2, Shield, Users, DollarSign } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Download, Shield, Users, DollarSign } from "lucide-react";
+import { jsPDF } from "jspdf";
 import {
   currentUser, pushToQueue, genRef, fmtCurrency, onStoreChange,
   type MtUser, type PendingTx,
