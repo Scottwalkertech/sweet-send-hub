@@ -354,8 +354,8 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
         <section className="bg-white border border-slate-200 rounded-xl">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Ledger — Resolved Transactions</h2>
-              <p className="text-xs text-slate-500 mt-0.5">{userHistory.length} entries · pending items stay in review</p>
+              <h2 className="text-sm font-semibold text-slate-900">Statement Activity Ledger</h2>
+              <p className="text-xs text-slate-500 mt-0.5">{userHistory.length} entries · pending items settle within 1–2 business days</p>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -371,23 +371,31 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
               </thead>
               <tbody>
                 {userHistory.length === 0 && (
-                  <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm">No resolved transactions yet.</td></tr>
+                  <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm">No transactions yet.</td></tr>
                 )}
                 {userHistory.map((t) => {
+                  const isPending = t.status === "Pending";
                   const isCredit = t.direction === "credit" && t.status === "Approved";
                   const sign = t.status === "Failed" ? "" : (t.direction === "credit" ? "+" : "-");
+                  const badgeCls =
+                    t.status === "Approved" ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                    : t.status === "Failed" ? "border-red-300 bg-red-50 text-red-700"
+                    : "border-amber-300 bg-amber-50 text-amber-700";
                   return (
-                    <tr key={t.id} className="border-t border-slate-100">
+                    <tr key={t.id} className={`border-t border-slate-100 ${isPending ? "bg-sky-50/40" : ""}`}>
                       <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.submitted}</td>
                       <td className="px-6 py-3 text-slate-900 font-mono text-xs">{t.reference}</td>
                       <td className="px-6 py-3 text-slate-600">{t.method}</td>
                       <td className="px-6 py-3">
-                        <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${
-                          t.status === "Approved" ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-red-300 bg-red-50 text-red-700"
-                        }`}>{t.status}</span>
+                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider font-semibold ${badgeCls}`}>
+                          {isPending && <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />}
+                          {t.status}
+                        </span>
                       </td>
                       <td className={`px-6 py-3 text-right font-medium tabular-nums ${
-                        t.status === "Failed" ? "text-slate-400 line-through" : isCredit ? "text-emerald-600" : "text-slate-900"
+                        t.status === "Failed" ? "text-slate-400 line-through"
+                        : isPending ? "text-slate-500 italic"
+                        : isCredit ? "text-emerald-600" : "text-slate-900"
                       }`}>{sign}{fmtCurrency(t.amount)}</td>
                     </tr>
                   );
@@ -397,6 +405,8 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
           </div>
         </section>
       </main>
+
+
 
       {activePending && <PendingOverlay tx={activePending} onExit={() => navigate({ to: "/transfer" })} />}
       {showProfile && <ProfileModal user={user} onClose={() => setShowProfile(false)} />}
