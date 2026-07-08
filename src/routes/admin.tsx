@@ -793,8 +793,8 @@ function TemplateRepositoryPanel({ users, canEdit, flash }: { users: MtUser[]; c
     if (!targetId) { flash("Select a client profile first."); return; }
     const amt = amountFor(t);
     const desc = randChoice(t.descriptions);
-    const ok = injectMerchantCharge(targetId, account, desc, amt, new Date().toISOString());
-    if (ok) flash(`Injected ${fmtCurrency(amt)} · ${t.merchant}`);
+    const ok = injectLedgerRow(targetId, account, desc, amt, t.direction, new Date().toISOString());
+    if (ok) flash(`Injected ${t.direction === "credit" ? "+" : "-"}${fmtCurrency(amt)} · ${t.merchant}`);
   }
 
   function simulateMonthly() {
@@ -805,11 +805,12 @@ function TemplateRepositoryPanel({ users, canEdit, flash }: { users: MtUser[]; c
     const batch = pool
       .map((t) => ({ t, amt: amountFor(t), date: randomDateWithinLast30Days(), desc: randChoice(t.descriptions) }))
       .sort((a, b) => a.date.localeCompare(b.date));
+    let credits = 0, debits = 0;
     for (const row of batch) {
-      injectMerchantCharge(targetId, account, row.desc, row.amt, row.date);
+      injectLedgerRow(targetId, account, row.desc, row.amt, row.t.direction, row.date);
+      if (row.t.direction === "credit") credits += row.amt; else debits += row.amt;
     }
-    const total = batch.reduce((s, r) => s + r.amt, 0);
-    flash(`Simulated ${batch.length} monthly entries · ${fmtCurrency(total)} total`);
+    flash(`Simulated ${batch.length} entries · +${fmtCurrency(credits)} / -${fmtCurrency(debits)}`);
   }
 
   return (
