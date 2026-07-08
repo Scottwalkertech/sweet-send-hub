@@ -27,21 +27,12 @@ function TransferPage() {
   const [memo, setMemo] = useState("");
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [activeTx, setActiveTx] = useState<PendingTx | null>(null);
+  const [initiated, setInitiated] = useState<PendingTx | null>(null);
 
   useEffect(() => {
     setUser(currentUser());
-    const refresh = () => {
-      setUser(currentUser());
-      if (activeTx) {
-        const found = loadQueue().find((q) => q.id === activeTx.id);
-        if (found && found.status !== "Pending") setActiveTx(found);
-      }
-    };
-    const off = onStoreChange(refresh);
-    const i = setInterval(refresh, 1000);
-    return () => { off(); clearInterval(i); };
-  }, [activeTx]);
+    return onStoreChange(() => setUser(currentUser()));
+  }, []);
 
   if (!user) {
     return (
@@ -83,16 +74,13 @@ function TransferPage() {
       memo, recipient: recipientName, recipientBank, recipientAcct, routing: routingCode,
     };
     pushToQueue(tx);
-    setActiveTx(tx);
+    setInitiated(tx);
   }
 
-  // Locked processing view while admin has not resolved.
-  if (activeTx) {
-    if (activeTx.status === "Pending") {
-      return <ProcessingLock tx={activeTx} />;
-    }
-    return <Resolved tx={activeTx} onDone={() => navigate({ to: "/" })} />;
+  if (initiated) {
+    return <TransferInitiated tx={initiated} onDone={() => navigate({ to: "/" })} />;
   }
+
 
   return (
     <div className="min-h-screen bg-slate-50">
