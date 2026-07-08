@@ -91,11 +91,11 @@ function DepositPage() {
         <div className="max-w-md w-full bg-white border border-slate-200 rounded-xl p-8 shadow-sm text-center">
           <div className="mx-auto h-14 w-14 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-3xl">⏳</div>
           <h1 className="mt-4 text-xl font-semibold text-slate-900">Deposit request submitted</h1>
-          <p className="text-sm text-slate-500 mt-1">Your request is now in the compliance review queue. Funds will be credited to your account once an administrator approves the deposit.</p>
+          <p className="text-sm text-slate-500 mt-1">Your request is now in the compliance review queue. Funds will be credited to your account once our Treasury Operations team approves the deposit.</p>
           <div className="mt-6 text-left bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm space-y-1.5">
             <RowKV k="Method" v={submitted.method} />
             <RowKV k="Reference" v={submitted.ref} />
-            <RowKV k="Status" v="Pending admin review" />
+            <RowKV k="Status" v="Pending Treasury Operations review" />
           </div>
           <div className="mt-6 flex gap-2">
             <button onClick={() => { setSubmitted(null); setAmount(""); }} className="flex-1 border border-slate-300 rounded-md py-2 text-sm hover:bg-slate-50">New deposit</button>
@@ -185,7 +185,7 @@ function DepositPage() {
                 <button type="submit" disabled={!amount || parseFloat(amount) <= 0} className="w-full bg-gradient-to-b from-amber-300 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-700 disabled:opacity-40 text-slate-900 text-sm font-bold py-3 rounded-md border border-amber-700/40">
                   Submit wire notification
                 </button>
-                <p className="text-[11px] text-slate-500">Your request will be queued for administrative review. Funds credit only after admin approval.</p>
+                <p className="text-[11px] text-slate-500">Your request will be queued for Treasury Operations review. Funds credit only after approval.</p>
               </div>
             </div>
           </form>
@@ -201,7 +201,7 @@ function DepositPage() {
                 ) : (
                   <div className="h-44 w-44 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center text-slate-400">
                     <span className="text-3xl">🔲</span>
-                    <span className="text-[10px] uppercase tracking-wider mt-1">QR pending admin upload</span>
+                    <span className="text-[10px] uppercase tracking-wider mt-1">QR pending Treasury Operations upload</span>
                   </div>
                 )}
               </div>
@@ -237,7 +237,7 @@ function DepositPage() {
               <button type="submit" disabled={!amount || parseFloat(amount) <= 0} className="w-full bg-gradient-to-b from-amber-300 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-700 disabled:opacity-40 text-slate-900 text-sm font-bold py-3 rounded-md border border-amber-700/40">
                 Confirm Deposit Request
               </button>
-              <p className="text-[11px] text-slate-500">Your request enters the admin review queue and credits after approval.</p>
+              <p className="text-[11px] text-slate-500">Your request enters the Treasury Operations review queue and credits after approval.</p>
             </div>
           </form>
         )}

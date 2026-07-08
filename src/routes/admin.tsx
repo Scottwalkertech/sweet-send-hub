@@ -11,8 +11,8 @@ import {
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Admin Console — Dynamic Bank of West" },
-      { name: "description", content: "Internal administration console." },
+      { title: "Treasury Management Console — Dynamic Bank of West" },
+      { name: "description", content: "Internal Treasury Management & Operations Console." },
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
@@ -53,7 +53,7 @@ function AdminGate({ onPass }: { onPass: (s: AdminSession) => void }) {
     if (match) {
       window.dispatchEvent(new Event("ptl:show"));
       setTimeout(() => onPass({ email: match.email, name: match.name, role: match.role }), 700);
-    } else setErr("Access denied. Invalid administrator credentials.");
+    } else setErr("Access denied. Invalid operator credentials.");
   }
   return (
     <div className="min-h-screen bg-[#0a0d14] text-slate-100 flex items-center justify-center px-4">
@@ -62,7 +62,7 @@ function AdminGate({ onPass }: { onPass: (s: AdminSession) => void }) {
           <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-black font-black">A</div>
           <div>
             <div className="text-xs uppercase tracking-[0.2em] text-amber-400/80">Restricted</div>
-            <h1 className="text-lg font-semibold">Administrator Sign-in</h1>
+            <h1 className="text-lg font-semibold">Treasury Management Sign-in</h1>
           </div>
         </div>
         <label className="mt-6 block text-xs uppercase tracking-wider text-slate-400">Email</label>
@@ -245,7 +245,7 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
             <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-black font-black">A</div>
             <div>
               <div className="text-[10px] uppercase tracking-[0.2em] text-amber-400/80">Restricted Console</div>
-              <div className="text-sm font-semibold">Dynamic Bank of West · Admin</div>
+              <div className="text-sm font-semibold">Dynamic Bank of West · Treasury Management</div>
             </div>
           </div>
           <div className="flex items-center gap-3">

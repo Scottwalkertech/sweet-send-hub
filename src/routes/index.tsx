@@ -565,7 +565,7 @@ function PendingOverlay({ tx, onExit }: { tx: PendingTx; onExit: () => void }) {
           <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300 font-semibold">Pending Verification</div>
           <h2 className="mt-2 text-xl font-semibold">Your transfer is under compliance review</h2>
           <p className="mt-2 text-sm text-slate-300">
-            Reference <span className="font-mono">{tx.reference}</span> for {fmtCurrency(tx.amount)} to {tx.recipient} is awaiting administrator approval. Your dashboard is locked on this screen until it resolves.
+            Reference <span className="font-mono">{tx.reference}</span> for {fmtCurrency(tx.amount)} to {tx.recipient} is awaiting Treasury Operations approval. Your request is being processed by our Treasury Operations team.
           </p>
           <button onClick={onExit} className="mt-6 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-semibold px-5 py-2">
             View processing view

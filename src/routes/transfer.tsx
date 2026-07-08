@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Loader2, Shield, Users, DollarSign } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Shield, Users, DollarSign } from "lucide-react";
 import {
-  currentUser, loadQueue, pushToQueue, genRef, fmtCurrency, onStoreChange,
+  currentUser, pushToQueue, genRef, fmtCurrency, onStoreChange,
   type MtUser, type PendingTx,
 } from "@/lib/mt-store";
 
@@ -27,21 +27,12 @@ function TransferPage() {
   const [memo, setMemo] = useState("");
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [activeTx, setActiveTx] = useState<PendingTx | null>(null);
+  const [initiated, setInitiated] = useState<PendingTx | null>(null);
 
   useEffect(() => {
     setUser(currentUser());
-    const refresh = () => {
-      setUser(currentUser());
-      if (activeTx) {
-        const found = loadQueue().find((q) => q.id === activeTx.id);
-        if (found && found.status !== "Pending") setActiveTx(found);
-      }
-    };
-    const off = onStoreChange(refresh);
-    const i = setInterval(refresh, 1000);
-    return () => { off(); clearInterval(i); };
-  }, [activeTx]);
+    return onStoreChange(() => setUser(currentUser()));
+  }, []);
 
   if (!user) {
     return (
@@ -83,16 +74,13 @@ function TransferPage() {
       memo, recipient: recipientName, recipientBank, recipientAcct, routing: routingCode,
     };
     pushToQueue(tx);
-    setActiveTx(tx);
+    setInitiated(tx);
   }
 
-  // Locked processing view while admin has not resolved.
-  if (activeTx) {
-    if (activeTx.status === "Pending") {
-      return <ProcessingLock tx={activeTx} />;
-    }
-    return <Resolved tx={activeTx} onDone={() => navigate({ to: "/" })} />;
+  if (initiated) {
+    return <TransferInitiated tx={initiated} onDone={() => navigate({ to: "/" })} />;
   }
+
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -209,77 +197,42 @@ function TransferPage() {
   );
 }
 
-function ProcessingLock({ tx }: { tx: PendingTx }) {
+function TransferInitiated({ tx, onDone }: { tx: PendingTx; onDone: () => void }) {
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4">
-      <div className="w-full max-w-lg bg-slate-900/70 border border-amber-500/30 rounded-2xl shadow-2xl overflow-hidden">
-        <div className="h-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600" />
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden">
+        <div className="h-1.5 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600" />
         <div className="px-8 py-10 text-center">
-          <div className="mx-auto relative h-24 w-24 mb-6">
-            <div className="absolute inset-0 rounded-full bg-amber-400/20 animate-ping" />
-            <div className="relative h-24 w-24 rounded-full bg-amber-500/20 border border-amber-400/40 flex items-center justify-center">
-              <Loader2 className="h-12 w-12 text-amber-300 animate-spin" />
-            </div>
+          <div className="mx-auto h-20 w-20 rounded-full bg-emerald-50 ring-8 ring-emerald-100 flex items-center justify-center">
+            <CheckCircle2 className="h-11 w-11 text-emerald-600" strokeWidth={2.25} />
           </div>
-          <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300 font-semibold">Pending Verification</div>
-          <h1 className="mt-2 text-2xl font-semibold">Your transfer is under compliance review</h1>
-          <p className="mt-3 text-sm text-slate-300 max-w-md mx-auto">
-            An administrator will review and resolve this transaction. Your dashboard is locked on this screen until the review completes.
+          <div className="mt-6 text-[10px] uppercase tracking-[0.28em] text-emerald-700 font-semibold">Transfer Initiated</div>
+          <h1 className="mt-2 text-2xl font-semibold text-slate-900 tracking-tight">Your transfer request has been queued</h1>
+          <p className="mt-3 text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+            Your transfer request has been successfully queued. Please note that processing standard external or non-instant pipeline transfers generally takes 1 to 2 business days to settle.
           </p>
 
-          <div className="mt-8 rounded-xl border border-white/10 bg-black/30 divide-y divide-white/10 text-left">
-            <LockRow k="Reference" v={tx.reference} mono />
-            <LockRow k="Amount" v={fmtCurrency(tx.amount)} mono />
-            <LockRow k="Recipient" v={tx.recipient ?? ""} />
-            <LockRow k="Submitted" v={tx.submitted} />
-            <LockRow k="Status" v="⏳ Pending admin review" />
-          </div>
-
-          <p className="mt-6 text-[11px] text-slate-500">Do not close this window. Status updates live as the administrator resolves the queue.</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LockRow({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
-  return (
-    <div className="flex items-center justify-between px-4 py-3">
-      <span className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">{k}</span>
-      <span className={`text-sm text-white ${mono ? "font-mono" : ""}`}>{v}</span>
-    </div>
-  );
-}
-
-function Resolved({ tx, onDone }: { tx: PendingTx; onDone: () => void }) {
-  const success = tx.status === "Approved";
-  return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden text-center">
-        <div className={`h-1.5 ${success ? "bg-emerald-500" : "bg-red-500"}`} />
-        <div className="px-6 py-10">
-          <div className={`mx-auto h-16 w-16 rounded-full flex items-center justify-center text-3xl ${success ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
-            {success ? "✓" : "✕"}
-          </div>
-          <h1 className="mt-4 text-xl font-semibold text-slate-900">{success ? "Transfer Approved" : "Transfer Rejected"}</h1>
-          <p className="mt-2 text-sm text-slate-500">
-            {success
-              ? "Your funds have been sent and your balance updated."
-              : "An administrator rejected this transfer. No funds were moved."}
-          </p>
-          <div className="mt-6 text-left rounded-lg border border-slate-200 bg-slate-50 divide-y divide-slate-100">
+          <div className="mt-7 rounded-xl border border-slate-200 bg-slate-50/70 divide-y divide-slate-100 text-left">
             <Row label="Reference" value={tx.reference} mono />
-            <Row label="Amount" value={fmtCurrency(tx.amount)} mono />
+            <Row label="Amount" value={fmtCurrency(tx.amount)} mono strong />
             <Row label="Recipient" value={tx.recipient ?? ""} />
+            <Row label="Submitted" value={tx.submitted} />
+            <Row label="Status" value="Queued for processing" />
           </div>
-          <button onClick={onDone} className="mt-6 w-full bg-slate-900 text-white text-sm font-semibold py-2.5 rounded-md hover:bg-slate-800">
-            Return to Dashboard
+
+          <button
+            onClick={onDone}
+            className="mt-7 w-full inline-flex items-center justify-center gap-2 h-12 rounded-lg bg-gradient-to-b from-amber-300 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-700 text-slate-900 text-sm font-bold border border-amber-700/40 shadow"
+          >
+            <ArrowLeft className="h-4 w-4" /> Return to Account Overview
           </button>
+          <p className="mt-4 text-[11px] text-slate-500">You will receive a settlement notification once the pipeline clears.</p>
         </div>
       </div>
     </div>
   );
 }
+
 
 // -- small primitives ---------------------------------------------------------
 
