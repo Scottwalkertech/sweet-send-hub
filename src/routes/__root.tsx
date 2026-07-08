@@ -120,6 +120,20 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
+
+  // Hidden Operations Console toggle: Ctrl/Cmd + Shift + A
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "A" || e.key === "a")) {
+        e.preventDefault();
+        try { sessionStorage.setItem("mt_admin_unlocked", "1"); } catch { /* */ }
+        router.navigate({ to: "/admin" });
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [router]);
 
   return (
     <QueryClientProvider client={queryClient}>

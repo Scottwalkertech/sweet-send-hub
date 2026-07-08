@@ -20,60 +20,47 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-const SS_ADMIN = "mt_admin_session";
+const SS_UNLOCK = "mt_admin_unlocked";
 type AdminRole = "SuperAdmin" | "Support";
 type AdminSession = { email: string; name: string; role: AdminRole };
 
-const ADMIN_ACCOUNTS: Array<{ email: string; password: string; name: string; role: AdminRole }> = [
-  { email: "root@dbw.io", password: "Admin2026!", name: "Root Administrator", role: "SuperAdmin" },
-  { email: "ops@dbw.io", password: "StaffPass99", name: "Operations Support", role: "Support" },
-];
+const DEFAULT_OPERATOR: AdminSession = {
+  email: "operator@dbw.internal",
+  name: "Treasury Operator",
+  role: "SuperAdmin",
+};
 
 function AdminPage() {
   const [booted, setBooted] = useState(false);
   const [session, setSession] = useState<AdminSession | null>(null);
   useEffect(() => {
-    const raw = sessionStorage.getItem(SS_ADMIN);
-    if (raw) { try { setSession(JSON.parse(raw) as AdminSession); } catch { /* */ } }
+    try {
+      if (sessionStorage.getItem(SS_UNLOCK) === "1") setSession(DEFAULT_OPERATOR);
+    } catch { /* */ }
     setBooted(true);
   }, []);
-  function handleLogin(s: AdminSession) { sessionStorage.setItem(SS_ADMIN, JSON.stringify(s)); setSession(s); }
-  function handleLogout() { sessionStorage.removeItem(SS_ADMIN); setSession(null); }
+  function handleLogout() {
+    try { sessionStorage.removeItem(SS_UNLOCK); } catch { /* */ }
+    setSession(null);
+    window.location.replace("/");
+  }
   if (!booted) return null;
-  if (!session) return <AdminGate onPass={handleLogin} />;
+  if (!session) return <AdminLocked />;
   return <AdminConsole session={session} onLogout={handleLogout} />;
 }
 
-function AdminGate({ onPass }: { onPass: (s: AdminSession) => void }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [err, setErr] = useState("");
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const match = ADMIN_ACCOUNTS.find((a) => a.email.toLowerCase() === email.trim().toLowerCase() && a.password === password);
-    if (match) {
-      window.dispatchEvent(new Event("ptl:show"));
-      setTimeout(() => onPass({ email: match.email, name: match.name, role: match.role }), 700);
-    } else setErr("Access denied. Invalid operator credentials.");
-  }
+function AdminLocked() {
   return (
     <div className="min-h-screen bg-[#0a0d14] text-slate-100 flex items-center justify-center px-4">
-      <form onSubmit={submit} className="w-full max-w-md rounded-2xl border border-amber-500/20 bg-[#0f1420] p-8 shadow-2xl">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-black font-black">A</div>
-          <div>
-            <div className="text-xs uppercase tracking-[0.2em] text-amber-400/80">Restricted</div>
-            <h1 className="text-lg font-semibold">Treasury Management Sign-in</h1>
-          </div>
+      <div className="max-w-md text-center">
+        <h1 className="text-2xl font-semibold text-white">Page not found</h1>
+        <p className="mt-2 text-sm text-slate-400">The page you're looking for doesn't exist.</p>
+        <div className="mt-6">
+          <Link to="/" className="inline-flex items-center justify-center rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 hover:bg-white/10">
+            Return to banking portal
+          </Link>
         </div>
-        <label className="mt-6 block text-xs uppercase tracking-wider text-slate-400">Email</label>
-        <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setErr(""); }} placeholder="you@dbw.io" className={inputDark} />
-        <label className="mt-4 block text-xs uppercase tracking-wider text-slate-400">Password</label>
-        <input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setErr(""); }} placeholder="••••••••" className={inputDark} />
-        {err && <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
-        <button type="submit" className="mt-6 w-full rounded-md bg-gradient-to-r from-amber-400 to-amber-600 py-2.5 text-sm font-semibold text-black hover:brightness-110">Sign in</button>
-        <div className="mt-4 text-center"><Link to="/" className="text-xs text-slate-500 hover:text-amber-400">← Return to banking portal</Link></div>
-      </form>
+      </div>
     </div>
   );
 }
