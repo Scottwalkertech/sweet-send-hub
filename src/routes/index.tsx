@@ -408,7 +408,7 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
 
 
 
-      {activePending && <PendingOverlay tx={activePending} onExit={() => navigate({ to: "/transfer" })} />}
+      
       {showProfile && <ProfileModal user={user} onClose={() => setShowProfile(false)} />}
       {showCard && <DebitCardModal user={user} onClose={() => setShowCard(false)} />}
       {showRouting && <RoutingInfoModal user={user} onClose={() => setShowRouting(false)} />}
