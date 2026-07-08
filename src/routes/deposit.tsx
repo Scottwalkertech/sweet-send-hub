@@ -10,6 +10,7 @@ import {
   type DepositSettings,
   type MtUser,
 } from "@/lib/mt-store";
+import { useSystemSetting } from "@/lib/mt-db";
 
 export const Route = createFileRoute("/deposit")({
   head: () => ({
@@ -24,18 +25,24 @@ export const Route = createFileRoute("/deposit")({
 function DepositPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState<MtUser | null>(null);
-  const [settings, setSettings] = useState<DepositSettings>(loadDepositSettings());
+  const dbSettings = useSystemSetting("deposit");
+  const [localSettings, setLocalSettings] = useState<DepositSettings>(loadDepositSettings());
   const [method, setMethod] = useState<"scan" | "wire" | "crypto">("wire");
   const [amount, setAmount] = useState("");
   const [copied, setCopied] = useState("");
   const [submitted, setSubmitted] = useState<null | { ref: string; method: "Wire" | "Crypto" }>(null);
 
+  // Prefer database-backed settings (live-updated by Ops Console); fall back to local defaults.
+  const settings: DepositSettings = dbSettings
+    ? { ...localSettings, ...dbSettings }
+    : localSettings;
+
   useEffect(() => {
     setUser(currentUser());
-    setSettings(loadDepositSettings());
+    setLocalSettings(loadDepositSettings());
     const off = onStoreChange(() => {
       setUser(currentUser());
-      setSettings(loadDepositSettings());
+      setLocalSettings(loadDepositSettings());
     });
     return off;
   }, []);

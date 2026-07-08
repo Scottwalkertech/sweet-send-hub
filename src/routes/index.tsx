@@ -30,9 +30,51 @@ function App() {
     return off;
   }, []);
 
+  // Supabase realtime: profile changes from the Operations Console
+  // patch the current local user so the dashboard reflects freezes,
+  // balance edits, tier changes, etc. without any refresh.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    async function syncOnce() {
+      const { data } = await supabase.from("profiles").select("*").eq("id", user!.id).maybeSingle();
+      if (cancelled || !data) return;
+      applyProfilePatch(user!, data);
+    }
+    syncOnce();
+    const channel = supabase
+      .channel(`client-profile:${user.id}`)
+      .on("postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${user.id}` },
+        (payload) => { applyProfilePatch(user, payload.new as Record<string, unknown>); })
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!booted) return null;
   if (!user) return <Login onAuth={(u) => { setCurrentUserId(u.id); setUser(u); }} />;
   return <Dashboard user={user} onLogout={() => { setCurrentUserId(null); setUser(null); }} />;
+}
+
+function applyProfilePatch(user: MtUser, row: Record<string, unknown>) {
+  const patched: MtUser = {
+    ...user,
+    name: (row.name as string) || user.name,
+    email: (row.email as string) || user.email,
+    phone: (row.phone as string) ?? user.phone,
+    tier: (row.tier as MtUser["tier"]) || user.tier,
+    status: (row.status as MtUser["status"]) || user.status,
+    verified: typeof row.verified === "boolean" ? row.verified : user.verified,
+    debitFrozen: typeof row.debit_frozen === "boolean" ? row.debit_frozen : user.debitFrozen,
+    dailyLimit: typeof row.daily_limit === "number" ? row.daily_limit : Number(row.daily_limit) || user.dailyLimit,
+    balance: typeof row.balance === "number" ? row.balance : Number(row.balance) || user.balance,
+    savingsBalance: typeof row.savings_balance === "number" ? row.savings_balance : Number(row.savings_balance) || user.savingsBalance,
+    accountNumber: (row.account_number as string) || user.accountNumber,
+    account: "•••• " + ((row.account_number as string) || user.accountNumber).slice(-4),
+    savingsAccountNumber: (row.savings_account_number as string) || user.savingsAccountNumber,
+    profilePicture: (row.profile_picture as string) || user.profilePicture,
+  };
+  upsertUser(patched);
 }
 
 function Login({ onAuth }: { onAuth: (u: MtUser) => void }) {
