@@ -185,8 +185,9 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
   }
 
   const userHistory = loadQueue()
-    .filter((t) => t.userId === user.id && t.status !== "Pending")
+    .filter((t) => t.userId === user.id)
     .slice(0, 20);
+
 
   const serviceMeta: Record<TopNavKey, { label: string; product: string; getBal: () => number }> = {
     personal:      { label: "Personal Banking",     product: "Everyday Checking",      getBal: () => user.balance },
