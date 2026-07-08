@@ -845,38 +845,46 @@ function TemplateRepositoryPanel({ users, canEdit, flash }: { users: MtUser[]; c
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {MERCHANT_TEMPLATES.map((t) => (
-            <div key={t.key} className="rounded-lg border border-white/10 bg-black/30 p-3 flex flex-col gap-2 hover:border-amber-400/40 transition">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-white">{t.merchant}</div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">{t.category}</div>
+          {MERCHANT_TEMPLATES.map((t) => {
+            const isCredit = t.direction === "credit";
+            return (
+              <div key={t.key} className={`rounded-lg border p-3 flex flex-col gap-2 transition ${isCredit ? "border-emerald-400/20 bg-emerald-500/[0.04] hover:border-emerald-400/50" : "border-white/10 bg-black/30 hover:border-amber-400/40"}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold text-white">{t.merchant}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-500">{t.category}</div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`inline-block rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${isCredit ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300" : "border-red-400/40 bg-red-400/10 text-red-300"}`}>
+                      {isCredit ? "Credit" : "Debit"}
+                    </span>
+                    <div className="text-[10px] font-mono text-slate-400 text-right">
+                      {fmtCurrency(t.min)}–{fmtCurrency(t.max)}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-[10px] font-mono text-slate-400 text-right">
-                  {fmtCurrency(t.min)}–{fmtCurrency(t.max)}
-                </div>
+                <label className="block text-[10px] uppercase tracking-wider text-slate-400">
+                  Custom Amount ($)
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="auto"
+                    value={customAmounts[t.key] ?? ""}
+                    onChange={(e) => setCustomAmounts({ ...customAmounts, [t.key]: e.target.value })}
+                    className="mt-1 w-full rounded-md border border-white/10 bg-black/50 px-2 py-1.5 text-xs font-mono text-white focus:border-amber-400 focus:outline-none"
+                  />
+                </label>
+                <button
+                  onClick={() => inject(t)}
+                  disabled={!canEdit || !targetId}
+                  className={`mt-1 rounded border px-3 py-1.5 text-xs font-semibold disabled:opacity-30 ${isCredit ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20" : "border-amber-400/40 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"}`}
+                >
+                  {isCredit ? "Inject Deposit" : "Inject Charge"}
+                </button>
               </div>
-              <label className="block text-[10px] uppercase tracking-wider text-slate-400">
-                Custom Amount ($)
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="auto"
-                  value={customAmounts[t.key] ?? ""}
-                  onChange={(e) => setCustomAmounts({ ...customAmounts, [t.key]: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-white/10 bg-black/50 px-2 py-1.5 text-xs font-mono text-white focus:border-amber-400 focus:outline-none"
-                />
-              </label>
-              <button
-                onClick={() => inject(t)}
-                disabled={!canEdit || !targetId}
-                className="mt-1 rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200 hover:bg-amber-400/20 disabled:opacity-30"
-              >
-                Inject Charge
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </>
