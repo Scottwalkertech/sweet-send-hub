@@ -1,12 +1,13 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
-  loadUsers, saveUsers, loadQueue, saveQueue,
-  loadDepositSettings, saveDepositSettings,
-  loadChatThreads, appendChatMessage,
-  appendLedger, upsertUser,
-  genAccountNumber, maskAccount, readFileAsDataUrl, fmtCurrency, SECURITY_QUESTIONS,
-  type MtUser, type AccountTier, type AccountStatus, type AccountKey, type PendingTx, type DepositSettings, type ChatMessage, type LedgerEntry,
+  useAllProfiles, useSystemSetting, useIsAdmin, updateProfile, updateSetting,
+  type DbProfile, type DepositSettingsDb, type RatesSettings, type LimitsSettings, type BannerSettings,
+} from "@/lib/mt-db";
+import {
+  loadQueue, saveQueue, appendLedger, loadUsers, saveUsers, fmtCurrency, readFileAsDataUrl,
+  type PendingTx, type AccountKey, type LedgerEntry, type MtUser,
 } from "@/lib/mt-store";
 
 export const Route = createFileRoute("/admin")({
@@ -21,35 +22,40 @@ export const Route = createFileRoute("/admin")({
 });
 
 const SS_UNLOCK = "mt_admin_unlocked";
-type AdminRole = "SuperAdmin" | "Support";
-type AdminSession = { email: string; name: string; role: AdminRole };
-
-const DEFAULT_OPERATOR: AdminSession = {
-  email: "operator@dbw.internal",
-  name: "Treasury Operator",
-  role: "SuperAdmin",
-};
 
 function AdminPage() {
   const [booted, setBooted] = useState(false);
-  const [session, setSession] = useState<AdminSession | null>(null);
+  const [unlocked, setUnlocked] = useState(false);
+  const [session, setSession] = useState<{ email: string; userId: string } | null>(null);
+  const isAdmin = useIsAdmin();
+
   useEffect(() => {
-    try {
-      if (sessionStorage.getItem(SS_UNLOCK) === "1") setSession(DEFAULT_OPERATOR);
-    } catch { /* */ }
-    setBooted(true);
+    try { setUnlocked(sessionStorage.getItem(SS_UNLOCK) === "1"); } catch { /* */ }
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setSession({ email: data.user.email ?? "", userId: data.user.id });
+      setBooted(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      setSession(s?.user ? { email: s.user.email ?? "", userId: s.user.id } : null);
+    });
+    return () => sub.subscription.unsubscribe();
   }, []);
-  function handleLogout() {
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
     try { sessionStorage.removeItem(SS_UNLOCK); } catch { /* */ }
-    setSession(null);
     window.location.replace("/");
   }
+
   if (!booted) return null;
-  if (!session) return <AdminLocked />;
-  return <AdminConsole session={session} onLogout={handleLogout} />;
+  if (!unlocked) return <NotFound />;
+  if (!session) return <OperatorSignIn />;
+  if (isAdmin === null) return <BootingConsole />;
+  if (!isAdmin) return <Forbidden email={session.email} />;
+  return <AdminConsole email={session.email} userId={session.userId} onLogout={handleLogout} />;
 }
 
-function AdminLocked() {
+function NotFound() {
   return (
     <div className="min-h-screen bg-[#0a0d14] text-slate-100 flex items-center justify-center px-4">
       <div className="max-w-md text-center">
@@ -65,160 +71,130 @@ function AdminLocked() {
   );
 }
 
-type EditForm = {
-  name: string; email: string; phone: string; ssn: string;
-  password: string;
-  tier: AccountTier; status: AccountStatus; balance: string; savingsBalance: string;
-  securityQ: string; securityA: string;
-  profilePicture: string;
-  enrollSmallBusiness: boolean; enrollCommercial: boolean; enrollWire: boolean;
-  balSmallBusiness: string; balCommercial: string; balWire: string;
-};
-
-function emptyForm(): EditForm {
-  return {
-    name: "", email: "", phone: "", ssn: "", password: "",
-    tier: "Standard", status: "Active", balance: "0", savingsBalance: "0",
-    securityQ: SECURITY_QUESTIONS[0], securityA: "", profilePicture: "",
-    enrollSmallBusiness: false, enrollCommercial: false, enrollWire: false,
-    balSmallBusiness: "0", balCommercial: "0", balWire: "0",
-  };
+function BootingConsole() {
+  return (
+    <div className="min-h-screen bg-[#0a0d14] text-slate-100 flex items-center justify-center">
+      <div className="text-sm text-slate-400">Verifying operator credentials…</div>
+    </div>
+  );
 }
 
-function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: () => void }) {
-  const canEdit = session.role === "SuperAdmin";
-  const [users, setUsers] = useState<MtUser[]>([]);
+function Forbidden({ email }: { email: string }) {
+  async function signOut() {
+    await supabase.auth.signOut();
+    window.location.replace("/");
+  }
+  return (
+    <div className="min-h-screen bg-[#0a0d14] text-slate-100 flex items-center justify-center px-4">
+      <div className="max-w-md text-center">
+        <h1 className="text-xl font-semibold text-white">Access denied</h1>
+        <p className="mt-2 text-sm text-slate-400">
+          The account <span className="text-amber-300">{email}</span> is not authorized for the Operations Console.
+        </p>
+        <button onClick={signOut} className="mt-6 rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 hover:bg-white/10">
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function OperatorSignIn() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const nav = useNavigate();
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true); setErr("");
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+    setBusy(false);
+    if (error) { setErr("Invalid credentials or unauthorized account."); return; }
+    nav({ to: "/admin" });
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0a0d14] text-slate-100 flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        <div className="flex items-center gap-3 justify-center mb-6">
+          <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-black font-black">A</div>
+          <div>
+            <div className="text-xs uppercase tracking-[0.2em] text-amber-400/80">Restricted Access</div>
+            <div className="text-sm font-semibold text-white">Treasury Operator Sign-in</div>
+          </div>
+        </div>
+        <form onSubmit={submit} className="rounded-2xl border border-amber-400/20 bg-[#0f1420] p-6 space-y-4 shadow-2xl">
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-slate-400 mb-1">Operator email</label>
+            <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="username"
+              className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none" />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-slate-400 mb-1">Password</label>
+            <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="current-password"
+              className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none tracking-widest" />
+          </div>
+          {err && <div className="rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
+          <button disabled={busy || !email || !password}
+            className="w-full rounded bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2.5 text-sm font-bold text-black hover:brightness-110 disabled:opacity-40">
+            {busy ? "Verifying…" : "Enter console"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+
+function AdminConsole({ email, userId, onLogout }: { email: string; userId: string; onLogout: () => void }) {
+  const { profiles } = useAllProfiles(true);
+  const deposit = useSystemSetting("deposit");
+  const rates = useSystemSetting("rates");
+  const limits = useSystemSetting("limits");
+  const banner = useSystemSetting("banner");
   const [queue, setQueue] = useState<PendingTx[]>([]);
-  const [settings, setSettings] = useState<DepositSettings>(loadDepositSettings());
-  const [editing, setEditing] = useState<MtUser | null>(null);
-  const [editForm, setEditForm] = useState<EditForm>(emptyForm());
-  const [creating, setCreating] = useState(false);
-  const [createForm, setCreateForm] = useState<EditForm>(emptyForm());
-  const [modalErr, setModalErr] = useState("");
+  const [editing, setEditing] = useState<DbProfile | null>(null);
   const [toast, setToast] = useState("");
-  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
-    setUsers(loadUsers());
     setQueue(loadQueue());
-    setSettings(loadDepositSettings());
-    const refresh = () => { setUsers(loadUsers()); setQueue(loadQueue()); setSettings(loadDepositSettings()); };
-    window.addEventListener("mt:users-changed", refresh);
+    const refresh = () => setQueue(loadQueue());
     window.addEventListener("mt:queue-changed", refresh);
-    window.addEventListener("mt:deposit-settings-changed", refresh);
     window.addEventListener("storage", refresh);
-    const i = setInterval(refresh, 1500);
     return () => {
-      window.removeEventListener("mt:users-changed", refresh);
       window.removeEventListener("mt:queue-changed", refresh);
-      window.removeEventListener("mt:deposit-settings-changed", refresh);
       window.removeEventListener("storage", refresh);
-      clearInterval(i);
     };
   }, []);
 
   function flash(m: string) { setToast(m); setTimeout(() => setToast(""), 2600); }
 
-  function openEdit(u: MtUser) {
-    if (!canEdit) { flash("Support role cannot edit customer profiles."); return; }
-    setEditing(u);
-    setModalErr("");
-    setEditForm({
-      name: u.name, email: u.email, phone: u.phone, ssn: u.ssn,
-      password: u.password,
-      tier: u.tier, status: u.status, balance: u.balance.toFixed(2), savingsBalance: (u.savingsBalance ?? 0).toFixed(2),
-      securityQ: u.securityQ, securityA: u.securityA,
-      profilePicture: u.profilePicture ?? "",
-      enrollSmallBusiness: !!u.enrollments?.smallBusiness,
-      enrollCommercial: !!u.enrollments?.commercial,
-      enrollWire: !!u.enrollments?.wire,
-      balSmallBusiness: (u.serviceBalances?.smallBusiness ?? 0).toFixed(2),
-      balCommercial: (u.serviceBalances?.commercial ?? 0).toFixed(2),
-      balWire: (u.serviceBalances?.wire ?? 0).toFixed(2),
-    });
-  }
-  function saveEdit() {
-    if (!editing || !canEdit) return;
-    const bal = Number(editForm.balance);
-    if (!editForm.name.trim() || !editForm.email.trim() || Number.isNaN(bal)) { setModalErr("Name, email, and a valid balance are required."); return; }
-    const next = users.map((u) => u.id === editing.id ? {
-      ...u,
-      name: editForm.name.trim(), email: editForm.email.trim(), phone: editForm.phone,
-      ssn: editForm.ssn, password: editForm.password || u.password,
-      tier: editForm.tier, status: editForm.status, balance: bal, savingsBalance: Number(editForm.savingsBalance) || 0,
-      securityQ: editForm.securityQ, securityA: editForm.securityA,
-      profilePicture: editForm.profilePicture || undefined,
-      enrollments: {
-        smallBusiness: editForm.enrollSmallBusiness,
-        commercial: editForm.enrollCommercial,
-        wire: editForm.enrollWire,
-      },
-      serviceBalances: {
-        smallBusiness: Number(editForm.balSmallBusiness) || 0,
-        commercial: Number(editForm.balCommercial) || 0,
-        wire: Number(editForm.balWire) || 0,
-      },
-    } : u);
-    saveUsers(next);
-    flash(`Profile updated for ${editForm.name}`);
-    setEditing(null);
-  }
-  function openCreate() {
-    if (!canEdit) { flash("Support role cannot create accounts."); return; }
-    setCreateForm(emptyForm()); setModalErr(""); setCreating(true);
-  }
-  function saveCreate() {
-    if (!canEdit) return;
-    const name = createForm.name.trim();
-    const email = createForm.email.trim();
-    const bal = Number(createForm.balance);
-    if (!name || !email) { setModalErr("Full name and email are required."); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setModalErr("Enter a valid email."); return; }
-    if (Number.isNaN(bal) || bal < 0) { setModalErr("Initial balance must be zero or positive."); return; }
-    const acctFull = genAccountNumber();
-    const newUser: MtUser = {
-      id: "u_" + Math.floor(1000 + Math.random() * 9000),
-      name, email, password: createForm.password || "password123",
-      phone: createForm.phone, ssn: createForm.ssn || "•••-••-••••",
-      securityQ: createForm.securityQ, securityA: createForm.securityA.toLowerCase(),
-      accountNumber: acctFull, account: maskAccount(acctFull),
-      tier: createForm.tier, status: createForm.status, balance: bal,
-      savingsBalance: Number(createForm.savingsBalance) || 0, savingsAccountNumber: genAccountNumber(),
-      verified: true, profilePicture: createForm.profilePicture || undefined,
-      createdAt: new Date().toISOString().slice(0, 10),
-      enrollments: {
-        smallBusiness: createForm.enrollSmallBusiness,
-        commercial: createForm.enrollCommercial,
-        wire: createForm.enrollWire,
-      },
-      serviceBalances: {
-        smallBusiness: Number(createForm.balSmallBusiness) || 0,
-        commercial: Number(createForm.balCommercial) || 0,
-        wire: Number(createForm.balWire) || 0,
-      },
-    };
-    saveUsers([newUser, ...users]);
-    flash(`Account created for ${name}`);
-    setCreating(false);
-  }
-
-  function approve(tx: PendingTx) {
+  async function approve(tx: PendingTx) {
     if (tx.status !== "Pending") return;
     const nextQ = queue.map((q) => q.id === tx.id ? { ...q, status: "Approved" as const, resolvedAt: new Date().toISOString() } : q);
-    const delta = tx.direction === "credit" ? tx.amount : -tx.amount;
-    const nextU = users.map((u) => u.id === tx.userId ? { ...u, balance: Math.max(0, u.balance + delta) } : u);
-    saveQueue(nextQ); saveUsers(nextU);
+    saveQueue(nextQ);
+    setQueue(nextQ);
+    // Push balance change to profile
+    const p = profiles.find((x) => x.id === tx.userId);
+    if (p) {
+      const delta = tx.direction === "credit" ? tx.amount : -tx.amount;
+      const newBal = Math.max(0, Number(p.balance) + delta);
+      try { await updateProfile(p.id, { balance: newBal }); } catch { /* rls */ }
+    }
     flash(`Approved ${fmtCurrency(tx.amount)} for ${tx.userName}`);
   }
   function fail(tx: PendingTx) {
     if (tx.status !== "Pending") return;
     const nextQ = queue.map((q) => q.id === tx.id ? { ...q, status: "Failed" as const, resolvedAt: new Date().toISOString() } : q);
-    saveQueue(nextQ);
+    saveQueue(nextQ); setQueue(nextQ);
     flash(`Marked ${tx.reference} as failed`);
   }
 
   const pendingCount = queue.filter((q) => q.status === "Pending").length;
-  const totalAum = users.reduce((s, u) => s + u.balance, 0);
+  const totalAum = profiles.reduce((s, p) => s + Number(p.balance) + Number(p.savings_balance), 0);
 
   return (
     <div className="min-h-screen bg-[#0a0d14] text-slate-100">
@@ -227,95 +203,89 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-black font-black">A</div>
             <div>
-              <div className="text-[10px] uppercase tracking-[0.2em] text-amber-400/80">Restricted Console</div>
+              <div className="text-[10px] uppercase tracking-[0.2em] text-amber-400/80">Restricted Console · Live-synced</div>
               <div className="text-sm font-semibold">Dynamic Bank of West · Treasury Management</div>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex flex-col items-end leading-tight">
-              <span className="text-xs font-medium text-white">{session.name}</span>
-              <span className="text-[10px] text-slate-500">{session.email}</span>
+              <span className="text-xs font-medium text-white">Treasury Operator</span>
+              <span className="text-[10px] text-slate-500">{email}</span>
             </div>
-            <RoleBadge role={session.role} />
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/50 bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-current" />SuperAdmin
+            </span>
             <Link to="/" className="text-xs text-slate-400 hover:text-amber-400">Portal</Link>
-            <button onClick={() => setChatOpen((v) => !v)}
-              className="rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-400/20">
-              {chatOpen ? "Close Chat" : "Live Chat"}
-            </button>
             <button onClick={onLogout} className="rounded border border-white/10 px-3 py-1.5 text-xs hover:bg-white/5">Sign out</button>
           </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-7xl px-4 pt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Stat label="Total Customers" value={String(users.length)} accent="text-amber-400" />
+        <Stat label="Total Customers" value={String(profiles.length)} accent="text-amber-400" />
         <Stat label="Assets Under Management" value={fmtCurrency(totalAum)} accent="text-emerald-400" />
         <Stat label="Pending Requests" value={String(pendingCount)} accent="text-cyan-400" />
       </div>
 
-      {/* Global Deposit Settings */}
       <section className="mx-auto max-w-7xl px-4 mt-8">
-        <SectionHeader title="Global Deposit Settings" subtitle="Edit the wire instructions and Bitcoin deposit address shown to every customer." />
-        <DepositSettingsPanel settings={settings} canEdit={canEdit} onSave={(s) => { saveDepositSettings(s); flash("Deposit settings saved."); }} />
+        <SectionHeader title="System Controls" subtitle="Interest rates, default limits, and the global banner. Every change broadcasts live to signed-in customers." />
+        <SystemControlsPanel rates={rates} limits={limits} banner={banner} onFlash={flash} />
       </section>
 
-      {/* User Management */}
+      <section className="mx-auto max-w-7xl px-4 mt-8">
+        <SectionHeader title="Global Deposit Settings" subtitle="Edit the wire instructions and Bitcoin deposit address shown to every customer." />
+        <DepositSettingsPanel settings={deposit} onSaved={() => flash("Deposit settings saved.")} />
+      </section>
+
       <section className="mx-auto max-w-7xl px-4 mt-10">
-        <div className="flex items-end justify-between gap-4">
-          <SectionHeader title="User Management" subtitle="Full override control over every customer profile." />
-          <button onClick={openCreate} disabled={!canEdit}
-            className="inline-flex items-center gap-2 rounded-md border border-emerald-400/40 bg-gradient-to-b from-emerald-500/20 to-emerald-600/10 px-3.5 py-2 text-xs font-semibold text-emerald-200 hover:from-emerald-500/30 disabled:opacity-30">
-            <span className="text-base leading-none">+</span> Create Account
-          </button>
-        </div>
+        <SectionHeader title="User Management" subtitle="Full override control over every customer profile. Edits push to the database and stream to customers in real time." />
         <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-[#0f1420]">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-white/5 text-xs uppercase tracking-wider text-slate-400">
                 <tr>
                   <Th>Customer</Th><Th>Account</Th><Th>Tier</Th><Th>Status</Th>
-                  <Th>Verified</Th><Th className="text-right">Balance</Th><Th className="text-right">Action</Th>
+                  <Th>Debit</Th><Th className="text-right">Balance</Th><Th className="text-right">Action</Th>
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => (
+                {profiles.map((u) => (
                   <tr key={u.id} className="border-t border-white/5 hover:bg-white/[0.03]">
                     <Td>
                       <div className="flex items-center gap-3">
-                        {u.profilePicture
-                          ? <img src={u.profilePicture} alt="" className="h-9 w-9 rounded-full object-cover border border-white/10" />
-                          : <div className="h-9 w-9 rounded-full bg-slate-700 text-white text-xs flex items-center justify-center">{u.name.slice(0, 1)}</div>}
+                        {u.profile_picture
+                          ? <img src={u.profile_picture} alt="" className="h-9 w-9 rounded-full object-cover border border-white/10" />
+                          : <div className="h-9 w-9 rounded-full bg-slate-700 text-white text-xs flex items-center justify-center">{u.name.slice(0, 1).toUpperCase() || "?"}</div>}
                         <div>
-                          <div className="font-medium text-white">{u.name}</div>
+                          <div className="font-medium text-white">{u.name || "(no name)"}</div>
                           <div className="text-xs text-slate-500">{u.email}</div>
                         </div>
                       </div>
                     </Td>
-                    <Td className="font-mono text-xs text-slate-300">{u.account}</Td>
+                    <Td className="font-mono text-xs text-slate-300">•••• {u.account_number.slice(-4)}</Td>
                     <Td><TierPill tier={u.tier} /></Td>
                     <Td><StatusPill status={u.status} /></Td>
-                    <Td>{u.verified ? <span className="text-emerald-300 text-xs">✓ Verified</span> : <span className="text-amber-300 text-xs">Pending</span>}</Td>
-                    <Td className="text-right font-mono text-white">{fmtCurrency(u.balance)}</Td>
+                    <Td>{u.debit_frozen ? <span className="text-red-300 text-xs">Frozen</span> : <span className="text-emerald-300 text-xs">OK</span>}</Td>
+                    <Td className="text-right font-mono text-white">{fmtCurrency(Number(u.balance))}</Td>
                     <Td className="text-right">
-                      <button onClick={() => openEdit(u)} disabled={!canEdit}
-                        className="rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs text-amber-300 hover:bg-amber-400/20 disabled:opacity-30">
+                      <button onClick={() => setEditing(u)}
+                        className="rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs text-amber-300 hover:bg-amber-400/20">
                         Edit
                       </button>
                     </Td>
                   </tr>
                 ))}
+                {profiles.length === 0 && <tr><Td className="text-center text-slate-500 py-8">No customer profiles yet — new signups appear here automatically.</Td></tr>}
               </tbody>
             </table>
           </div>
         </div>
       </section>
 
-      {/* Transaction Template Repository (admin-only) */}
       <section className="mx-auto max-w-7xl px-4 mt-10">
-        <TemplateRepositoryPanel users={users} canEdit={canEdit} flash={flash} />
+        <TemplateRepositoryPanel profiles={profiles} flash={flash} />
       </section>
 
-      {/* Transaction Queue */}
       <section className="mx-auto max-w-7xl px-4 mt-10 pb-16">
         <SectionHeader title="Transaction Queue" subtitle="All customer deposit and transfer requests awaiting review." />
         <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-[#0f1420]">
@@ -339,25 +309,26 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
                     <Td><TxStatus status={tx.status} /></Td>
                     <Td className="text-right">
                       <div className="inline-flex gap-2">
-                        <button disabled={tx.status !== "Pending"} onClick={() => approve(tx)}
-                          className="rounded border border-emerald-400/40 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300 hover:bg-emerald-400/20 disabled:opacity-30">Approve</button>
-                        <button disabled={tx.status !== "Pending"} onClick={() => fail(tx)}
-                          className="rounded border border-red-400/40 bg-red-400/10 px-3 py-1 text-xs text-red-300 hover:bg-red-400/20 disabled:opacity-30">Fail</button>
+                        <button disabled={tx.status !== "Pending"} onClick={() => approve(tx)} className="rounded border border-emerald-400/40 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300 hover:bg-emerald-400/20 disabled:opacity-30">Approve</button>
+                        <button disabled={tx.status !== "Pending"} onClick={() => fail(tx)} className="rounded border border-red-400/40 bg-red-400/10 px-3 py-1 text-xs text-red-300 hover:bg-red-400/20 disabled:opacity-30">Fail</button>
                       </div>
                     </Td>
                   </tr>
                 ))}
-                {queue.length === 0 && (<tr><Td className="text-center text-slate-500 py-8">No transactions in queue.</Td></tr>)}
+                {queue.length === 0 && <tr><Td className="text-center text-slate-500 py-8">No transactions in queue.</Td></tr>}
               </tbody>
             </table>
           </div>
         </div>
       </section>
 
-      {editing && <UserModal title={`Edit — ${editing.name}`} tone="amber" form={editForm} setForm={setEditForm} err={modalErr} onClose={() => setEditing(null)} onSave={saveEdit} />}
-      {creating && <UserModal title="Create Customer Account" tone="emerald" form={createForm} setForm={setCreateForm} err={modalErr} onClose={() => setCreating(false)} onSave={saveCreate} />}
-
-      {chatOpen && <AdminChatPanel users={users} agentName={session.name} onClose={() => setChatOpen(false)} />}
+      {editing && (
+        <EditProfileModal
+          profile={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); flash("Profile updated. Changes are live for this customer."); }}
+        />
+      )}
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-4 py-2 text-sm text-emerald-200 shadow-lg backdrop-blur">{toast}</div>
@@ -366,31 +337,124 @@ function AdminConsole({ session, onLogout }: { session: AdminSession; onLogout: 
   );
 }
 
-function DepositSettingsPanel({ settings, canEdit, onSave }: { settings: DepositSettings; canEdit: boolean; onSave: (s: DepositSettings) => void }) {
-  const [draft, setDraft] = useState(settings);
+// -- System Controls ---------------------------------------------------------
+
+function SystemControlsPanel({
+  rates, limits, banner, onFlash,
+}: {
+  rates: RatesSettings | null;
+  limits: LimitsSettings | null;
+  banner: BannerSettings | null;
+  onFlash: (m: string) => void;
+}) {
+  const [checkingApy, setCheckingApy] = useState("");
+  const [savingsApy, setSavingsApy] = useState("");
+  const [defaultLimit, setDefaultLimit] = useState("");
+  const [wireCutoff, setWireCutoff] = useState("");
+  const [bnEnabled, setBnEnabled] = useState(false);
+  const [bnTone, setBnTone] = useState<BannerSettings["tone"]>("info");
+  const [bnMessage, setBnMessage] = useState("");
+
+  useEffect(() => {
+    if (rates) { setCheckingApy(String(rates.checkingApy)); setSavingsApy(String(rates.savingsApy)); }
+  }, [rates]);
+  useEffect(() => {
+    if (limits) { setDefaultLimit(String(limits.defaultDailyLimit)); setWireCutoff(String(limits.wireCutoffHour)); }
+  }, [limits]);
+  useEffect(() => {
+    if (banner) { setBnEnabled(banner.enabled); setBnTone(banner.tone); setBnMessage(banner.message); }
+  }, [banner]);
+
+  async function saveRates() {
+    await updateSetting("rates", { checkingApy: Number(checkingApy) || 0, savingsApy: Number(savingsApy) || 0 });
+    onFlash("Interest rates broadcast to all customers.");
+  }
+  async function saveLimits() {
+    await updateSetting("limits", { defaultDailyLimit: Number(defaultLimit) || 0, wireCutoffHour: Number(wireCutoff) || 16 });
+    onFlash("Transaction limits saved.");
+  }
+  async function saveBanner() {
+    await updateSetting("banner", { enabled: bnEnabled, tone: bnTone, message: bnMessage });
+    onFlash("Banner updated — visible everywhere immediately.");
+  }
+
+  return (
+    <div className="mt-4 grid gap-4 md:grid-cols-3">
+      <div className="rounded-xl border border-white/10 bg-[#0f1420] p-5">
+        <div className="text-[10px] uppercase tracking-[0.2em] text-amber-400/80">Interest Rates (APY %)</div>
+        <div className="mt-4 space-y-3">
+          <DarkField label="Everyday Checking APY"><input value={checkingApy} onChange={(e) => setCheckingApy(e.target.value)} type="number" step="0.01" className={`${inputDark} font-mono`} /></DarkField>
+          <DarkField label="Way2Save Savings APY"><input value={savingsApy} onChange={(e) => setSavingsApy(e.target.value)} type="number" step="0.01" className={`${inputDark} font-mono`} /></DarkField>
+          <button onClick={saveRates} className="w-full rounded bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 text-xs font-semibold text-black hover:brightness-110">Publish rates</button>
+        </div>
+      </div>
+      <div className="rounded-xl border border-white/10 bg-[#0f1420] p-5">
+        <div className="text-[10px] uppercase tracking-[0.2em] text-amber-400/80">Transaction Parameters</div>
+        <div className="mt-4 space-y-3">
+          <DarkField label="Default daily transfer limit ($)"><input value={defaultLimit} onChange={(e) => setDefaultLimit(e.target.value)} type="number" className={`${inputDark} font-mono`} /></DarkField>
+          <DarkField label="Wire cutoff hour (0–23)"><input value={wireCutoff} onChange={(e) => setWireCutoff(e.target.value)} type="number" min="0" max="23" className={`${inputDark} font-mono`} /></DarkField>
+          <button onClick={saveLimits} className="w-full rounded bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 text-xs font-semibold text-black hover:brightness-110">Publish limits</button>
+        </div>
+      </div>
+      <div className="rounded-xl border border-white/10 bg-[#0f1420] p-5">
+        <div className="flex items-center justify-between">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-amber-400/80">Global Banner</div>
+          <label className="inline-flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
+            <input type="checkbox" checked={bnEnabled} onChange={(e) => setBnEnabled(e.target.checked)} className="h-3.5 w-3.5 accent-amber-500" /> Enabled
+          </label>
+        </div>
+        <div className="mt-4 space-y-3">
+          <DarkField label="Tone">
+            <select value={bnTone} onChange={(e) => setBnTone(e.target.value as BannerSettings["tone"])} className={inputDark}>
+              <option value="info">Info</option>
+              <option value="success">Success</option>
+              <option value="warning">Warning</option>
+              <option value="danger">Danger</option>
+            </select>
+          </DarkField>
+          <DarkField label="Message">
+            <textarea value={bnMessage} onChange={(e) => setBnMessage(e.target.value)} rows={2} className={inputDark} placeholder="e.g. Scheduled maintenance Sunday 3am ET." />
+          </DarkField>
+          <button onClick={saveBanner} className="w-full rounded bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 text-xs font-semibold text-black hover:brightness-110">Publish banner</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -- Deposit settings --------------------------------------------------------
+
+function DepositSettingsPanel({ settings, onSaved }: { settings: DepositSettingsDb | null; onSaved: () => void }) {
+  const [draft, setDraft] = useState<DepositSettingsDb | null>(settings);
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => { setDraft(settings); }, [settings]);
+  if (!draft) return <div className="mt-4 text-xs text-slate-500">Loading deposit settings…</div>;
 
   async function pickQr(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]; if (!f) return;
+    const f = e.target.files?.[0]; if (!f || !draft) return;
     const dataUrl = await readFileAsDataUrl(f);
     setDraft({ ...draft, btcQrDataUrl: dataUrl });
+  }
+  async function save() {
+    if (!draft) return;
+    await updateSetting("deposit", draft);
+    onSaved();
   }
 
   return (
     <div className="mt-4 grid lg:grid-cols-[1fr_260px] gap-4">
       <div className="rounded-xl border border-white/10 bg-[#0f1420] p-6 grid sm:grid-cols-2 gap-3">
-        <DarkField label="Bank name"><input value={draft.bankName} onChange={(e) => setDraft({ ...draft, bankName: e.target.value })} className={inputDark} disabled={!canEdit} /></DarkField>
-        <DarkField label="Routing / ABA"><input value={draft.routing} onChange={(e) => setDraft({ ...draft, routing: e.target.value })} className={inputDark} disabled={!canEdit} /></DarkField>
-        <DarkField label="Beneficiary"><input value={draft.beneficiary} onChange={(e) => setDraft({ ...draft, beneficiary: e.target.value })} className={inputDark} disabled={!canEdit} /></DarkField>
-        <DarkField label="Account number"><input value={draft.accountNumber} onChange={(e) => setDraft({ ...draft, accountNumber: e.target.value })} className={inputDark} disabled={!canEdit} /></DarkField>
-        <DarkField label="SWIFT / BIC"><input value={draft.swift} onChange={(e) => setDraft({ ...draft, swift: e.target.value })} className={inputDark} disabled={!canEdit} /></DarkField>
-        <DarkField label="Bank address"><input value={draft.bankAddress} onChange={(e) => setDraft({ ...draft, bankAddress: e.target.value })} className={inputDark} disabled={!canEdit} /></DarkField>
+        <DarkField label="Bank name"><input value={draft.bankName} onChange={(e) => setDraft({ ...draft, bankName: e.target.value })} className={inputDark} /></DarkField>
+        <DarkField label="Routing / ABA"><input value={draft.routing} onChange={(e) => setDraft({ ...draft, routing: e.target.value })} className={inputDark} /></DarkField>
+        <DarkField label="Beneficiary"><input value={draft.beneficiary} onChange={(e) => setDraft({ ...draft, beneficiary: e.target.value })} className={inputDark} /></DarkField>
+        <DarkField label="Account number"><input value={draft.accountNumber} onChange={(e) => setDraft({ ...draft, accountNumber: e.target.value })} className={inputDark} /></DarkField>
+        <DarkField label="SWIFT / BIC"><input value={draft.swift} onChange={(e) => setDraft({ ...draft, swift: e.target.value })} className={inputDark} /></DarkField>
+        <DarkField label="Bank address"><input value={draft.bankAddress} onChange={(e) => setDraft({ ...draft, bankAddress: e.target.value })} className={inputDark} /></DarkField>
         <div className="sm:col-span-2">
-          <DarkField label="Bitcoin (BTC) wallet address"><input value={draft.btcAddress} onChange={(e) => setDraft({ ...draft, btcAddress: e.target.value })} className={`${inputDark} font-mono`} disabled={!canEdit} /></DarkField>
+          <DarkField label="Bitcoin (BTC) wallet address"><input value={draft.btcAddress} onChange={(e) => setDraft({ ...draft, btcAddress: e.target.value })} className={`${inputDark} font-mono`} /></DarkField>
         </div>
         <div className="sm:col-span-2 flex justify-end">
-          <button disabled={!canEdit} onClick={() => onSave(draft)} className="rounded bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 text-xs font-semibold text-black hover:brightness-110 disabled:opacity-30">Save deposit settings</button>
+          <button onClick={save} className="rounded bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 text-xs font-semibold text-black hover:brightness-110">Save deposit settings</button>
         </div>
       </div>
       <div className="rounded-xl border border-white/10 bg-[#0f1420] p-6 flex flex-col items-center gap-3">
@@ -398,417 +462,217 @@ function DepositSettingsPanel({ settings, canEdit, onSave }: { settings: Deposit
         {draft.btcQrDataUrl
           ? <img src={draft.btcQrDataUrl} alt="BTC QR" className="h-40 w-40 rounded-md object-contain bg-white p-2" />
           : <div className="h-40 w-40 rounded-md border-2 border-dashed border-white/10 flex items-center justify-center text-slate-500 text-xs">No QR uploaded</div>}
-        <input ref={fileRef} type="file" accept="image/*" onChange={pickQr} className="hidden" disabled={!canEdit} />
-        <button disabled={!canEdit} onClick={() => fileRef.current?.click()} className="w-full rounded border border-white/10 px-3 py-2 text-xs hover:bg-white/5 disabled:opacity-30">Upload QR image</button>
+        <input ref={fileRef} type="file" accept="image/*" onChange={pickQr} className="hidden" />
+        <button onClick={() => fileRef.current?.click()} className="w-full rounded border border-white/10 px-3 py-2 text-xs hover:bg-white/5">Upload QR image</button>
         {draft.btcQrDataUrl && (
-          <button disabled={!canEdit} onClick={() => setDraft({ ...draft, btcQrDataUrl: "" })} className="text-[10px] text-red-300 hover:text-red-200">Remove QR</button>
+          <button onClick={() => setDraft({ ...draft, btcQrDataUrl: "" })} className="text-[10px] text-red-300 hover:text-red-200">Remove QR</button>
         )}
       </div>
     </div>
   );
 }
 
-function UserModal({ title, tone, form, setForm, err, onClose, onSave }: {
-  title: string; tone: "amber" | "emerald";
-  form: EditForm; setForm: (f: EditForm) => void; err: string;
-  onClose: () => void; onSave: () => void;
-}) {
+// -- Profile edit modal ------------------------------------------------------
+
+function EditProfileModal({ profile, onClose, onSaved }: { profile: DbProfile; onClose: () => void; onSaved: () => void }) {
+  const [draft, setDraft] = useState<DbProfile>(profile);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
   async function pickPic(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return;
     const dataUrl = await readFileAsDataUrl(f);
-    setForm({ ...form, profilePicture: dataUrl });
+    setDraft({ ...draft, profile_picture: dataUrl });
   }
-  const borderColor = tone === "amber" ? "border-amber-400/30" : "border-emerald-400/30";
-  const btnBg = tone === "amber" ? "from-amber-400 to-amber-600" : "from-emerald-400 to-emerald-600";
+  async function save() {
+    if (!draft.name.trim() || !draft.email.trim()) { setErr("Name and email required."); return; }
+    setBusy(true);
+    try {
+      await updateProfile(profile.id, {
+        name: draft.name.trim(),
+        email: draft.email.trim(),
+        phone: draft.phone,
+        address: draft.address,
+        tier: draft.tier,
+        status: draft.status,
+        verified: draft.verified,
+        debit_frozen: draft.debit_frozen,
+        daily_limit: Number(draft.daily_limit) || 0,
+        balance: Number(draft.balance) || 0,
+        savings_balance: Number(draft.savings_balance) || 0,
+        profile_picture: draft.profile_picture,
+      });
+      onSaved();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally { setBusy(false); }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" onClick={onClose}>
-      <div className={`w-full max-w-2xl rounded-2xl border ${borderColor} bg-[#0f1420] p-6 shadow-2xl max-h-[90vh] overflow-y-auto`} onClick={(e) => e.stopPropagation()}>
-        <div className="text-xs uppercase tracking-[0.2em] text-amber-400/80">{title.startsWith("Edit") ? "Edit" : "Create"} Customer Profile</div>
-        <h3 className="mt-1 text-lg font-semibold text-white">{title}</h3>
+      <div className="w-full max-w-2xl rounded-2xl border border-amber-400/30 bg-[#0f1420] p-6 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="text-xs uppercase tracking-[0.2em] text-amber-400/80">Edit Customer Profile</div>
+        <h3 className="mt-1 text-lg font-semibold text-white">{profile.name || profile.email}</h3>
 
         <div className="mt-5 flex items-center gap-4">
-          {form.profilePicture
-            ? <img src={form.profilePicture} alt="" className="h-16 w-16 rounded-full object-cover border border-white/10" />
-            : <div className="h-16 w-16 rounded-full bg-slate-700 text-white text-lg flex items-center justify-center">{(form.name || "?").slice(0, 1)}</div>}
+          {draft.profile_picture
+            ? <img src={draft.profile_picture} alt="" className="h-16 w-16 rounded-full object-cover border border-white/10" />
+            : <div className="h-16 w-16 rounded-full bg-slate-700 text-white text-lg flex items-center justify-center">{(draft.name || "?").slice(0, 1).toUpperCase()}</div>}
           <input ref={fileRef} type="file" accept="image/*" onChange={pickPic} className="hidden" />
           <div className="flex flex-col gap-1">
             <button onClick={() => fileRef.current?.click()} className="rounded border border-white/10 px-3 py-1.5 text-xs hover:bg-white/5">Upload profile picture</button>
-            {form.profilePicture && <button onClick={() => setForm({ ...form, profilePicture: "" })} className="text-[10px] text-red-300 hover:text-red-200 text-left">Remove picture</button>}
+            {draft.profile_picture && <button onClick={() => setDraft({ ...draft, profile_picture: null })} className="text-[10px] text-red-300 hover:text-red-200 text-left">Remove picture</button>}
           </div>
         </div>
 
         <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <DarkField label="Full Name"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputDark} /></DarkField>
-          <DarkField label="Email"><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputDark} /></DarkField>
-          <DarkField label="Phone"><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputDark} /></DarkField>
-          <DarkField label="SSN"><input value={form.ssn} onChange={(e) => setForm({ ...form, ssn: e.target.value })} className={`${inputDark} font-mono`} /></DarkField>
-          <DarkField label="Password (login)"><input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={inputDark} placeholder="Leave unchanged" /></DarkField>
-          <DarkField label="Checking Balance (USD)"><input type="number" step="0.01" value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} className={`${inputDark} font-mono`} /></DarkField>
-          <DarkField label="Way2Save Savings Balance (USD)"><input type="number" step="0.01" value={form.savingsBalance} onChange={(e) => setForm({ ...form, savingsBalance: e.target.value })} className={`${inputDark} font-mono`} /></DarkField>
+          <DarkField label="Full Name"><input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className={inputDark} /></DarkField>
+          <DarkField label="Email"><input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} className={inputDark} /></DarkField>
+          <DarkField label="Phone"><input value={draft.phone ?? ""} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} className={inputDark} /></DarkField>
+          <DarkField label="Address"><input value={draft.address ?? ""} onChange={(e) => setDraft({ ...draft, address: e.target.value })} className={inputDark} /></DarkField>
+          <DarkField label="Checking Balance (USD)"><input type="number" step="0.01" value={draft.balance} onChange={(e) => setDraft({ ...draft, balance: Number(e.target.value) })} className={`${inputDark} font-mono`} /></DarkField>
+          <DarkField label="Way2Save Savings Balance (USD)"><input type="number" step="0.01" value={draft.savings_balance} onChange={(e) => setDraft({ ...draft, savings_balance: Number(e.target.value) })} className={`${inputDark} font-mono`} /></DarkField>
+          <DarkField label="Daily Transfer Limit ($)"><input type="number" value={draft.daily_limit} onChange={(e) => setDraft({ ...draft, daily_limit: Number(e.target.value) })} className={`${inputDark} font-mono`} /></DarkField>
           <DarkField label="Tier">
-            <select value={form.tier} onChange={(e) => setForm({ ...form, tier: e.target.value as AccountTier })} className={inputDark}>
-              {(["Standard", "Premier", "Private", "Business"] as AccountTier[]).map((t) => <option key={t} value={t}>{t}</option>)}
+            <select value={draft.tier} onChange={(e) => setDraft({ ...draft, tier: e.target.value })} className={inputDark}>
+              {["Standard", "Premier", "Private", "Business"].map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </DarkField>
           <DarkField label="Status">
-            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as AccountStatus })} className={inputDark}>
-              {(["Active", "Frozen", "Review"] as AccountStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
+            <select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value })} className={inputDark}>
+              {["Active", "Frozen", "Review"].map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </DarkField>
-          <div className="sm:col-span-2">
-            <DarkField label="Security question">
-              <select value={form.securityQ} onChange={(e) => setForm({ ...form, securityQ: e.target.value })} className={inputDark}>
-                {SECURITY_QUESTIONS.map((q) => <option key={q} value={q}>{q}</option>)}
-              </select>
-            </DarkField>
-          </div>
-          <div className="sm:col-span-2">
-            <DarkField label="Security answer"><input value={form.securityA} onChange={(e) => setForm({ ...form, securityA: e.target.value })} className={inputDark} /></DarkField>
-          </div>
+          <label className="flex items-center gap-2 text-sm text-white mt-6">
+            <input type="checkbox" checked={draft.debit_frozen} onChange={(e) => setDraft({ ...draft, debit_frozen: e.target.checked })} className="h-4 w-4 accent-amber-500" />
+            Freeze debit card
+          </label>
+          <label className="flex items-center gap-2 text-sm text-white mt-6">
+            <input type="checkbox" checked={draft.verified} onChange={(e) => setDraft({ ...draft, verified: e.target.checked })} className="h-4 w-4 accent-amber-500" />
+            Identity verified
+          </label>
         </div>
-
-        <div className="mt-6 rounded-lg border border-amber-400/20 bg-black/30 p-4">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-amber-400/80 font-semibold">Service Enrollments</div>
-          <p className="text-[11px] text-slate-500 mt-0.5">Toggle to enroll this customer and set a starting balance for each service.</p>
-          <div className="mt-3 space-y-2">
-            <EnrollRow label="Small Business"
-              enrolled={form.enrollSmallBusiness}
-              onToggle={(v) => setForm({ ...form, enrollSmallBusiness: v })}
-              balance={form.balSmallBusiness}
-              onBalance={(b) => setForm({ ...form, balSmallBusiness: b })} />
-            <EnrollRow label="Commercial Accounts"
-              enrolled={form.enrollCommercial}
-              onToggle={(v) => setForm({ ...form, enrollCommercial: v })}
-              balance={form.balCommercial}
-              onBalance={(b) => setForm({ ...form, balCommercial: b })} />
-            <EnrollRow label="Wire Services"
-              enrolled={form.enrollWire}
-              onToggle={(v) => setForm({ ...form, enrollWire: v })}
-              balance={form.balWire}
-              onBalance={(b) => setForm({ ...form, balWire: b })} />
-          </div>
-        </div>
-
 
         {err && <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
 
         <div className="mt-6 flex justify-end gap-2">
           <button onClick={onClose} className="rounded border border-white/10 px-4 py-2 text-xs hover:bg-white/5">Cancel</button>
-          <button onClick={onSave} className={`rounded bg-gradient-to-r ${btnBg} px-4 py-2 text-xs font-semibold text-black hover:brightness-110`}>Save</button>
+          <button onClick={save} disabled={busy} className="rounded bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 text-xs font-semibold text-black hover:brightness-110 disabled:opacity-40">
+            {busy ? "Saving…" : "Save & broadcast"}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-// -- primitives ---------------------------------------------------------------
-
-const inputDark = "mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none";
-function DarkField({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="block text-xs uppercase tracking-wider text-slate-400">{label}{children}</label>;
-}
-function Stat({ label, value, accent }: { label: string; value: string; accent: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-[#0f1420] p-4">
-      <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">{label}</div>
-      <div className={`mt-2 text-2xl font-semibold ${accent}`}>{value}</div>
-    </div>
-  );
-}
-function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
-  return (
-    <div>
-      <h2 className="text-lg font-semibold text-white">{title}</h2>
-      <p className="text-xs text-slate-400">{subtitle}</p>
-    </div>
-  );
-}
-function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <th className={`px-4 py-3 text-left font-medium ${className}`}>{children}</th>;
-}
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-4 py-3 align-middle ${className}`}>{children}</td>;
-}
-function TierPill({ tier }: { tier: AccountTier }) {
-  const map: Record<AccountTier, string> = {
-    Standard: "border-slate-400/30 bg-slate-400/10 text-slate-300",
-    Premier: "border-amber-400/40 bg-amber-400/10 text-amber-300",
-    Private: "border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300",
-    Business: "border-cyan-400/40 bg-cyan-400/10 text-cyan-300",
-  };
-  return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[tier]}`}>{tier}</span>;
-}
-function StatusPill({ status }: { status: AccountStatus }) {
-  const map: Record<AccountStatus, string> = {
-    Active: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
-    Frozen: "border-red-400/40 bg-red-400/10 text-red-300",
-    Review: "border-amber-400/40 bg-amber-400/10 text-amber-300",
-  };
-  return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[status]}`}>{status}</span>;
-}
-function TxStatus({ status }: { status: PendingTx["status"] }) {
-  const map = {
-    Pending: "border-amber-400/40 bg-amber-400/10 text-amber-300",
-    Approved: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
-    Failed: "border-red-400/40 bg-red-400/10 text-red-300",
-  } as const;
-  return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[status]}`}>{status}</span>;
-}
-function MethodPill({ method }: { method: PendingTx["method"] }) {
-  return <span className="inline-block rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">{method}</span>;
-}
-function EnrollRow({ label, enrolled, onToggle, balance, onBalance }: {
-  label: string; enrolled: boolean; onToggle: (v: boolean) => void;
-  balance: string; onBalance: (b: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-3 rounded-md border border-white/5 bg-white/[0.02] px-3 py-2">
-      <label className="inline-flex items-center gap-2 cursor-pointer select-none min-w-[190px]">
-        <input type="checkbox" checked={enrolled} onChange={(e) => onToggle(e.target.checked)} className="h-4 w-4 accent-amber-500" />
-        <span className="text-sm text-white">{label}</span>
-      </label>
-      <span className={`text-[10px] uppercase tracking-wider rounded-full border px-2 py-0.5 ${enrolled ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300" : "border-slate-500/30 bg-slate-500/10 text-slate-400"}`}>
-        {enrolled ? "Enrolled" : "Not enrolled"}
-      </span>
-      <div className="ml-auto flex items-center gap-2">
-        <span className="text-[10px] uppercase tracking-wider text-slate-500">Balance</span>
-        <input type="number" step="0.01" value={balance} disabled={!enrolled}
-          onChange={(e) => onBalance(e.target.value)}
-          className="w-32 rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs font-mono text-white focus:border-amber-400 focus:outline-none disabled:opacity-40" />
-      </div>
-    </div>
-  );
-}
-
-function RoleBadge({ role }: { role: AdminRole }) {
-  const cls = role === "SuperAdmin" ? "border-amber-400/50 bg-amber-400/15 text-amber-300" : "border-cyan-400/50 bg-cyan-400/10 text-cyan-300";
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${cls}`}>
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />{role}
-    </span>
-  );
-}
-
-function AdminChatPanel({ users, agentName, onClose }: { users: MtUser[]; agentName: string; onClose: () => void }) {
-  const [threads, setThreads] = useState<Record<string, ChatMessage[]>>({});
-  const [activeId, setActiveId] = useState<string | null>(users[0]?.id ?? null);
-  const [text, setText] = useState("");
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function refresh() { setThreads(loadChatThreads()); }
-    refresh();
-    window.addEventListener("mt:chat-changed", refresh);
-    window.addEventListener("storage", refresh);
-    const i = setInterval(refresh, 1200);
-    return () => {
-      window.removeEventListener("mt:chat-changed", refresh);
-      window.removeEventListener("storage", refresh);
-      clearInterval(i);
-    };
-  }, []);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [threads, activeId]);
-
-  function send() {
-    const v = text.trim(); if (!v || !activeId) return;
-    appendChatMessage(activeId, {
-      id: `m_${Date.now()}`, from: "agent", text: v,
-      ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    });
-    setText("");
-  }
-
-  const activeMsgs = activeId ? (threads[activeId] ?? []) : [];
-  const activeUser = users.find((u) => u.id === activeId);
-
-  return (
-    <div className="fixed bottom-6 right-6 z-50 w-[min(720px,calc(100vw-3rem))] h-[520px] rounded-2xl border border-amber-400/40 bg-[#0f1420] shadow-2xl overflow-hidden flex">
-      {/* Thread list */}
-      <aside className="w-52 border-r border-white/10 flex flex-col">
-        <div className="px-3 py-3 border-b border-white/10 bg-black/40">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300 font-semibold">Live Support</div>
-          <div className="text-xs text-slate-300 mt-0.5">Agent: {agentName}</div>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          {users.map((u) => {
-            const t = threads[u.id] ?? [];
-            const last = t[t.length - 1];
-            const active = activeId === u.id;
-            return (
-              <button key={u.id} onClick={() => setActiveId(u.id)}
-                className={`w-full text-left px-3 py-2.5 border-b border-white/5 transition ${active ? "bg-amber-400/10" : "hover:bg-white/[0.03]"}`}>
-                <div className="text-xs font-medium text-white truncate">{u.name}</div>
-                <div className="text-[10px] text-slate-400 truncate mt-0.5">{last ? `${last.from === "agent" ? "You: " : ""}${last.text}` : "No messages yet"}</div>
-              </button>
-            );
-          })}
-          {users.length === 0 && <div className="p-4 text-xs text-slate-500">No customers.</div>}
-        </div>
-      </aside>
-
-      {/* Conversation */}
-      <div className="flex-1 flex flex-col">
-        <div className="px-4 py-3 border-b border-white/10 bg-black/40 flex items-center justify-between">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300 font-semibold">🔒 Secure Channel</div>
-            <div className="text-sm font-semibold text-white">{activeUser?.name ?? "Select a customer"}</div>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
-        </div>
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#0a0d14]">
-          {activeMsgs.map((m) => (
-            <div key={m.id} className={`flex ${m.from === "agent" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${m.from === "agent" ? "bg-gradient-to-r from-amber-400 to-amber-600 text-black rounded-br-sm" : "bg-white/10 text-slate-100 rounded-bl-sm border border-white/10"}`}>
-                <div>{m.text}</div>
-                <div className={`text-[10px] mt-1 ${m.from === "agent" ? "text-black/60" : "text-slate-400"}`}>{m.ts}</div>
-              </div>
-            </div>
-          ))}
-          {activeMsgs.length === 0 && activeUser && (
-            <div className="text-center text-xs text-slate-500 py-10">No messages in this thread yet.</div>
-          )}
-        </div>
-        <div className="border-t border-white/10 p-2 flex items-center gap-2 bg-black/40">
-          <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }}
-            disabled={!activeId} placeholder="Type as DBW Concierge…"
-            className="flex-1 rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none disabled:opacity-40" />
-          <button onClick={send} disabled={!activeId}
-            className="rounded-md bg-gradient-to-r from-amber-400 to-amber-600 text-black text-xs font-bold px-3 py-2 hover:brightness-110 disabled:opacity-40">Send</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// -- Transaction Template Repository (admin-only injection tools) ------------
+// -- Merchant template repository (writes to profiles.balance + local ledger) -
 
 type MerchantTemplate = {
-  key: string;
-  merchant: string;
-  category: string;
-  descriptions: string[];
-  min: number;
-  max: number;
+  key: string; merchant: string; category: string;
+  descriptions: string[]; min: number; max: number;
   direction: "debit" | "credit";
 };
 
 const MERCHANT_TEMPLATES: MerchantTemplate[] = [
-  // ---- Debits (merchant charges) ----
-  { key: "starbucks", merchant: "Starbucks", category: "Coffee & Food", descriptions: ["STARBUCKS STORE #4471 SEATTLE WA", "STARBUCKS #22910 LOS ANGELES CA", "STARBUCKS COFFEE #7712"], min: 4.75, max: 18.9, direction: "debit" },
+  { key: "starbucks", merchant: "Starbucks", category: "Coffee & Food", descriptions: ["STARBUCKS STORE #4471 SEATTLE WA", "STARBUCKS #22910 LOS ANGELES CA"], min: 4.75, max: 18.9, direction: "debit" },
   { key: "att", merchant: "AT&T", category: "Telecom", descriptions: ["AT&T *PAYMENT 800-288-2020 TX", "AT&T WIRELESS AUTOPAY"], min: 65, max: 189.4, direction: "debit" },
-  { key: "verizon", merchant: "Verizon", category: "Telecom", descriptions: ["VERIZON WRLS MYACCT VW", "VZWRLSS*APOCC VISW 800-922-0204"], min: 70, max: 245.75, direction: "debit" },
-  { key: "walmart", merchant: "Walmart", category: "Retail", descriptions: ["WAL-MART SUPERCENTER #1287", "WMT PURCHASE STORE 3341", "WALMART.COM 800-966-6546 AR"], min: 14.5, max: 312.6, direction: "debit" },
-  { key: "amazon", merchant: "Amazon", category: "E-commerce", descriptions: ["AMZN Mktp US*RT7Y21P43", "AMAZON.COM*MK9J812TA SEATTLE WA", "AMZN Digital*3H21K4XY2"], min: 8.99, max: 429.15, direction: "debit" },
-  { key: "nike", merchant: "Nike", category: "Apparel", descriptions: ["NIKE.COM 800-806-6453 OR", "NIKE STORE #0428 BEAVERTON"], min: 45, max: 289.95, direction: "debit" },
-  { key: "target", merchant: "Target", category: "Retail", descriptions: ["TARGET T-0912 LOS ANGELES", "TARGET.COM * 800-591-3869", "TARGET STORE T-2247"], min: 12.75, max: 267.4, direction: "debit" },
-  { key: "bestbuy", merchant: "Best Buy", category: "Electronics", descriptions: ["BEST BUY #0428 BURBANK CA", "BESTBUY.COM 888-BESTBUY MN"], min: 24.5, max: 899, direction: "debit" },
-  { key: "shell", merchant: "Shell", category: "Fuel", descriptions: ["SHELL SERVICE STATION #7118", "SHELL OIL 57544218809 CA"], min: 28.4, max: 92.15, direction: "debit" },
-  { key: "uber", merchant: "Uber", category: "Rideshare", descriptions: ["UBER *TRIP HELP.UBER.COM CA", "UBER EATS SAN FRANCISCO CA"], min: 6.5, max: 68.9, direction: "debit" },
+  { key: "verizon", merchant: "Verizon", category: "Telecom", descriptions: ["VERIZON WRLS MYACCT VW"], min: 70, max: 245.75, direction: "debit" },
+  { key: "walmart", merchant: "Walmart", category: "Retail", descriptions: ["WAL-MART SUPERCENTER #1287", "WALMART.COM 800-966-6546 AR"], min: 14.5, max: 312.6, direction: "debit" },
+  { key: "amazon", merchant: "Amazon", category: "E-commerce", descriptions: ["AMZN Mktp US*RT7Y21P43", "AMAZON.COM*MK9J812TA"], min: 8.99, max: 429.15, direction: "debit" },
+  { key: "target", merchant: "Target", category: "Retail", descriptions: ["TARGET T-0912 LOS ANGELES", "TARGET.COM * 800-591-3869"], min: 12.75, max: 267.4, direction: "debit" },
+  { key: "bestbuy", merchant: "Best Buy", category: "Electronics", descriptions: ["BEST BUY #0428 BURBANK CA"], min: 24.5, max: 899, direction: "debit" },
   { key: "netflix", merchant: "Netflix", category: "Subscription", descriptions: ["NETFLIX.COM LOS GATOS CA"], min: 15.49, max: 22.99, direction: "debit" },
-  { key: "spotify", merchant: "Spotify", category: "Subscription", descriptions: ["SPOTIFY USA NEW YORK NY"], min: 10.99, max: 16.99, direction: "debit" },
-  { key: "costco", merchant: "Costco", category: "Wholesale", descriptions: ["COSTCO WHSE #0431 LOS ANGELES", "COSTCO GAS #0428"], min: 45, max: 512.8, direction: "debit" },
-  { key: "cvs", merchant: "CVS Pharmacy", category: "Pharmacy", descriptions: ["CVS/PHARMACY #04128", "CVS 04128 Q03 LOS ANGELES CA"], min: 8.9, max: 142.3, direction: "debit" },
-  { key: "wholefoods", merchant: "Whole Foods", category: "Grocery", descriptions: ["WHOLEFDS LAB #10221", "WHOLE FOODS MARKET #10221"], min: 22.4, max: 274.6, direction: "debit" },
-  { key: "chipotle", merchant: "Chipotle", category: "Dining", descriptions: ["CHIPOTLE 0472 LOS ANGELES CA", "CHIPOTLE ONLINE 1800-CHIPOTLE"], min: 11.5, max: 46.9, direction: "debit" },
-  // ---- Credits (deposits / inbound funds) ----
-  { key: "payroll", merchant: "Payroll Direct Deposit", category: "Payroll", descriptions: ["DIRECT DEP PAYROLL EMPLR CO", "ACH CREDIT PAYROLL 072118", "EMPLR PAYROLL DIRECT DEP PPD"], min: 1850, max: 6420, direction: "credit" },
-  { key: "irs", merchant: "IRS Refund", category: "Government", descriptions: ["IRS TREAS 310 TAX REF", "US TREASURY 310 TAX REFUND"], min: 420, max: 3890, direction: "credit" },
-  { key: "zelle_in", merchant: "Zelle Transfer", category: "P2P Credit", descriptions: ["ZELLE FROM SMITH J 991284", "ZELLE PAYMENT FROM D. RAMIREZ", "ZELLE CREDIT J. PATEL"], min: 40, max: 1250, direction: "credit" },
-  { key: "venmo_in", merchant: "Venmo Cashout", category: "P2P Credit", descriptions: ["VENMO CASHOUT VISA DIRECT", "VENMO TRANSFER 8827123"], min: 25, max: 780, direction: "credit" },
-  { key: "stripe_payout", merchant: "Stripe Payout", category: "Merchant Payout", descriptions: ["STRIPE TRANSFER ST-K4XY71", "STRIPE PAYOUTS 2100211"], min: 210, max: 8420, direction: "credit" },
-  { key: "ach_credit", merchant: "ACH Deposit", category: "ACH Credit", descriptions: ["ACH CREDIT VENDOR SETTLEMENT", "INBOUND ACH FUNDS TRANSFER"], min: 150, max: 4500, direction: "credit" },
-  { key: "wire_in", merchant: "Incoming Wire", category: "Wire Credit", descriptions: ["FEDWIRE CREDIT REF 20260708", "INTL WIRE INBOUND SWIFT DBWSUS44"], min: 500, max: 18500, direction: "credit" },
-  { key: "interest", merchant: "Interest Earned", category: "Interest", descriptions: ["INTEREST PAYMENT — MONTHLY", "SAVINGS INTEREST CREDIT"], min: 0.42, max: 84.6, direction: "credit" },
-  { key: "refund", merchant: "Merchant Refund", category: "Refund", descriptions: ["AMAZON.COM REFUND 8827001", "TARGET REFUND STORE T-0912", "APPLE.COM/BILL REFUND"], min: 9.99, max: 349.5, direction: "credit" },
+  { key: "payroll", merchant: "Payroll Direct Deposit", category: "Payroll", descriptions: ["DIRECT DEP PAYROLL EMPLR CO", "ACH CREDIT PAYROLL 072118"], min: 1850, max: 6420, direction: "credit" },
+  { key: "irs", merchant: "IRS Refund", category: "Government", descriptions: ["IRS TREAS 310 TAX REF"], min: 420, max: 3890, direction: "credit" },
+  { key: "zelle_in", merchant: "Zelle Transfer", category: "P2P Credit", descriptions: ["ZELLE FROM SMITH J 991284"], min: 40, max: 1250, direction: "credit" },
+  { key: "stripe_payout", merchant: "Stripe Payout", category: "Merchant Payout", descriptions: ["STRIPE TRANSFER ST-K4XY71"], min: 210, max: 8420, direction: "credit" },
+  { key: "wire_in", merchant: "Incoming Wire", category: "Wire Credit", descriptions: ["FEDWIRE CREDIT REF 20260708"], min: 500, max: 18500, direction: "credit" },
+  { key: "interest", merchant: "Interest Earned", category: "Interest", descriptions: ["INTEREST PAYMENT — MONTHLY"], min: 0.42, max: 84.6, direction: "credit" },
+  { key: "refund", merchant: "Merchant Refund", category: "Refund", descriptions: ["AMAZON.COM REFUND 8827001"], min: 9.99, max: 349.5, direction: "credit" },
 ];
 
-function rand(min: number, max: number): number {
-  return Math.round((Math.random() * (max - min) + min) * 100) / 100;
-}
+function rand(min: number, max: number) { return Math.round((Math.random() * (max - min) + min) * 100) / 100; }
 function randChoice<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
-function randomDateWithinLast30Days(): string {
-  const now = Date.now();
-  const offsetMs = Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000);
-  const d = new Date(now - offsetMs);
-  return d.toISOString();
-}
 
-function injectLedgerRow(userId: string, account: AccountKey, description: string, amount: number, direction: "debit" | "credit", dateIso: string): boolean {
-  const users = loadUsers();
-  const u = users.find((x) => x.id === userId);
-  if (!u) return false;
+async function injectRow(profile: DbProfile, account: AccountKey, description: string, amount: number, direction: "debit" | "credit", dateIso: string) {
   const signed = direction === "credit" ? amount : -amount;
-  const current = account === "checking" ? u.balance : u.savingsBalance;
-  const newBal = Math.round((current + signed) * 100) / 100;
-  const updated: MtUser = account === "checking"
-    ? { ...u, balance: newBal }
-    : { ...u, savingsBalance: newBal };
-  upsertUser(updated);
+  const currentDb = account === "checking" ? Number(profile.balance) : Number(profile.savings_balance);
+  const newBal = Math.round((currentDb + signed) * 100) / 100;
+  // Push to DB (realtime broadcasts to the customer)
+  await updateProfile(profile.id, account === "checking" ? { balance: newBal } : { savings_balance: newBal });
+  // Also mirror to a local user record so the customer's ledger view (still localStorage-backed) shows the row.
+  const local = loadUsers();
+  const idx = local.findIndex((x) => x.id === profile.id);
+  if (idx === -1) {
+    local.unshift({
+      id: profile.id, name: profile.name, email: profile.email, password: "",
+      phone: profile.phone ?? "", ssn: "", securityQ: "", securityA: "",
+      accountNumber: profile.account_number, account: "•••• " + profile.account_number.slice(-4),
+      tier: (profile.tier as MtUser["tier"]) || "Standard",
+      status: (profile.status as MtUser["status"]) || "Active",
+      balance: account === "checking" ? newBal : Number(profile.balance),
+      savingsBalance: account === "savings" ? newBal : Number(profile.savings_balance),
+      savingsAccountNumber: profile.savings_account_number,
+      verified: profile.verified, createdAt: profile.created_at.slice(0, 10),
+    });
+  } else {
+    local[idx] = { ...local[idx], balance: account === "checking" ? newBal : local[idx].balance, savingsBalance: account === "savings" ? newBal : local[idx].savingsBalance };
+  }
+  saveUsers(local);
   const entry: LedgerEntry = {
     id: `led_${Math.random().toString(36).slice(2, 10)}`,
-    userId, account, date: dateIso,
-    description, amount: signed, balanceAfter: newBal,
+    userId: profile.id, account, date: dateIso, description, amount: signed, balanceAfter: newBal,
   };
   appendLedger(entry);
-  return true;
 }
 
-function TemplateRepositoryPanel({ users, canEdit, flash }: { users: MtUser[]; canEdit: boolean; flash: (m: string) => void }) {
-  const [targetId, setTargetId] = useState<string>(users[0]?.id ?? "");
+function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; flash: (m: string) => void }) {
+  const [targetId, setTargetId] = useState<string>(profiles[0]?.id ?? "");
   const [account, setAccount] = useState<AccountKey>("checking");
   const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    if (!targetId && users[0]) setTargetId(users[0].id);
-  }, [users, targetId]);
+  useEffect(() => { if (!targetId && profiles[0]) setTargetId(profiles[0].id); }, [profiles, targetId]);
 
   function amountFor(t: MerchantTemplate): number {
     const raw = customAmounts[t.key]?.trim();
-    if (raw) {
-      const n = Number(raw);
-      if (!Number.isNaN(n) && n > 0) return Math.round(n * 100) / 100;
-    }
+    if (raw) { const n = Number(raw); if (!Number.isNaN(n) && n > 0) return Math.round(n * 100) / 100; }
     return rand(t.min, t.max);
   }
 
-  function inject(t: MerchantTemplate) {
-    if (!canEdit) { flash("Support role cannot inject ledger entries."); return; }
-    if (!targetId) { flash("Select a client profile first."); return; }
+  async function inject(t: MerchantTemplate) {
+    const target = profiles.find((p) => p.id === targetId);
+    if (!target) { flash("Select a client profile first."); return; }
     const amt = amountFor(t);
     const desc = randChoice(t.descriptions);
-    const ok = injectLedgerRow(targetId, account, desc, amt, t.direction, new Date().toISOString());
-    if (ok) flash(`Injected ${t.direction === "credit" ? "+" : "-"}${fmtCurrency(amt)} · ${t.merchant}`);
+    await injectRow(target, account, desc, amt, t.direction, new Date().toISOString());
+    flash(`Injected ${t.direction === "credit" ? "+" : "-"}${fmtCurrency(amt)} · ${t.merchant}`);
   }
 
-  function simulateMonthly() {
-    if (!canEdit) { flash("Support role cannot run batch simulation."); return; }
-    if (!targetId) { flash("Select a client profile first."); return; }
-    const count = 5 + Math.floor(Math.random() * 3); // 5–7
+  async function simulateMonthly() {
+    const target = profiles.find((p) => p.id === targetId);
+    if (!target) { flash("Select a client profile first."); return; }
+    const count = 5 + Math.floor(Math.random() * 3);
     const pool = [...MERCHANT_TEMPLATES].sort(() => Math.random() - 0.5).slice(0, count);
-    const batch = pool
-      .map((t) => ({ t, amt: amountFor(t), date: randomDateWithinLast30Days(), desc: randChoice(t.descriptions) }))
+    const batch = pool.map((t) => ({ t, amt: amountFor(t), date: new Date(Date.now() - Math.floor(Math.random() * 30 * 86400000)).toISOString(), desc: randChoice(t.descriptions) }))
       .sort((a, b) => a.date.localeCompare(b.date));
-    let credits = 0, debits = 0;
-    for (const row of batch) {
-      injectLedgerRow(targetId, account, row.desc, row.amt, row.t.direction, row.date);
-      if (row.t.direction === "credit") credits += row.amt; else debits += row.amt;
+    let cr = 0, dr = 0;
+    for (const r of batch) {
+      // Re-read latest target from state to stay in sync
+      const latest = profiles.find((p) => p.id === targetId)!;
+      await injectRow(latest, account, r.desc, r.amt, r.t.direction, r.date);
+      if (r.t.direction === "credit") cr += r.amt; else dr += r.amt;
     }
-    flash(`Simulated ${batch.length} entries · +${fmtCurrency(credits)} / -${fmtCurrency(debits)}`);
+    flash(`Simulated ${batch.length} entries · +${fmtCurrency(cr)} / -${fmtCurrency(dr)}`);
   }
 
   return (
     <>
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <SectionHeader title="Transaction Template Repository" subtitle="Internal ledger injection tools. Rows appear as ordinary production entries in the client-facing view." />
-        <button
-          onClick={simulateMonthly}
-          disabled={!canEdit || !targetId}
-          className="inline-flex items-center gap-2 rounded-md border border-amber-400/50 bg-gradient-to-b from-amber-400/25 to-amber-600/15 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-amber-200 hover:from-amber-400/40 disabled:opacity-30"
-        >
+        <button onClick={simulateMonthly} disabled={!targetId}
+          className="inline-flex items-center gap-2 rounded-md border border-amber-400/50 bg-gradient-to-b from-amber-400/25 to-amber-600/15 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-amber-200 hover:from-amber-400/40 disabled:opacity-30">
           ⚡ Simulate Complete Monthly Activity
         </button>
       </div>
@@ -817,7 +681,7 @@ function TemplateRepositoryPanel({ users, canEdit, flash }: { users: MtUser[]; c
         <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 mb-5">
           <DarkField label="Target Client Profile">
             <select value={targetId} onChange={(e) => setTargetId(e.target.value)} className={inputDark}>
-              {users.map((u) => <option key={u.id} value={u.id}>{u.name} — {u.account}</option>)}
+              {profiles.map((u) => <option key={u.id} value={u.id}>{u.name || u.email} — •••• {u.account_number.slice(-4)}</option>)}
             </select>
           </DarkField>
           <DarkField label="Destination Account">
@@ -845,28 +709,18 @@ function TemplateRepositoryPanel({ users, canEdit, flash }: { users: MtUser[]; c
                     <span className={`inline-block rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${isCredit ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300" : "border-red-400/40 bg-red-400/10 text-red-300"}`}>
                       {isCredit ? "Credit" : "Debit"}
                     </span>
-                    <div className="text-[10px] font-mono text-slate-400 text-right">
-                      {fmtCurrency(t.min)}–{fmtCurrency(t.max)}
-                    </div>
+                    <div className="text-[10px] font-mono text-slate-400 text-right">{fmtCurrency(t.min)}–{fmtCurrency(t.max)}</div>
                   </div>
                 </div>
                 <label className="block text-[10px] uppercase tracking-wider text-slate-400">
                   Custom Amount ($)
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="auto"
+                  <input type="number" step="0.01" min="0" placeholder="auto"
                     value={customAmounts[t.key] ?? ""}
                     onChange={(e) => setCustomAmounts({ ...customAmounts, [t.key]: e.target.value })}
-                    className="mt-1 w-full rounded-md border border-white/10 bg-black/50 px-2 py-1.5 text-xs font-mono text-white focus:border-amber-400 focus:outline-none"
-                  />
+                    className="mt-1 w-full rounded-md border border-white/10 bg-black/50 px-2 py-1.5 text-xs font-mono text-white focus:border-amber-400 focus:outline-none" />
                 </label>
-                <button
-                  onClick={() => inject(t)}
-                  disabled={!canEdit || !targetId}
-                  className={`mt-1 rounded border px-3 py-1.5 text-xs font-semibold disabled:opacity-30 ${isCredit ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20" : "border-amber-400/40 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"}`}
-                >
+                <button onClick={() => inject(t)} disabled={!targetId}
+                  className={`mt-1 rounded border px-3 py-1.5 text-xs font-semibold disabled:opacity-30 ${isCredit ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20" : "border-amber-400/40 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"}`}>
                   {isCredit ? "Inject Deposit" : "Inject Charge"}
                 </button>
               </div>
@@ -876,4 +730,61 @@ function TemplateRepositoryPanel({ users, canEdit, flash }: { users: MtUser[]; c
       </div>
     </>
   );
+}
+
+// -- primitives --------------------------------------------------------------
+
+const inputDark = "mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none";
+function DarkField({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="block text-xs uppercase tracking-wider text-slate-400">{label}{children}</label>;
+}
+function Stat({ label, value, accent }: { label: string; value: string; accent: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#0f1420] p-4">
+      <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">{label}</div>
+      <div className={`mt-2 text-2xl font-semibold ${accent}`}>{value}</div>
+    </div>
+  );
+}
+function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-white">{title}</h2>
+      <p className="text-xs text-slate-400">{subtitle}</p>
+    </div>
+  );
+}
+function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <th className={`px-4 py-3 text-left font-medium ${className}`}>{children}</th>;
+}
+function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <td className={`px-4 py-3 align-middle ${className}`}>{children}</td>;
+}
+function TierPill({ tier }: { tier: string }) {
+  const map: Record<string, string> = {
+    Standard: "border-slate-400/30 bg-slate-400/10 text-slate-300",
+    Premier: "border-amber-400/40 bg-amber-400/10 text-amber-300",
+    Private: "border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300",
+    Business: "border-cyan-400/40 bg-cyan-400/10 text-cyan-300",
+  };
+  return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[tier] ?? map.Standard}`}>{tier}</span>;
+}
+function StatusPill({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    Active: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
+    Frozen: "border-red-400/40 bg-red-400/10 text-red-300",
+    Review: "border-amber-400/40 bg-amber-400/10 text-amber-300",
+  };
+  return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[status] ?? map.Active}`}>{status}</span>;
+}
+function TxStatus({ status }: { status: PendingTx["status"] }) {
+  const map = {
+    Pending: "border-amber-400/40 bg-amber-400/10 text-amber-300",
+    Approved: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
+    Failed: "border-red-400/40 bg-red-400/10 text-red-300",
+  } as const;
+  return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[status]}`}>{status}</span>;
+}
+function MethodPill({ method }: { method: PendingTx["method"] }) {
+  return <span className="inline-block rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">{method}</span>;
 }
