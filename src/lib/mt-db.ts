@@ -149,9 +149,8 @@ export function useSystemSetting<K extends keyof SettingsMap>(key: K) {
 }
 
 export async function updateSetting<K extends keyof SettingsMap>(key: K, value: SettingsMap[K]) {
-  const { error } = await supabase
-    .from("system_settings")
-    .upsert({ key, value: value as unknown as Record<string, unknown> }, { onConflict: "key" });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await supabase.from("system_settings").upsert({ key, value: value as any }, { onConflict: "key" });
   if (error) throw error;
 }
 
