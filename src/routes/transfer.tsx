@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, CheckCircle2, Shield, Users, DollarSign } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Download, Shield, Users, DollarSign } from "lucide-react";
+import { jsPDF } from "jspdf";
 import {
   currentUser, pushToQueue, genRef, fmtCurrency, onStoreChange,
   type MtUser, type PendingTx,
@@ -220,18 +221,104 @@ function TransferInitiated({ tx, onDone }: { tx: PendingTx; onDone: () => void }
             <Row label="Status" value="Queued for processing" />
           </div>
 
-          <button
-            onClick={onDone}
-            className="mt-7 w-full inline-flex items-center justify-center gap-2 h-12 rounded-lg bg-gradient-to-b from-amber-300 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-700 text-slate-900 text-sm font-bold border border-amber-700/40 shadow"
-          >
-            <ArrowLeft className="h-4 w-4" /> Return to Account Overview
-          </button>
-          <p className="mt-4 text-[11px] text-slate-500">You will receive a settlement notification once the pipeline clears.</p>
+          <div className="mt-7 flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={onDone}
+              className="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-lg bg-gradient-to-b from-amber-300 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-700 text-slate-900 text-sm font-bold border border-amber-700/40 shadow"
+            >
+              <ArrowLeft className="h-4 w-4" /> Return to Account Overview
+            </button>
+            <button
+              type="button"
+              onClick={() => downloadTransferReceiptPdf(tx)}
+              className="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-lg bg-[#0a2540] hover:bg-[#0f3160] text-white text-sm font-semibold border border-[#0a2540] shadow"
+            >
+              <Download className="h-4 w-4" /> Download PDF Receipt
+            </button>
+          </div>
+          <p className="mt-4 text-[11px] text-slate-500">You will receive a settlement notification once the pipeline clears. Your account remains fully accessible.</p>
+
         </div>
       </div>
     </div>
   );
 }
+
+function downloadTransferReceiptPdf(tx: PendingTx) {
+  const doc = new jsPDF({ unit: "pt", format: "letter" });
+  const w = doc.internal.pageSize.getWidth();
+
+  // Header band
+  doc.setFillColor(10, 37, 64);
+  doc.rect(0, 0, w, 90, "F");
+  doc.setFillColor(245, 191, 66);
+  doc.rect(0, 90, w, 4, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("DYNAMIC BANK OF WEST", 48, 46);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(245, 191, 66);
+  doc.text("Transfer Receipt · Treasury Operations", 48, 66);
+
+  // Body
+  doc.setTextColor(20, 30, 48);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Transfer Initiated", 48, 140);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(60, 60, 60);
+  const wrapped = doc.splitTextToSize(
+    "Your transfer request has been successfully queued. Please note that processing standard external or non-instant pipeline transfers generally takes 1 to 2 business days to settle.",
+    w - 96,
+  );
+  doc.text(wrapped, 48, 164);
+
+  // Detail table
+  const rows: Array<[string, string]> = [
+    ["Reference", tx.reference],
+    ["Amount (USD)", fmtCurrency(tx.amount)],
+    ["Recipient", tx.recipient ?? "—"],
+    ["Recipient Bank", tx.recipientBank ?? "—"],
+    ["Routing", tx.routing ?? "—"],
+    ["Account", tx.recipientAcct ? `•••• ${tx.recipientAcct.slice(-4)}` : "—"],
+    ["Submitted", tx.submitted],
+    ["Status", "Pending — 1–2 business days"],
+  ];
+  let y = 230;
+  doc.setDrawColor(220, 226, 236);
+  doc.setLineWidth(0.5);
+  doc.rect(48, y - 18, w - 96, rows.length * 26 + 8);
+  rows.forEach((r, i) => {
+    if (i > 0) doc.line(48, y - 8, w - 48, y - 8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 58, 138);
+    doc.setFontSize(9);
+    doc.text(r[0].toUpperCase(), 60, y + 4);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(20, 30, 48);
+    doc.setFontSize(11);
+    doc.text(r[1], w - 60, y + 4, { align: "right" });
+    y += 26;
+  });
+
+  // Footer
+  doc.setFontSize(9);
+  doc.setTextColor(120, 120, 120);
+  doc.text(
+    "Dynamic Bank of West, N.A. · Member FDIC · Keep this receipt for your records.",
+    w / 2,
+    doc.internal.pageSize.getHeight() - 40,
+    { align: "center" },
+  );
+
+  doc.save(`DBW-Transfer-Receipt-${tx.reference}.pdf`);
+}
+
 
 
 // -- small primitives ---------------------------------------------------------

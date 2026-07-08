@@ -5,7 +5,7 @@ import {
   loadQueue, onStoreChange, fmtCurrency, readFileAsDataUrl,
   loadChatThread, appendChatMessage,
   genAccountNumber, maskAccount,
-  type MtUser, type PendingTx, type ChatMessage,
+  type MtUser, type ChatMessage,
 } from "@/lib/mt-store";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -154,7 +154,6 @@ function isEnrolled(user: MtUser, key: TopNavKey): boolean {
 
 function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
   const navigate = useNavigate();
-  const [activePending, setActivePending] = useState<PendingTx | null>(null);
   const [showProfile, setShowProfile] = useState(false);
   const [showCard, setShowCard] = useState(false);
   const [showRouting, setShowRouting] = useState(false);
@@ -162,20 +161,15 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [notEnrolled, setNotEnrolled] = useState<null | { label: string }>(null);
   const [activeTop, setActiveTop] = useState<TopNavKey>("personal");
+  const [, forceTick] = useState(0);
   const dbwRef = useRef<HTMLDivElement>(null);
 
 
   useEffect(() => {
-    function refresh() {
-      const q = loadQueue().filter((t) => t.userId === user.id);
-      const pending = q.find((t) => t.status === "Pending" && t.method === "Transfer");
-      setActivePending(pending ?? null);
-    }
-    refresh();
-    const off = onStoreChange(refresh);
-    const i = setInterval(refresh, 1200);
-    return () => { off(); clearInterval(i); };
+    const off = onStoreChange(() => forceTick((n) => n + 1));
+    return off;
   }, [user.id]);
+
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -191,8 +185,9 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
   }
 
   const userHistory = loadQueue()
-    .filter((t) => t.userId === user.id && t.status !== "Pending")
+    .filter((t) => t.userId === user.id)
     .slice(0, 20);
+
 
   const serviceMeta: Record<TopNavKey, { label: string; product: string; getBal: () => number }> = {
     personal:      { label: "Personal Banking",     product: "Everyday Checking",      getBal: () => user.balance },
@@ -359,8 +354,8 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
         <section className="bg-white border border-slate-200 rounded-xl">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Ledger — Resolved Transactions</h2>
-              <p className="text-xs text-slate-500 mt-0.5">{userHistory.length} entries · pending items stay in review</p>
+              <h2 className="text-sm font-semibold text-slate-900">Statement Activity Ledger</h2>
+              <p className="text-xs text-slate-500 mt-0.5">{userHistory.length} entries · pending items settle within 1–2 business days</p>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -376,23 +371,31 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
               </thead>
               <tbody>
                 {userHistory.length === 0 && (
-                  <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm">No resolved transactions yet.</td></tr>
+                  <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm">No transactions yet.</td></tr>
                 )}
                 {userHistory.map((t) => {
+                  const isPending = t.status === "Pending";
                   const isCredit = t.direction === "credit" && t.status === "Approved";
                   const sign = t.status === "Failed" ? "" : (t.direction === "credit" ? "+" : "-");
+                  const badgeCls =
+                    t.status === "Approved" ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                    : t.status === "Failed" ? "border-red-300 bg-red-50 text-red-700"
+                    : "border-amber-300 bg-amber-50 text-amber-700";
                   return (
-                    <tr key={t.id} className="border-t border-slate-100">
+                    <tr key={t.id} className={`border-t border-slate-100 ${isPending ? "bg-sky-50/40" : ""}`}>
                       <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.submitted}</td>
                       <td className="px-6 py-3 text-slate-900 font-mono text-xs">{t.reference}</td>
                       <td className="px-6 py-3 text-slate-600">{t.method}</td>
                       <td className="px-6 py-3">
-                        <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${
-                          t.status === "Approved" ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-red-300 bg-red-50 text-red-700"
-                        }`}>{t.status}</span>
+                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider font-semibold ${badgeCls}`}>
+                          {isPending && <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />}
+                          {t.status}
+                        </span>
                       </td>
                       <td className={`px-6 py-3 text-right font-medium tabular-nums ${
-                        t.status === "Failed" ? "text-slate-400 line-through" : isCredit ? "text-emerald-600" : "text-slate-900"
+                        t.status === "Failed" ? "text-slate-400 line-through"
+                        : isPending ? "text-slate-500 italic"
+                        : isCredit ? "text-emerald-600" : "text-slate-900"
                       }`}>{sign}{fmtCurrency(t.amount)}</td>
                     </tr>
                   );
@@ -403,7 +406,9 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
         </section>
       </main>
 
-      {activePending && <PendingOverlay tx={activePending} onExit={() => navigate({ to: "/transfer" })} />}
+
+
+      
       {showProfile && <ProfileModal user={user} onClose={() => setShowProfile(false)} />}
       {showCard && <DebitCardModal user={user} onClose={() => setShowCard(false)} />}
       {showRouting && <RoutingInfoModal user={user} onClose={() => setShowRouting(false)} />}
@@ -552,29 +557,8 @@ function AccountCard({ to, params, product, tag, accountMasked, balance }: {
   );
 }
 
-function PendingOverlay({ tx, onExit }: { tx: PendingTx; onExit: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center px-4">
-      <div className="w-full max-w-lg bg-slate-900/70 border border-amber-500/40 rounded-2xl shadow-2xl overflow-hidden">
-        <div className="h-1.5 bg-gradient-to-r from-amber-400 to-amber-600" />
-        <div className="px-8 py-8 text-white text-center">
-          <div className="mx-auto relative h-20 w-20 mb-5">
-            <div className="absolute inset-0 rounded-full bg-amber-400/20 animate-ping" />
-            <div className="relative h-20 w-20 rounded-full bg-amber-500/15 border border-amber-400/40 flex items-center justify-center text-3xl">⏳</div>
-          </div>
-          <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300 font-semibold">Pending Verification</div>
-          <h2 className="mt-2 text-xl font-semibold">Your transfer is under compliance review</h2>
-          <p className="mt-2 text-sm text-slate-300">
-            Reference <span className="font-mono">{tx.reference}</span> for {fmtCurrency(tx.amount)} to {tx.recipient} is awaiting Treasury Operations approval. Your request is being processed by our Treasury Operations team.
-          </p>
-          <button onClick={onExit} className="mt-6 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-semibold px-5 py-2">
-            View processing view
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+
+
 
 function ProfileModal({ user, onClose }: { user: MtUser; onClose: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
