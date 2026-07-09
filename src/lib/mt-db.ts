@@ -157,29 +157,46 @@ export async function updateSetting<K extends keyof SettingsMap>(key: K, value: 
 // ------- role check ----------------------------------------------------------
 
 export async function checkIsAdmin(userId: string): Promise<boolean> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("user_roles")
     .select("role")
     .eq("user_id", userId)
     .eq("role", "admin")
     .maybeSingle();
+  if (error) {
+    console.error("[checkIsAdmin] user_roles read failed:", error);
+    return false;
+  }
   return !!data;
 }
 
 export function useIsAdmin() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [currentUid, setCurrentUid] = useState<string | null | undefined>(undefined);
+
+  // Track identity only. Ignore TOKEN_REFRESHED / INITIAL_SESSION churn
+  // so the admin check doesn't thrash on token refresh.
   useEffect(() => {
     let mounted = true;
-    async function run() {
-      const { data } = await supabase.auth.getUser();
-      const uid = data.user?.id;
-      if (!uid) { if (mounted) setIsAdmin(false); return; }
-      const ok = await checkIsAdmin(uid);
-      if (mounted) setIsAdmin(ok);
-    }
-    run();
-    const { data: sub } = supabase.auth.onAuthStateChange(() => run());
+    supabase.auth.getUser().then(({ data }) => {
+      if (mounted) setCurrentUid(data.user?.id ?? null);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+      setCurrentUid(session?.user?.id ?? null);
+    });
     return () => { mounted = false; sub.subscription.unsubscribe(); };
   }, []);
+
+  // Re-check role only when the user identity actually changes.
+  useEffect(() => {
+    if (currentUid === undefined) return; // still hydrating session
+    if (currentUid === null) { setIsAdmin(false); return; }
+    let mounted = true;
+    setIsAdmin(null);
+    checkIsAdmin(currentUid).then((ok) => { if (mounted) setIsAdmin(ok); });
+    return () => { mounted = false; };
+  }, [currentUid]);
+
   return isAdmin;
 }
