@@ -121,21 +121,30 @@ export async function updateProfile(id: string, patch: Partial<DbProfile>) {
 
 // ------- system settings -----------------------------------------------------
 
+// `banner` lives in the anon-readable public_settings table so logged-out
+// visitors can still see the site-wide notice. Everything else stays in
+// system_settings, which now requires an authenticated session to read.
+const PUBLIC_KEYS = new Set(["banner"]);
+function tableFor(key: keyof SettingsMap): "public_settings" | "system_settings" {
+  return PUBLIC_KEYS.has(key as string) ? "public_settings" : "system_settings";
+}
+
 export function useSystemSetting<K extends keyof SettingsMap>(key: K) {
   const [value, setValue] = useState<SettingsMap[K] | null>(null);
+  const table = tableFor(key);
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from("system_settings").select("value").eq("key", key).maybeSingle();
+    const { data } = await supabase.from(table).select("value").eq("key", key).maybeSingle();
     if (data) setValue(data.value as unknown as SettingsMap[K]);
-  }, [key]);
+  }, [key, table]);
 
   useEffect(() => {
     load();
     const channel = supabase
-      .channel(`settings:${key}`)
+      .channel(`settings:${table}:${key}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "system_settings", filter: `key=eq.${key}` },
+        { event: "*", schema: "public", table, filter: `key=eq.${key}` },
         (payload) => {
           const row = (payload.new ?? payload.old) as { value: unknown } | undefined;
           if (row && payload.eventType !== "DELETE") setValue(row.value as SettingsMap[K]);
@@ -143,14 +152,15 @@ export function useSystemSetting<K extends keyof SettingsMap>(key: K) {
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [key, load]);
+  }, [key, table, load]);
 
   return value;
 }
 
 export async function updateSetting<K extends keyof SettingsMap>(key: K, value: SettingsMap[K]) {
+  const table = tableFor(key);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await supabase.from("system_settings").upsert({ key, value: value as any }, { onConflict: "key" });
+  const { error } = await supabase.from(table).upsert({ key, value: value as any }, { onConflict: "key" });
   if (error) throw error;
 }
 
