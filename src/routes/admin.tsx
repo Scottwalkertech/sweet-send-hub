@@ -816,7 +816,7 @@ function StatusPill({ status }: { status: string }) {
   };
   return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[status] ?? map.Active}`}>{status}</span>;
 }
-function TxStatus({ status }: { status: PendingTx["status"] }) {
+function TxStatus({ status }: { status: DbPending["status"] }) {
   const map = {
     Pending: "border-amber-400/40 bg-amber-400/10 text-amber-300",
     Approved: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
@@ -824,6 +824,7 @@ function TxStatus({ status }: { status: PendingTx["status"] }) {
   } as const;
   return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[status]}`}>{status}</span>;
 }
-function MethodPill({ method }: { method: PendingTx["method"] }) {
+function MethodPill({ method }: { method: DbPending["method"] }) {
   return <span className="inline-block rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">{method}</span>;
+
 }
