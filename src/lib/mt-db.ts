@@ -141,7 +141,7 @@ export function useSystemSetting<K extends keyof SettingsMap>(key: K) {
   useEffect(() => {
     load();
     const channel = supabase
-      .channel(`settings:${table}:${key}`)
+      .channel(`settings:${table}:${key}:${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table, filter: `key=eq.${key}` },
