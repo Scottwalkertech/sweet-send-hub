@@ -1,9 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import { EXTERNAL_SUPABASE_ANON_KEY, EXTERNAL_SUPABASE_URL } from "./external-supabase-config";
+import {
+  VITE_EXTERNAL_PROJECT_ANON_KEY,
+  VITE_EXTERNAL_PROJECT_URL,
+} from "./external-supabase-config";
 
+// Exclusively use the hardcoded custom-named credentials. Do NOT fall back to
+// VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY — those are injected by the
+// Lovable Cloud build and would silently point the client at the wrong project.
 function getExternalSupabaseConfig() {
-  return { url: EXTERNAL_SUPABASE_URL, anonKey: EXTERNAL_SUPABASE_ANON_KEY };
+  return { url: VITE_EXTERNAL_PROJECT_URL, anonKey: VITE_EXTERNAL_PROJECT_ANON_KEY };
 }
 
 function createExternalSupabaseClient() {
