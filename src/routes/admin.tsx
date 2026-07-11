@@ -207,46 +207,46 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
   const rates = useSystemSetting("rates");
   const limits = useSystemSetting("limits");
   const banner = useSystemSetting("banner");
-  const [queue, setQueue] = useState<PendingTx[]>([]);
+  const { queue } = usePendingQueue({ adminAll: true });
   const [editing, setEditing] = useState<DbProfile | null>(null);
   const [toast, setToast] = useState("");
 
-  useEffect(() => {
-    setQueue(loadQueue());
-    const refresh = () => setQueue(loadQueue());
-    window.addEventListener("mt:queue-changed", refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.removeEventListener("mt:queue-changed", refresh);
-      window.removeEventListener("storage", refresh);
-    };
-  }, []);
-
   function flash(m: string) { setToast(m); setTimeout(() => setToast(""), 2600); }
 
-  async function approve(tx: PendingTx) {
+  async function approve(tx: DbPending) {
     if (tx.status !== "Pending") return;
-    const nextQ = queue.map((q) => q.id === tx.id ? { ...q, status: "Approved" as const, resolvedAt: new Date().toISOString() } : q);
-    saveQueue(nextQ);
-    setQueue(nextQ);
-    // Push balance change to profile
-    const p = profiles.find((x) => x.id === tx.userId);
-    if (p) {
-      const delta = tx.direction === "credit" ? tx.amount : -tx.amount;
-      const newBal = Math.max(0, Number(p.balance) + delta);
-      try { await updateProfile(p.id, { balance: newBal }); } catch { /* rls */ }
+    try {
+      const p = profiles.find((x) => x.id === tx.user_id);
+      if (p) {
+        const delta = tx.direction === "credit" ? Number(tx.amount) : -Number(tx.amount);
+        const newBal = Math.max(0, Number(p.balance) + delta);
+        await updateProfile(p.id, { balance: newBal });
+        await insertTransaction({
+          user_id: p.id, account: "checking",
+          posted_at: new Date().toISOString(),
+          description: `${tx.method} ${tx.direction === "credit" ? "deposit" : "debit"} · ${tx.reference}`,
+          amount: delta, balance_after: newBal,
+        });
+      }
+      await updatePendingStatus(tx.id, "Approved");
+      flash(`Approved ${fmtCurrency(Number(tx.amount))} for ${tx.user_name}`);
+    } catch (e) {
+      flash(`Approve failed: ${(e as Error).message}`);
     }
-    flash(`Approved ${fmtCurrency(tx.amount)} for ${tx.userName}`);
   }
-  function fail(tx: PendingTx) {
+  async function fail(tx: DbPending) {
     if (tx.status !== "Pending") return;
-    const nextQ = queue.map((q) => q.id === tx.id ? { ...q, status: "Failed" as const, resolvedAt: new Date().toISOString() } : q);
-    saveQueue(nextQ); setQueue(nextQ);
-    flash(`Marked ${tx.reference} as failed`);
+    try {
+      await updatePendingStatus(tx.id, "Failed");
+      flash(`Marked ${tx.reference} as failed`);
+    } catch (e) {
+      flash(`Mark-failed failed: ${(e as Error).message}`);
+    }
   }
 
   const pendingCount = queue.filter((q) => q.status === "Pending").length;
   const totalAum = profiles.reduce((s, p) => s + Number(p.balance) + Number(p.savings_balance), 0);
+
 
   return (
     <div className="min-h-screen bg-[#0a0d14] text-slate-100">
