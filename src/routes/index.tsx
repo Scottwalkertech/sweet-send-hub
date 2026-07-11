@@ -432,9 +432,9 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                     : "border-amber-300 bg-amber-50 text-amber-700";
                   return (
                     <tr key={t.id} className={`border-t border-slate-100 ${isPending ? "bg-sky-50/40" : ""}`}>
-                      <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.submitted_at.slice(0, 10)}</td>
+                      <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.timestamp.slice(0, 10)}</td>
                       <td className="px-6 py-3 text-slate-900 font-mono text-xs">{t.reference}</td>
-                      <td className="px-6 py-3 text-slate-600">{t.method}</td>
+                      <td className="px-6 py-3 text-slate-600">{t.method}{t.description ? <span className="block text-[10px] text-slate-400">{t.description}</span> : null}</td>
                       <td className="px-6 py-3">
                         <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider font-semibold ${badgeCls}`}>
                           {isPending && <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />}
