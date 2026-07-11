@@ -235,6 +235,8 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
 
   const { items: unifiedActivity } = useUnifiedUserActivity(user.id);
   const userHistory = unifiedActivity.slice(0, 40);
+  const [showFullLedger, setShowFullLedger] = useState(false);
+  const visibleHistory = showFullLedger ? userHistory : userHistory.slice(0, 5);
 
 
 
@@ -404,7 +406,11 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-slate-900">Unified Activity Ledger</h2>
-              <p className="text-xs text-slate-500 mt-0.5">{userHistory.length} entries · checking, savings, and admin-injected transactions combined · newest first</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {showFullLedger
+                  ? `${userHistory.length} entries · checking, savings, and admin-injected transactions combined · newest first`
+                  : `Showing ${Math.min(5, userHistory.length)} most recent of ${userHistory.length}`}
+              </p>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -419,10 +425,10 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                 </tr>
               </thead>
               <tbody>
-                {userHistory.length === 0 && (
+                {visibleHistory.length === 0 && (
                   <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm">No transactions yet.</td></tr>
                 )}
-                {userHistory.map((t) => {
+                {visibleHistory.map((t) => {
                   const isPending = t.status === "Pending";
                   const isCredit = t.direction === "credit" && t.status === "Approved";
                   const sign = t.status === "Failed" ? "" : (t.direction === "credit" ? "+" : "-");
@@ -453,6 +459,17 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
               </tbody>
             </table>
           </div>
+          {userHistory.length > 5 && (
+            <div className="px-6 py-3 border-t border-slate-100 flex justify-center bg-slate-50/60">
+              <button
+                type="button"
+                onClick={() => setShowFullLedger((v) => !v)}
+                className="text-xs uppercase tracking-[0.18em] font-semibold text-amber-700 hover:text-amber-900 transition"
+              >
+                {showFullLedger ? "Show less ↑" : `View full list (${userHistory.length}) →`}
+              </button>
+            </div>
+          )}
         </section>
       </main>
 
@@ -581,9 +598,9 @@ function AccountCard({ to, params, product, tag, accountMasked, balance }: {
 }) {
   return (
     <Link to={to} params={params}
-      className="group block rounded-2xl overflow-hidden border border-amber-500/25 shadow-xl hover:border-amber-400 hover:shadow-2xl transition-all">
-      <div className="relative px-7 py-8 text-white bg-gradient-to-br from-[#5a0d10] via-[#3b0507] to-[#1a0304]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.22),transparent_55%)]" />
+      className="group block rounded-2xl overflow-hidden border border-slate-800 shadow-xl hover:border-amber-400 hover:shadow-2xl transition-all">
+      <div className="relative px-7 py-8 text-white bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.15),transparent_60%)]" />
         <div className="relative flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-amber-300 text-[10px] uppercase tracking-[0.24em] font-semibold">

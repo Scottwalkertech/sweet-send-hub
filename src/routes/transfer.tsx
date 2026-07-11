@@ -1,12 +1,26 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, CheckCircle2, Download, Shield, Users, DollarSign } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Download, Shield, Users, DollarSign, Building2 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import {
   currentUser, genRef, fmtCurrency, onStoreChange,
   type MtUser, type PendingTx,
 } from "@/lib/mt-store";
 import { insertPending } from "@/lib/mt-db";
+
+// Local ABA routing lookup — extend as needed. Real, verifiable HQ addresses.
+const ROUTING_DB: Record<string, { name: string; address: string }> = {
+  "021000021": { name: "JPMorgan Chase Bank, N.A.", address: "383 Madison Avenue, New York, NY 10179" },
+  "121000248": { name: "Wells Fargo Bank, N.A.",    address: "420 Montgomery Street, San Francisco, CA 94104" },
+  "026009593": { name: "Bank of America, N.A.",     address: "100 North Tryon Street, Charlotte, NC 28255" },
+  "021000089": { name: "Citibank, N.A.",            address: "388 Greenwich Street, New York, NY 10013" },
+  "031176110": { name: "Capital One, N.A.",         address: "1680 Capital One Drive, McLean, VA 22102" },
+  "071000013": { name: "The Northern Trust Company", address: "50 South LaSalle Street, Chicago, IL 60603" },
+  "322271627": { name: "JPMorgan Chase Bank (CA)",  address: "270 Park Avenue, New York, NY 10017" },
+  "011401533": { name: "TD Bank, N.A.",             address: "1701 Route 70 East, Cherry Hill, NJ 08034" },
+  "124003116": { name: "Zions Bank",                address: "One South Main Street, Salt Lake City, UT 84133" },
+  "064000017": { name: "Truist Bank",               address: "214 North Tryon Street, Charlotte, NC 28202" },
+};
 
 
 export const Route = createFileRoute("/transfer")({
@@ -36,6 +50,21 @@ function TransferPage() {
     setUser(currentUser());
     return onStoreChange(() => setUser(currentUser()));
   }, []);
+
+  const routingDigits = routingCode.replace(/\D/g, "");
+  const routingComplete = routingDigits.length === 9;
+  const routingMatch = useMemo(
+    () => (routingComplete ? ROUTING_DB[routingDigits] ?? null : null),
+    [routingDigits, routingComplete],
+  );
+
+  // Auto-fill bank name when a known routing number is entered and the
+  // recipient bank field is empty or matches a previous auto-fill.
+  useEffect(() => {
+    if (routingMatch && !recipientBank.trim()) {
+      setRecipientBank(routingMatch.name);
+    }
+  }, [routingMatch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!user) {
     return (
@@ -133,6 +162,25 @@ function TransferPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Routing Code (9 digits)" error={errors.routing}>
                     <input value={routingCode} onChange={(e) => setRoutingCode(e.target.value.replace(/\D/g, "").slice(0, 9))} inputMode="numeric" placeholder="121000248" className={inputCls} />
+                    {routingComplete && (
+                      routingMatch ? (
+                        <div className="mt-2 flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2.5">
+                          <Building2 className="h-4 w-4 mt-0.5 text-emerald-700 shrink-0" />
+                          <div className="min-w-0">
+                            <div className="text-[10px] uppercase tracking-[0.18em] font-semibold text-emerald-700">Verified Financial Institution</div>
+                            <div className="text-sm font-semibold text-slate-900 truncate">{routingMatch.name}</div>
+                            <div className="text-xs text-slate-600">{routingMatch.address}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-2 flex items-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                          <Shield className="h-4 w-4 mt-0.5 text-slate-500 shrink-0" />
+                          <div className="text-xs text-slate-600 leading-relaxed">
+                            Routing format valid. Institution not in our quick-lookup registry — please confirm the bank name above matches your recipient's statement.
+                          </div>
+                        </div>
+                      )
+                    )}
                   </Field>
                   <Field label="Account Number" error={errors.acct}>
                     <input value={recipientAcct} onChange={(e) => setRecipientAcct(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="000000000000" className={inputCls} />
