@@ -95,7 +95,7 @@ function OperatorSignIn() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr(""); setInfo(""); setShowReset(false);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) {
       setErr("Invalid credentials or unauthorized account.");
@@ -106,7 +106,7 @@ function OperatorSignIn() {
   }
 
   async function sendReset() {
-    const target = email.trim().toLowerCase();
+    const target = email;
     if (!target) { setErr("Enter the operator email above, then try reset again."); return; }
     setResetBusy(true); setErr(""); setInfo("");
     const { error } = await supabase.auth.resetPasswordForEmail(target, {
@@ -143,7 +143,7 @@ function OperatorSignIn() {
           {showReset && (
             <button type="button" onClick={sendReset} disabled={resetBusy || !email}
               className="w-full rounded border border-amber-400/40 bg-amber-400/10 px-4 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-400/20 disabled:opacity-40">
-              {resetBusy ? "Sending reset email…" : `Email a password reset link${email ? ` to ${email.trim().toLowerCase()}` : ""}`}
+              {resetBusy ? "Sending reset email…" : `Email a password reset link${email ? ` to ${email}` : ""}`}
             </button>
           )}
           {info && <div className="rounded border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">{info}</div>}
