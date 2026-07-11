@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
   loadUsers, upsertUser, saveUsers, setCurrentUserId, currentUser,
-  onStoreChange, fmtCurrency, readFileAsDataUrl,
+  onStoreChange, fmtCurrency,
   loadChatThread, appendChatMessage,
   genAccountNumber, maskAccount,
   type MtUser, type ChatMessage,
