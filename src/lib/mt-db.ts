@@ -210,3 +210,115 @@ export function useIsAdmin() {
 
   return isAdmin;
 }
+
+// ------- transactions (posted ledger) ---------------------------------------
+
+export type DbTransaction = {
+  id: string;
+  user_id: string;
+  account: "checking" | "savings";
+  posted_at: string;
+  description: string;
+  amount: number;
+  balance_after: number;
+  created_at: string;
+};
+
+export function useUserLedger(userId: string | null | undefined, account: "checking" | "savings") {
+  const [entries, setEntries] = useState<DbTransaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!userId) { setEntries([]); setLoading(false); return; }
+    const { data, error } = await supabase
+      .from("transactions").select("*")
+      .eq("user_id", userId).eq("account", account)
+      .order("posted_at", { ascending: false });
+    if (!error && data) setEntries(data as unknown as DbTransaction[]);
+    setLoading(false);
+  }, [userId, account]);
+
+  useEffect(() => {
+    load();
+    if (!userId) return;
+    const channel = supabase
+      .channel(`ledger:${userId}:${account}:${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "transactions", filter: `user_id=eq.${userId}` },
+        () => load(),
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId, account, load]);
+
+  return { entries, loading, refresh: load };
+}
+
+export async function insertTransaction(row: Omit<DbTransaction, "id" | "created_at">) {
+  const { error } = await supabase.from("transactions").insert(row);
+  if (error) throw error;
+}
+
+// ------- pending transactions (queue) ---------------------------------------
+
+export type DbPending = {
+  id: string;
+  reference: string;
+  user_id: string;
+  user_name: string;
+  method: "Wire" | "ACH" | "Check" | "Crypto" | "Transfer" | string;
+  direction: "credit" | "debit";
+  amount: number;
+  status: "Pending" | "Approved" | "Failed";
+  submitted_at: string;
+  resolved_at: string | null;
+  memo: string | null;
+  recipient: string | null;
+  recipient_bank: string | null;
+  recipient_acct: string | null;
+  routing: string | null;
+};
+
+export function usePendingQueue(scope: { adminAll?: boolean; userId?: string | null }) {
+  const [queue, setQueue] = useState<DbPending[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    let q = supabase.from("pending_transactions").select("*").order("submitted_at", { ascending: false });
+    if (!scope.adminAll) {
+      if (!scope.userId) { setQueue([]); setLoading(false); return; }
+      q = q.eq("user_id", scope.userId);
+    }
+    const { data, error } = await q;
+    if (!error && data) setQueue(data as unknown as DbPending[]);
+    setLoading(false);
+  }, [scope.adminAll, scope.userId]);
+
+  useEffect(() => {
+    load();
+    const suffix = scope.adminAll ? "all" : (scope.userId ?? "none");
+    const channel = supabase
+      .channel(`pending_tx:${suffix}:${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "pending_transactions" },
+        () => load(),
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [scope.adminAll, scope.userId, load]);
+
+  return { queue, loading, refresh: load };
+}
+
+export async function insertPending(row: Omit<DbPending, "id" | "submitted_at" | "resolved_at" | "status"> & { status?: DbPending["status"] }) {
+  const { data, error } = await supabase.from("pending_transactions").insert(row).select().single();
+  if (error) throw error;
+  return data as unknown as DbPending;
+}
+
+export async function updatePendingStatus(id: string, status: "Approved" | "Failed") {
+  const { error } = await supabase.from("pending_transactions")
+    .update({ status, resolved_at: new Date().toISOString() }).eq("id", id);
+  if (error) throw error;
+}
+
