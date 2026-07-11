@@ -3,7 +3,7 @@
 // dashboards update live without a refresh.
 
 import { useEffect, useState, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/external-supabase";
 
 export type ServiceEnrollments = { smallBusiness?: boolean; commercial?: boolean; wire?: boolean };
 export type ServiceBalances = { smallBusiness?: number; commercial?: number; wire?: number };
