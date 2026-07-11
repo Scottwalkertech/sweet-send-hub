@@ -538,6 +538,15 @@ function EditProfileModal({ profile, onClose, onSaved }: { profile: DbProfile; o
     const dataUrl = await readFileAsDataUrl(f);
     setDraft({ ...draft, profile_picture: dataUrl });
   }
+  const enr = draft.enrollments ?? { smallBusiness: false, commercial: false, wire: false };
+  const svc = draft.service_balances ?? { smallBusiness: 0, commercial: 0, wire: 0 };
+  function setEnr(patch: Partial<typeof enr>) {
+    setDraft({ ...draft, enrollments: { ...enr, ...patch } });
+  }
+  function setSvc(patch: Partial<typeof svc>) {
+    setDraft({ ...draft, service_balances: { ...svc, ...patch } });
+  }
+
   async function save() {
     if (!draft.name.trim() || !draft.email.trim()) { setErr("Name and email required."); return; }
     setBusy(true);
@@ -555,6 +564,12 @@ function EditProfileModal({ profile, onClose, onSaved }: { profile: DbProfile; o
         balance: Number(draft.balance) || 0,
         savings_balance: Number(draft.savings_balance) || 0,
         profile_picture: draft.profile_picture,
+        enrollments: enr,
+        service_balances: {
+          smallBusiness: Number(svc.smallBusiness) || 0,
+          commercial: Number(svc.commercial) || 0,
+          wire: Number(svc.wire) || 0,
+        },
       });
       onSaved();
     } catch (e) {
@@ -607,7 +622,36 @@ function EditProfileModal({ profile, onClose, onSaved }: { profile: DbProfile; o
           </label>
         </div>
 
+        <div className="mt-6 rounded-lg border border-amber-400/20 bg-black/30 p-4">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-amber-400/80">Specialized Services · Enrollment & Balances</div>
+          <p className="text-[11px] text-slate-400 mt-1">Toggle enrollment to unlock the section for the customer. Balance fields override the ledger amount displayed on their dashboard.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <ServicePanel
+              title="Wire Services"
+              enrolled={!!enr.wire}
+              onToggle={(v) => setEnr({ wire: v })}
+              balance={svc.wire ?? 0}
+              onBalance={(v) => setSvc({ wire: v })}
+            />
+            <ServicePanel
+              title="Small Business Banking"
+              enrolled={!!enr.smallBusiness}
+              onToggle={(v) => setEnr({ smallBusiness: v })}
+              balance={svc.smallBusiness ?? 0}
+              onBalance={(v) => setSvc({ smallBusiness: v })}
+            />
+            <ServicePanel
+              title="Commercial Accounts"
+              enrolled={!!enr.commercial}
+              onToggle={(v) => setEnr({ commercial: v })}
+              balance={svc.commercial ?? 0}
+              onBalance={(v) => setSvc({ commercial: v })}
+            />
+          </div>
+        </div>
+
         {err && <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
+
 
         <div className="mt-6 flex justify-end gap-2">
           <button onClick={onClose} className="rounded border border-white/10 px-4 py-2 text-xs hover:bg-white/5">Cancel</button>
@@ -827,4 +871,30 @@ function TxStatus({ status }: { status: DbPending["status"] }) {
 function MethodPill({ method }: { method: DbPending["method"] }) {
   return <span className="inline-block rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">{method}</span>;
 
+}
+
+function ServicePanel({ title, enrolled, onToggle, balance, onBalance }: {
+  title: string; enrolled: boolean; onToggle: (v: boolean) => void;
+  balance: number; onBalance: (v: number) => void;
+}) {
+  return (
+    <div className={`rounded-lg border p-3 ${enrolled ? "border-emerald-400/40 bg-emerald-500/[0.06]" : "border-white/10 bg-black/40"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-semibold text-white">{title}</div>
+        <label className="inline-flex items-center gap-1.5 text-[10px] text-slate-300 cursor-pointer">
+          <input type="checkbox" checked={enrolled} onChange={(e) => onToggle(e.target.checked)} className="h-3.5 w-3.5 accent-emerald-500" />
+          {enrolled ? "Enrolled" : "Off"}
+        </label>
+      </div>
+      <label className="mt-3 block text-[10px] uppercase tracking-wider text-slate-400">
+        Balance (USD)
+        <input
+          type="number" step="0.01" value={balance}
+          onChange={(e) => onBalance(Number(e.target.value))}
+          disabled={!enrolled}
+          className="mt-1 w-full rounded-md border border-white/10 bg-black/50 px-2 py-1.5 text-xs font-mono text-white focus:border-amber-400 focus:outline-none disabled:opacity-40"
+        />
+      </label>
+    </div>
+  );
 }

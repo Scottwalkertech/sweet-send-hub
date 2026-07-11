@@ -83,12 +83,14 @@ export type Database = {
           daily_limit: number
           debit_frozen: boolean
           email: string
+          enrollments: Json
           id: string
           name: string
           phone: string | null
           profile_picture: string | null
           savings_account_number: string
           savings_balance: number
+          service_balances: Json
           status: string
           tier: string
           updated_at: string
@@ -102,12 +104,14 @@ export type Database = {
           daily_limit?: number
           debit_frozen?: boolean
           email?: string
+          enrollments?: Json
           id: string
           name?: string
           phone?: string | null
           profile_picture?: string | null
           savings_account_number?: string
           savings_balance?: number
+          service_balances?: Json
           status?: string
           tier?: string
           updated_at?: string
@@ -121,12 +125,14 @@ export type Database = {
           daily_limit?: number
           debit_frozen?: boolean
           email?: string
+          enrollments?: Json
           id?: string
           name?: string
           phone?: string | null
           profile_picture?: string | null
           savings_account_number?: string
           savings_balance?: number
+          service_balances?: Json
           status?: string
           tier?: string
           updated_at?: string
