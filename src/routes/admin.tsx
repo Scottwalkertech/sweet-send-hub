@@ -538,6 +538,15 @@ function EditProfileModal({ profile, onClose, onSaved }: { profile: DbProfile; o
     const dataUrl = await readFileAsDataUrl(f);
     setDraft({ ...draft, profile_picture: dataUrl });
   }
+  const enr = draft.enrollments ?? { smallBusiness: false, commercial: false, wire: false };
+  const svc = draft.service_balances ?? { smallBusiness: 0, commercial: 0, wire: 0 };
+  function setEnr(patch: Partial<typeof enr>) {
+    setDraft({ ...draft, enrollments: { ...enr, ...patch } });
+  }
+  function setSvc(patch: Partial<typeof svc>) {
+    setDraft({ ...draft, service_balances: { ...svc, ...patch } });
+  }
+
   async function save() {
     if (!draft.name.trim() || !draft.email.trim()) { setErr("Name and email required."); return; }
     setBusy(true);
@@ -555,6 +564,12 @@ function EditProfileModal({ profile, onClose, onSaved }: { profile: DbProfile; o
         balance: Number(draft.balance) || 0,
         savings_balance: Number(draft.savings_balance) || 0,
         profile_picture: draft.profile_picture,
+        enrollments: enr,
+        service_balances: {
+          smallBusiness: Number(svc.smallBusiness) || 0,
+          commercial: Number(svc.commercial) || 0,
+          wire: Number(svc.wire) || 0,
+        },
       });
       onSaved();
     } catch (e) {
