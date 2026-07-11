@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/external-supabase";
 import {
   useAllProfiles, useSystemSetting, useIsAdmin, updateProfile, updateSetting,
   usePendingQueue, insertTransaction, updatePendingStatus, insertPending,
@@ -88,7 +88,6 @@ function OperatorSignIn() {
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
-  const [bootBusy, setBootBusy] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const nav = useNavigate();
@@ -117,37 +116,6 @@ function OperatorSignIn() {
     if (error) { setErr(error.message); return; }
     setInfo(`Password reset link sent to ${target}. Check your inbox.`);
     setShowReset(false);
-  }
-
-  async function bootstrap() {
-    setBootBusy(true); setErr(""); setInfo("");
-    try {
-      const res = await fetch("/api/public/bootstrap-admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(email && password ? { email: email.trim().toLowerCase(), password } : {}),
-      });
-      const raw = await res.text();
-      let data: { ok?: boolean; error?: string; email?: string; alreadyBootstrapped?: boolean } = {};
-      try { data = JSON.parse(raw); } catch {
-        setErr(res.status === 404
-          ? "Bootstrap endpoint not deployed yet — publish the app, then try again."
-          : `Unexpected response (HTTP ${res.status}). Try again in a moment.`);
-        return;
-      }
-      if (!res.ok || !data.ok) {
-        setErr(data.error ?? "Bootstrap failed. An admin may already exist.");
-      } else if (data.alreadyBootstrapped) {
-        setInfo("Admin already exists — sign in below.");
-      } else {
-        setInfo(`Admin created: ${data.email}. Sign in below.`);
-        setEmail(data.email ?? "");
-      }
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Bootstrap request failed.");
-    } finally {
-      setBootBusy(false);
-    }
   }
 
   return (
@@ -183,16 +151,9 @@ function OperatorSignIn() {
             className="w-full rounded bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2.5 text-sm font-bold text-black hover:brightness-110 disabled:opacity-40">
             {busy ? "Verifying…" : "Enter console"}
           </button>
-          <div className="pt-2 border-t border-white/5">
-            <button type="button" onClick={bootstrap} disabled={bootBusy}
-              className="w-full rounded border border-amber-400/30 bg-black/30 px-4 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-400/10 disabled:opacity-40">
-              {bootBusy ? "Bootstrapping…" : "One-click bootstrap admin"}
-            </button>
-            <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
-              Creates the master admin account (defaults to gerhardjames1@gmail.com) and grants the admin role.
-              Fill in email + password above to override the defaults. Disabled once an admin exists.
-            </p>
-          </div>
+          <p className="pt-2 border-t border-white/5 text-[10px] text-slate-500 leading-relaxed">
+            Admin access is managed by the connected external authentication project. Use an operator account that already has the admin role there.
+          </p>
         </form>
       </div>
     </div>
