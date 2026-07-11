@@ -5,6 +5,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+export type ServiceEnrollments = { smallBusiness?: boolean; commercial?: boolean; wire?: boolean };
+export type ServiceBalances = { smallBusiness?: number; commercial?: number; wire?: number };
+
 export type DbProfile = {
   id: string;
   name: string;
@@ -22,6 +25,8 @@ export type DbProfile = {
   savings_account_number: string;
   profile_picture: string | null;
   created_at: string;
+  enrollments: ServiceEnrollments;
+  service_balances: ServiceBalances;
 };
 
 export type DepositSettingsDb = {
