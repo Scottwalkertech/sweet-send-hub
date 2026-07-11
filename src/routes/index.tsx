@@ -235,6 +235,8 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
 
   const { items: unifiedActivity } = useUnifiedUserActivity(user.id);
   const userHistory = unifiedActivity.slice(0, 40);
+  const [showFullLedger, setShowFullLedger] = useState(false);
+  const visibleHistory = showFullLedger ? userHistory : userHistory.slice(0, 5);
 
 
 
