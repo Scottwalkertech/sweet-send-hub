@@ -21,68 +21,38 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-const SS_UNLOCK = "mt_admin_unlocked";
-
 function AdminPage() {
   const [booted, setBooted] = useState(false);
-  const [unlocked, setUnlocked] = useState(false);
   const [session, setSession] = useState<{ email: string; userId: string } | null>(null);
   const isAdmin = useIsAdmin();
 
   useEffect(() => {
-    try { setUnlocked(sessionStorage.getItem(SS_UNLOCK) === "1"); } catch { /* */ }
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        setSession({ email: data.user.email ?? "", userId: data.user.id });
-        // An authenticated visitor to /admin is by definition an operator.
-        // Persist the unlock so refreshes and the password-reset redirect
-        // don't drop them on the decoy NotFound screen.
-        try { sessionStorage.setItem(SS_UNLOCK, "1"); } catch { /* */ }
-        setUnlocked(true);
-      }
+      if (data.user) setSession({ email: data.user.email ?? "", userId: data.user.id });
       setBooted(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
-      if (s?.user) {
-        setSession({ email: s.user.email ?? "", userId: s.user.id });
-        try { sessionStorage.setItem(SS_UNLOCK, "1"); } catch { /* */ }
-        setUnlocked(true);
-      } else {
-        setSession(null);
-      }
+      if (s?.user) setSession({ email: s.user.email ?? "", userId: s.user.id });
+      else setSession(null);
     });
     return () => sub.subscription.unsubscribe();
   }, []);
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    try { sessionStorage.removeItem(SS_UNLOCK); } catch { /* */ }
     window.location.replace("/");
   }
 
   if (!booted) return null;
-  if (!session && !unlocked) return <NotFound />;
+  // Signed-out visitors see the sign-in card (which also hides the console
+  // behind operator credentials). Session presence + admin role are the only
+  // gates — no sessionStorage flag required.
   if (!session) return <OperatorSignIn />;
   if (isAdmin === null) return <BootingConsole />;
   if (!isAdmin) return <Forbidden email={session.email} />;
   return <AdminConsole email={session.email} userId={session.userId} onLogout={handleLogout} />;
 }
 
-function NotFound() {
-  return (
-    <div className="min-h-screen bg-[#0a0d14] text-slate-100 flex items-center justify-center px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-2xl font-semibold text-white">Page not found</h1>
-        <p className="mt-2 text-sm text-slate-400">The page you're looking for doesn't exist.</p>
-        <div className="mt-6">
-          <Link to="/" className="inline-flex items-center justify-center rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 hover:bg-white/10">
-            Return to banking portal
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function BootingConsole() {
   return (
