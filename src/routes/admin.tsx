@@ -653,33 +653,19 @@ async function injectRow(profile: DbProfile, account: AccountKey, description: s
   const signed = direction === "credit" ? amount : -amount;
   const currentDb = account === "checking" ? Number(profile.balance) : Number(profile.savings_balance);
   const newBal = Math.round((currentDb + signed) * 100) / 100;
-  // Push to DB (realtime broadcasts to the customer)
+  // Push balance change to profile (realtime broadcasts to the customer)
   await updateProfile(profile.id, account === "checking" ? { balance: newBal } : { savings_balance: newBal });
-  // Also mirror to a local user record so the customer's ledger view (still localStorage-backed) shows the row.
-  const local = loadUsers();
-  const idx = local.findIndex((x) => x.id === profile.id);
-  if (idx === -1) {
-    local.unshift({
-      id: profile.id, name: profile.name, email: profile.email, password: "",
-      phone: profile.phone ?? "", ssn: "", securityQ: "", securityA: "",
-      accountNumber: profile.account_number, account: "•••• " + profile.account_number.slice(-4),
-      tier: (profile.tier as MtUser["tier"]) || "Standard",
-      status: (profile.status as MtUser["status"]) || "Active",
-      balance: account === "checking" ? newBal : Number(profile.balance),
-      savingsBalance: account === "savings" ? newBal : Number(profile.savings_balance),
-      savingsAccountNumber: profile.savings_account_number,
-      verified: profile.verified, createdAt: profile.created_at.slice(0, 10),
-    });
-  } else {
-    local[idx] = { ...local[idx], balance: account === "checking" ? newBal : local[idx].balance, savingsBalance: account === "savings" ? newBal : local[idx].savingsBalance };
-  }
-  saveUsers(local);
-  const entry: LedgerEntry = {
-    id: `led_${Math.random().toString(36).slice(2, 10)}`,
-    userId: profile.id, account, date: dateIso, description, amount: signed, balanceAfter: newBal,
-  };
-  appendLedger(entry);
+  // Write ledger entry to the transactions table so the customer's account page updates live.
+  await insertTransaction({
+    user_id: profile.id,
+    account,
+    posted_at: dateIso,
+    description,
+    amount: signed,
+    balance_after: newBal,
+  });
 }
+
 
 function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; flash: (m: string) => void }) {
   const [targetId, setTargetId] = useState<string>(profiles[0]?.id ?? "");
