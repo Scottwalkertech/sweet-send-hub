@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  currentUser, upsertUser, appendLedger, ledgerFor, onStoreChange,
-  fmtCurrency, type MtUser, type AccountKey, type LedgerEntry,
+  currentUser, upsertUser, onStoreChange,
+  fmtCurrency, type MtUser, type AccountKey,
 } from "@/lib/mt-store";
+import { useUserLedger, insertTransaction, updateProfile } from "@/lib/mt-db";
 
 export const Route = createFileRoute("/account/$type")({
   head: () => ({
@@ -21,17 +22,14 @@ function AccountPage() {
   const navigate = useNavigate();
   const account = (type === "savings" ? "savings" : "checking") as AccountKey;
   const [user, setUser] = useState<MtUser | null>(null);
-  const [entries, setEntries] = useState<LedgerEntry[]>([]);
+  const { entries } = useUserLedger(user?.id, account);
 
   useEffect(() => {
-    function refresh() {
-      const u = currentUser();
-      setUser(u);
-      if (u) setEntries(ledgerFor(u.id, account));
-    }
+    function refresh() { setUser(currentUser()); }
     refresh();
     return onStoreChange(refresh);
   }, [account]);
+
 
   if (!user) {
     return (

@@ -67,7 +67,7 @@ function TransferPage() {
     setErrors(e); return Object.keys(e).length === 0;
   }
 
-  function submitTransfer() {
+  async function submitTransfer() {
     const ref = genRef("DBW-XFR");
     const tx: PendingTx = {
       id: ref, userId: user!.id, userName: user!.name,
@@ -76,13 +76,23 @@ function TransferPage() {
       status: "Pending", reference: ref, direction: "debit",
       memo, recipient: recipientName, recipientBank, recipientAcct, routing: routingCode,
     };
-    pushToQueue(tx);
-    setInitiated(tx);
+    try {
+      await insertPending({
+        reference: ref, user_id: user!.id, user_name: user!.name,
+        method: "Transfer", direction: "debit", amount: amountNum,
+        memo, recipient: recipientName, recipient_bank: recipientBank,
+        recipient_acct: recipientAcct, routing: routingCode,
+      });
+      setInitiated(tx);
+    } catch (e) {
+      setErrors({ amount: `Submission failed: ${(e as Error).message}` });
+    }
   }
 
   if (initiated) {
     return <TransferInitiated tx={initiated} onDone={() => navigate({ to: "/" })} />;
   }
+
 
 
   return (
