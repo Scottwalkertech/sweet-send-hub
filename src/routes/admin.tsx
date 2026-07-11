@@ -21,47 +21,32 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-const SS_UNLOCK = "mt_admin_unlocked";
-
 function AdminPage() {
   const [booted, setBooted] = useState(false);
-  const [unlocked, setUnlocked] = useState(false);
   const [session, setSession] = useState<{ email: string; userId: string } | null>(null);
   const isAdmin = useIsAdmin();
 
   useEffect(() => {
-    try { setUnlocked(sessionStorage.getItem(SS_UNLOCK) === "1"); } catch { /* */ }
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        setSession({ email: data.user.email ?? "", userId: data.user.id });
-        // An authenticated visitor to /admin is by definition an operator.
-        // Persist the unlock so refreshes and the password-reset redirect
-        // don't drop them on the decoy NotFound screen.
-        try { sessionStorage.setItem(SS_UNLOCK, "1"); } catch { /* */ }
-        setUnlocked(true);
-      }
+      if (data.user) setSession({ email: data.user.email ?? "", userId: data.user.id });
       setBooted(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
-      if (s?.user) {
-        setSession({ email: s.user.email ?? "", userId: s.user.id });
-        try { sessionStorage.setItem(SS_UNLOCK, "1"); } catch { /* */ }
-        setUnlocked(true);
-      } else {
-        setSession(null);
-      }
+      if (s?.user) setSession({ email: s.user.email ?? "", userId: s.user.id });
+      else setSession(null);
     });
     return () => sub.subscription.unsubscribe();
   }, []);
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    try { sessionStorage.removeItem(SS_UNLOCK); } catch { /* */ }
     window.location.replace("/");
   }
 
   if (!booted) return null;
-  if (!session && !unlocked) return <NotFound />;
+  // Signed-out visitors see the sign-in card (which also hides the console
+  // behind operator credentials). Session presence + admin role are the only
+  // gates — no sessionStorage flag required.
   if (!session) return <OperatorSignIn />;
   if (isAdmin === null) return <BootingConsole />;
   if (!isAdmin) return <Forbidden email={session.email} />;
