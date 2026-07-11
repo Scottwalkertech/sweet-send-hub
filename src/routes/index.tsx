@@ -611,33 +611,10 @@ function AccountCard({ to, params, product, tag, accountMasked, balance }: {
 
 
 function ProfileModal({ user, onClose }: { user: MtUser; onClose: () => void }) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [pic, setPic] = useState(user.profilePicture ?? "");
-  const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({
-    name: user.name, email: user.email, phone: user.phone ?? "", address: user.address ?? "",
-  });
   const [pwOpen, setPwOpen] = useState(false);
   const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [savedMsg, setSavedMsg] = useState("");
 
-  async function pickPic(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]; if (!f) return;
-    const dataUrl = await readFileAsDataUrl(f);
-    setPic(dataUrl);
-    upsertUser({ ...user, profilePicture: dataUrl });
-  }
-  function removePic() {
-    setPic("");
-    upsertUser({ ...user, profilePicture: undefined });
-  }
-  function saveProfile() {
-    upsertUser({ ...user, name: form.name.trim() || user.name, email: form.email.trim() || user.email, phone: form.phone.trim(), address: form.address.trim() });
-    setEditing(false);
-    setSavedMsg("Profile updated");
-    setTimeout(() => setSavedMsg(""), 2500);
-  }
   function submitPw(e: React.FormEvent) {
     e.preventDefault();
     setPwMsg(null);
@@ -663,31 +640,28 @@ function ProfileModal({ user, onClose }: { user: MtUser; onClose: () => void }) 
         </div>
 
         <div className="px-6 py-5 flex items-center gap-4 border-b border-slate-100">
-          {pic
-            ? <img src={pic} alt="Profile" className="h-20 w-20 rounded-full object-cover border border-slate-200" />
+          {user.profilePicture
+            ? <img src={user.profilePicture} alt="Profile" className="h-20 w-20 rounded-full object-cover border border-slate-200" />
             : <div className="h-20 w-20 rounded-full bg-slate-200 text-slate-600 text-2xl flex items-center justify-center">{user.name.slice(0, 1)}</div>}
-          <div className="flex flex-col gap-1.5">
-            <input ref={fileRef} type="file" accept="image/*" onChange={pickPic} className="hidden" />
-            <button onClick={() => fileRef.current?.click()} className="rounded-md bg-slate-900 text-white text-xs px-3 py-1.5 hover:bg-slate-800">Upload photo</button>
-            {pic && <button onClick={removePic} className="text-[11px] text-red-600 hover:text-red-700 text-left">Remove picture</button>}
+          <div className="text-xs text-slate-500 leading-relaxed">
+            Profile photo and personal details are managed by your relationship officer. Contact support to request a change.
           </div>
         </div>
 
         <div className="px-6 py-5 space-y-3">
           <div className="flex items-center justify-between">
             <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Personal Information</div>
-            {!editing
-              ? <button onClick={() => setEditing(true)} className="text-xs text-amber-700 hover:text-amber-900 font-semibold">Edit</button>
-              : <div className="flex gap-2">
-                  <button onClick={() => { setEditing(false); setForm({ name: user.name, email: user.email, phone: user.phone ?? "", address: user.address ?? "" }); }} className="text-xs text-slate-500 hover:text-slate-800">Cancel</button>
-                  <button onClick={saveProfile} className="text-xs bg-slate-900 text-white rounded px-2.5 py-1 hover:bg-slate-800">Save</button>
-                </div>}
+            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-slate-500 border border-slate-200 rounded-full px-2 py-0.5 bg-slate-50">
+              🔒 Read-only
+            </span>
           </div>
-          <ProfRow label="Full Name" value={form.name} editing={editing} onChange={(v) => setForm({ ...form, name: v })} />
-          <ProfRow label="Email" value={form.email} editing={editing} onChange={(v) => setForm({ ...form, email: v })} />
-          <ProfRow label="Phone" value={form.phone} editing={editing} onChange={(v) => setForm({ ...form, phone: v })} placeholder="(555) 555-5555" />
-          <ProfRow label="Address" value={form.address} editing={editing} onChange={(v) => setForm({ ...form, address: v })} placeholder="Street, City, State, ZIP" />
-          {savedMsg && <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2">{savedMsg}</div>}
+          <ProfRowRO label="Full Name" value={user.name} />
+          <ProfRowRO label="Email" value={user.email} />
+          <ProfRowRO label="Phone" value={user.phone} />
+          <ProfRowRO label="Address" value={user.address ?? ""} />
+          <div className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-md px-3 py-2 leading-relaxed">
+            For your security, only Dynamic Bank of West operators can modify identity fields. Submit a written request through Secure Messages to update your profile.
+          </div>
         </div>
 
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/60">
@@ -719,13 +693,11 @@ function ProfileModal({ user, onClose }: { user: MtUser; onClose: () => void }) 
   );
 }
 
-function ProfRow({ label, value, editing, onChange, placeholder }: { label: string; value: string; editing: boolean; onChange: (v: string) => void; placeholder?: string }) {
+function ProfRowRO({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{label}</div>
-      {editing
-        ? <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="mt-0.5 w-full rounded border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
-        : <div className="text-sm text-slate-900 mt-0.5">{value || <span className="text-slate-400 italic">Not set</span>}</div>}
+      <div className="text-sm text-slate-900 mt-0.5">{value || <span className="text-slate-400 italic">Not set</span>}</div>
     </div>
   );
 }
