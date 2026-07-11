@@ -3,12 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   useAllProfiles, useSystemSetting, useIsAdmin, updateProfile, updateSetting,
+  usePendingQueue, insertTransaction, updatePendingStatus, insertPending,
   type DbProfile, type DepositSettingsDb, type RatesSettings, type LimitsSettings, type BannerSettings,
+  type DbPending,
 } from "@/lib/mt-db";
-import {
-  loadQueue, saveQueue, appendLedger, loadUsers, saveUsers, fmtCurrency, readFileAsDataUrl,
-  type PendingTx, type AccountKey, type LedgerEntry, type MtUser,
-} from "@/lib/mt-store";
+import { fmtCurrency, readFileAsDataUrl, type AccountKey } from "@/lib/mt-store";
+
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
