@@ -59,11 +59,14 @@ function App() {
 }
 
 function applyProfilePatch(user: MtUser, row: Record<string, unknown>) {
+  const enr = (row.enrollments as MtUser["enrollments"]) ?? user.enrollments;
+  const svc = (row.service_balances as MtUser["serviceBalances"]) ?? user.serviceBalances;
   const patched: MtUser = {
     ...user,
     name: (row.name as string) || user.name,
     email: (row.email as string) || user.email,
     phone: (row.phone as string) ?? user.phone,
+    address: (row.address as string) ?? user.address,
     tier: (row.tier as MtUser["tier"]) || user.tier,
     status: (row.status as MtUser["status"]) || user.status,
     verified: typeof row.verified === "boolean" ? row.verified : user.verified,
@@ -75,6 +78,8 @@ function applyProfilePatch(user: MtUser, row: Record<string, unknown>) {
     account: "•••• " + ((row.account_number as string) || user.accountNumber).slice(-4),
     savingsAccountNumber: (row.savings_account_number as string) || user.savingsAccountNumber,
     profilePicture: (row.profile_picture as string) || user.profilePicture,
+    enrollments: enr,
+    serviceBalances: svc,
   };
   upsertUser(patched);
 }
