@@ -622,7 +622,36 @@ function EditProfileModal({ profile, onClose, onSaved }: { profile: DbProfile; o
           </label>
         </div>
 
+        <div className="mt-6 rounded-lg border border-amber-400/20 bg-black/30 p-4">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-amber-400/80">Specialized Services · Enrollment & Balances</div>
+          <p className="text-[11px] text-slate-400 mt-1">Toggle enrollment to unlock the section for the customer. Balance fields override the ledger amount displayed on their dashboard.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <ServicePanel
+              title="Wire Services"
+              enrolled={!!enr.wire}
+              onToggle={(v) => setEnr({ wire: v })}
+              balance={svc.wire ?? 0}
+              onBalance={(v) => setSvc({ wire: v })}
+            />
+            <ServicePanel
+              title="Small Business Banking"
+              enrolled={!!enr.smallBusiness}
+              onToggle={(v) => setEnr({ smallBusiness: v })}
+              balance={svc.smallBusiness ?? 0}
+              onBalance={(v) => setSvc({ smallBusiness: v })}
+            />
+            <ServicePanel
+              title="Commercial Accounts"
+              enrolled={!!enr.commercial}
+              onToggle={(v) => setEnr({ commercial: v })}
+              balance={svc.commercial ?? 0}
+              onBalance={(v) => setSvc({ commercial: v })}
+            />
+          </div>
+        </div>
+
         {err && <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
+
 
         <div className="mt-6 flex justify-end gap-2">
           <button onClick={onClose} className="rounded border border-white/10 px-4 py-2 text-xs hover:bg-white/5">Cancel</button>
