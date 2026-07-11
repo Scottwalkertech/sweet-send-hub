@@ -94,9 +94,8 @@ function Login({ onAuth }: { onAuth: (u: MtUser) => void }) {
     e.preventDefault();
     setBusy(true);
     setErr("");
-    const emailLower = email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: emailLower,
+      email,
       password,
     });
     setBusy(false);
@@ -112,13 +111,13 @@ function Login({ onAuth }: { onAuth: (u: MtUser) => void }) {
 
     // Bridge Supabase auth → local DBW profile store used by the dashboard.
     const users = loadUsers();
-    let match = users.find((u) => u.email.toLowerCase() === emailLower);
+    let match = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
     if (!match) {
       const acctFull = genAccountNumber();
       match = {
         id: data.user?.id ?? "u_" + Math.floor(1000 + Math.random() * 9000),
-        name: (data.user?.user_metadata?.full_name as string) || emailLower.split("@")[0],
-        email: emailLower,
+        name: (data.user?.user_metadata?.full_name as string) || email.split("@")[0],
+        email,
         password,
         phone: "",
         ssn: "",

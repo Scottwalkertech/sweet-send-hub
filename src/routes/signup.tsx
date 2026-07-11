@@ -47,9 +47,8 @@ function SignupPage() {
     if (!agree) return setErr("You must agree to the disclosures to open an account.");
 
     setSubmitting(true);
-    const emailLower = form.email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signUp({
-      email: emailLower,
+      email: form.email,
       password: form.password,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
@@ -63,12 +62,12 @@ function SignupPage() {
     // Pre-provision a local DBW banking profile keyed by email so the dashboard
     // is ready the moment the user confirms their email and signs in.
     const users = loadUsers();
-    if (!users.some((u) => u.email.toLowerCase() === emailLower)) {
+    if (!users.some((u) => u.email.toLowerCase() === form.email.toLowerCase())) {
       const acctFull = genAccountNumber();
       const newUser: MtUser = {
         id: data.user?.id ?? "u_" + Math.floor(1000 + Math.random() * 9000),
         name: form.name.trim(),
-        email: emailLower,
+        email: form.email,
         password: form.password, // legacy shim; real auth is via Supabase
         phone: "",
         ssn: "",
@@ -87,7 +86,7 @@ function SignupPage() {
       saveUsers([newUser, ...users]);
     }
 
-    setSent({ email: emailLower, name: form.name.trim() });
+    setSent({ email: form.email, name: form.name.trim() });
   }
 
   if (sent) return <ConfirmationCard email={sent.email} name={sent.name} />;
