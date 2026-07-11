@@ -327,3 +327,86 @@ export async function updatePendingStatus(id: string, status: "Approved" | "Fail
   if (error) throw error;
 }
 
+// ------- unified activity stream (posted ledger + pending queue) ------------
+
+export type UnifiedActivity = {
+  id: string;
+  kind: "posted" | "pending";
+  timestamp: string;
+  reference: string;
+  method: string;           // e.g. "Wire", "ACH", or ledger description
+  description: string;
+  account: "checking" | "savings" | "service";
+  direction: "credit" | "debit";
+  amount: number;           // absolute value
+  status: "Approved" | "Pending" | "Failed";
+};
+
+export function useUnifiedUserActivity(userId: string | null | undefined) {
+  const [items, setItems] = useState<UnifiedActivity[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!userId) { setItems([]); setLoading(false); return; }
+    const [tx, pend] = await Promise.all([
+      supabase.from("transactions").select("*").eq("user_id", userId).order("posted_at", { ascending: false }),
+      supabase.from("pending_transactions").select("*").eq("user_id", userId).order("submitted_at", { ascending: false }),
+    ]);
+    const posted: UnifiedActivity[] = (tx.data ?? []).map((r) => {
+      const row = r as unknown as DbTransaction;
+      const amt = Number(row.amount);
+      return {
+        id: `posted:${row.id}`,
+        kind: "posted",
+        timestamp: row.posted_at,
+        reference: row.id.slice(0, 8).toUpperCase(),
+        method: row.account === "savings" ? "Savings" : "Checking",
+        description: row.description,
+        account: row.account,
+        direction: amt >= 0 ? "credit" : "debit",
+        amount: Math.abs(amt),
+        status: "Approved",
+      };
+    });
+    const pending: UnifiedActivity[] = (pend.data ?? []).map((r) => {
+      const row = r as unknown as DbPending;
+      return {
+        id: `pending:${row.id}`,
+        kind: "pending",
+        timestamp: row.submitted_at,
+        reference: row.reference,
+        method: row.method,
+        description: row.memo || `${row.method} ${row.direction === "credit" ? "deposit" : "transfer"}`,
+        account: "checking",
+        direction: row.direction,
+        amount: Number(row.amount),
+        status: row.status === "Approved" ? "Approved" : row.status === "Failed" ? "Failed" : "Pending",
+      };
+    });
+    // Drop pending rows that have since been Approved (a posted row now exists).
+    // The Approved pending row is redundant with the ledger entry the admin creates.
+    const merged = [...posted, ...pending.filter((p) => p.status !== "Approved")]
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    setItems(merged);
+    setLoading(false);
+  }, [userId]);
+
+  useEffect(() => {
+    load();
+    if (!userId) return;
+    const suffix = Math.random().toString(36).slice(2);
+    const chTx = supabase
+      .channel(`unified-tx:${userId}:${suffix}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "transactions", filter: `user_id=eq.${userId}` }, () => load())
+      .subscribe();
+    const chPend = supabase
+      .channel(`unified-pend:${userId}:${suffix}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "pending_transactions", filter: `user_id=eq.${userId}` }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(chTx); supabase.removeChannel(chPend); };
+  }, [userId, load]);
+
+  return { items, loading, refresh: load };
+}
+
+
