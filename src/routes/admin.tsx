@@ -32,11 +32,24 @@ function AdminPage() {
   useEffect(() => {
     try { setUnlocked(sessionStorage.getItem(SS_UNLOCK) === "1"); } catch { /* */ }
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) setSession({ email: data.user.email ?? "", userId: data.user.id });
+      if (data.user) {
+        setSession({ email: data.user.email ?? "", userId: data.user.id });
+        // An authenticated visitor to /admin is by definition an operator.
+        // Persist the unlock so refreshes and the password-reset redirect
+        // don't drop them on the decoy NotFound screen.
+        try { sessionStorage.setItem(SS_UNLOCK, "1"); } catch { /* */ }
+        setUnlocked(true);
+      }
       setBooted(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
-      setSession(s?.user ? { email: s.user.email ?? "", userId: s.user.id } : null);
+      if (s?.user) {
+        setSession({ email: s.user.email ?? "", userId: s.user.id });
+        try { sessionStorage.setItem(SS_UNLOCK, "1"); } catch { /* */ }
+        setUnlocked(true);
+      } else {
+        setSession(null);
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -48,7 +61,7 @@ function AdminPage() {
   }
 
   if (!booted) return null;
-  if (!unlocked) return <NotFound />;
+  if (!session && !unlocked) return <NotFound />;
   if (!session) return <OperatorSignIn />;
   if (isAdmin === null) return <BootingConsole />;
   if (!isAdmin) return <Forbidden email={session.email} />;
