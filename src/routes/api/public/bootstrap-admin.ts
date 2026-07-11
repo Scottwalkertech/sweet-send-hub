@@ -17,22 +17,24 @@ export const Route = createFileRoute("/api/public/bootstrap-admin")({
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-        // Guard: if an admin already exists, do nothing.
-        const { data: existingAdmins, error: roleErr } = await supabaseAdmin
-          .from("user_roles").select("user_id").eq("role", "admin").limit(1);
-        if (roleErr) return Response.json({ ok: false, error: roleErr.message }, { status: 500 });
-        if (existingAdmins && existingAdmins.length > 0) {
-          return Response.json({ ok: true, alreadyBootstrapped: true });
-        }
-
-        // Find or create the auth user.
+        // Find or create the auth user for the requested email, then ensure
+        // password + email_confirmed + admin role. Idempotent.
         let userId: string | null = null;
         const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
         if (listErr) return Response.json({ ok: false, error: listErr.message }, { status: 500 });
         const found = list.users.find((u) => (u.email ?? "").toLowerCase() === email);
+
+        // Guard: if an admin already exists AND it isn't this email, refuse.
+        const { data: existingAdmins, error: roleErr } = await supabaseAdmin
+          .from("user_roles").select("user_id").eq("role", "admin");
+        if (roleErr) return Response.json({ ok: false, error: roleErr.message }, { status: 500 });
+        const adminIds = new Set((existingAdmins ?? []).map((r) => r.user_id));
+        if (adminIds.size > 0 && (!found || !adminIds.has(found.id))) {
+          return Response.json({ ok: false, error: "An admin already exists for a different email." }, { status: 409 });
+        }
+
         if (found) {
           userId = found.id;
-          // Ensure the password matches what the caller provided and the email is confirmed.
           await supabaseAdmin.auth.admin.updateUserById(found.id, { password, email_confirm: true });
         } else {
           const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
@@ -44,13 +46,13 @@ export const Route = createFileRoute("/api/public/bootstrap-admin")({
           userId = created.user.id;
         }
 
-        // Grant admin role (customer role is added by handle_new_user trigger).
         const { error: insErr } = await supabaseAdmin
           .from("user_roles")
           .upsert({ user_id: userId, role: "admin" }, { onConflict: "user_id,role" });
         if (insErr) return Response.json({ ok: false, error: insErr.message }, { status: 500 });
 
-        return Response.json({ ok: true, userId, email });
+        return Response.json({ ok: true, userId, email, synced: adminIds.has(userId) });
+
       },
     },
   },
