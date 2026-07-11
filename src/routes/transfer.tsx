@@ -51,6 +51,21 @@ function TransferPage() {
     return onStoreChange(() => setUser(currentUser()));
   }, []);
 
+  const routingDigits = routingCode.replace(/\D/g, "");
+  const routingComplete = routingDigits.length === 9;
+  const routingMatch = useMemo(
+    () => (routingComplete ? ROUTING_DB[routingDigits] ?? null : null),
+    [routingDigits, routingComplete],
+  );
+
+  // Auto-fill bank name when a known routing number is entered and the
+  // recipient bank field is empty or matches a previous auto-fill.
+  useEffect(() => {
+    if (routingMatch && !recipientBank.trim()) {
+      setRecipientBank(routingMatch.name);
+    }
+  }, [routingMatch]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 text-center">
