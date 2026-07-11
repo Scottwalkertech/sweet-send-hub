@@ -598,9 +598,9 @@ function AccountCard({ to, params, product, tag, accountMasked, balance }: {
 }) {
   return (
     <Link to={to} params={params}
-      className="group block rounded-2xl overflow-hidden border border-amber-500/25 shadow-xl hover:border-amber-400 hover:shadow-2xl transition-all">
-      <div className="relative px-7 py-8 text-white bg-gradient-to-br from-[#5a0d10] via-[#3b0507] to-[#1a0304]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.22),transparent_55%)]" />
+      className="group block rounded-2xl overflow-hidden border border-slate-800 shadow-xl hover:border-amber-400 hover:shadow-2xl transition-all">
+      <div className="relative px-7 py-8 text-white bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.15),transparent_60%)]" />
         <div className="relative flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-amber-300 text-[10px] uppercase tracking-[0.24em] font-semibold">
