@@ -125,7 +125,14 @@ function OperatorSignIn() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(email && password ? { email: email.trim().toLowerCase(), password } : {}),
       });
-      const data = await res.json();
+      const raw = await res.text();
+      let data: { ok?: boolean; error?: string; email?: string; alreadyBootstrapped?: boolean } = {};
+      try { data = JSON.parse(raw); } catch {
+        setErr(res.status === 404
+          ? "Bootstrap endpoint not deployed yet — publish the app, then try again."
+          : `Unexpected response (HTTP ${res.status}). Try again in a moment.`);
+        return;
+      }
       if (!res.ok || !data.ok) {
         setErr(data.error ?? "Bootstrap failed. An admin may already exist.");
       } else if (data.alreadyBootstrapped) {
