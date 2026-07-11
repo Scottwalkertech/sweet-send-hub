@@ -3,12 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   useAllProfiles, useSystemSetting, useIsAdmin, updateProfile, updateSetting,
+  usePendingQueue, insertTransaction, updatePendingStatus, insertPending,
   type DbProfile, type DepositSettingsDb, type RatesSettings, type LimitsSettings, type BannerSettings,
+  type DbPending,
 } from "@/lib/mt-db";
-import {
-  loadQueue, saveQueue, appendLedger, loadUsers, saveUsers, fmtCurrency, readFileAsDataUrl,
-  type PendingTx, type AccountKey, type LedgerEntry, type MtUser,
-} from "@/lib/mt-store";
+import { fmtCurrency, readFileAsDataUrl, type AccountKey } from "@/lib/mt-store";
+
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -207,46 +207,46 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
   const rates = useSystemSetting("rates");
   const limits = useSystemSetting("limits");
   const banner = useSystemSetting("banner");
-  const [queue, setQueue] = useState<PendingTx[]>([]);
+  const { queue } = usePendingQueue({ adminAll: true });
   const [editing, setEditing] = useState<DbProfile | null>(null);
   const [toast, setToast] = useState("");
 
-  useEffect(() => {
-    setQueue(loadQueue());
-    const refresh = () => setQueue(loadQueue());
-    window.addEventListener("mt:queue-changed", refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.removeEventListener("mt:queue-changed", refresh);
-      window.removeEventListener("storage", refresh);
-    };
-  }, []);
-
   function flash(m: string) { setToast(m); setTimeout(() => setToast(""), 2600); }
 
-  async function approve(tx: PendingTx) {
+  async function approve(tx: DbPending) {
     if (tx.status !== "Pending") return;
-    const nextQ = queue.map((q) => q.id === tx.id ? { ...q, status: "Approved" as const, resolvedAt: new Date().toISOString() } : q);
-    saveQueue(nextQ);
-    setQueue(nextQ);
-    // Push balance change to profile
-    const p = profiles.find((x) => x.id === tx.userId);
-    if (p) {
-      const delta = tx.direction === "credit" ? tx.amount : -tx.amount;
-      const newBal = Math.max(0, Number(p.balance) + delta);
-      try { await updateProfile(p.id, { balance: newBal }); } catch { /* rls */ }
+    try {
+      const p = profiles.find((x) => x.id === tx.user_id);
+      if (p) {
+        const delta = tx.direction === "credit" ? Number(tx.amount) : -Number(tx.amount);
+        const newBal = Math.max(0, Number(p.balance) + delta);
+        await updateProfile(p.id, { balance: newBal });
+        await insertTransaction({
+          user_id: p.id, account: "checking",
+          posted_at: new Date().toISOString(),
+          description: `${tx.method} ${tx.direction === "credit" ? "deposit" : "debit"} · ${tx.reference}`,
+          amount: delta, balance_after: newBal,
+        });
+      }
+      await updatePendingStatus(tx.id, "Approved");
+      flash(`Approved ${fmtCurrency(Number(tx.amount))} for ${tx.user_name}`);
+    } catch (e) {
+      flash(`Approve failed: ${(e as Error).message}`);
     }
-    flash(`Approved ${fmtCurrency(tx.amount)} for ${tx.userName}`);
   }
-  function fail(tx: PendingTx) {
+  async function fail(tx: DbPending) {
     if (tx.status !== "Pending") return;
-    const nextQ = queue.map((q) => q.id === tx.id ? { ...q, status: "Failed" as const, resolvedAt: new Date().toISOString() } : q);
-    saveQueue(nextQ); setQueue(nextQ);
-    flash(`Marked ${tx.reference} as failed`);
+    try {
+      await updatePendingStatus(tx.id, "Failed");
+      flash(`Marked ${tx.reference} as failed`);
+    } catch (e) {
+      flash(`Mark-failed failed: ${(e as Error).message}`);
+    }
   }
 
   const pendingCount = queue.filter((q) => q.status === "Pending").length;
   const totalAum = profiles.reduce((s, p) => s + Number(p.balance) + Number(p.savings_balance), 0);
+
 
   return (
     <div className="min-h-screen bg-[#0a0d14] text-slate-100">
@@ -353,11 +353,12 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
                 {queue.map((tx) => (
                   <tr key={tx.id} className="border-t border-white/5 hover:bg-white/[0.03]">
                     <Td className="font-mono text-xs text-amber-300">{tx.reference}</Td>
-                    <Td className="text-white">{tx.userName}</Td>
+                    <Td className="text-white">{tx.user_name}</Td>
                     <Td><MethodPill method={tx.method} /></Td>
                     <Td className="text-xs text-slate-400">{tx.direction === "credit" ? "Credit ↓" : "Debit ↑"}</Td>
-                    <Td className="text-slate-400 text-xs">{tx.submitted}</Td>
-                    <Td className={`text-right font-mono ${tx.direction === "credit" ? "text-emerald-300" : "text-red-300"}`}>{tx.direction === "credit" ? "+" : "-"}{fmtCurrency(tx.amount)}</Td>
+                    <Td className="text-slate-400 text-xs">{tx.submitted_at.slice(0, 10)}</Td>
+                    <Td className={`text-right font-mono ${tx.direction === "credit" ? "text-emerald-300" : "text-red-300"}`}>{tx.direction === "credit" ? "+" : "-"}{fmtCurrency(Number(tx.amount))}</Td>
+
                     <Td><TxStatus status={tx.status} /></Td>
                     <Td className="text-right">
                       <div className="inline-flex gap-2">
@@ -652,33 +653,19 @@ async function injectRow(profile: DbProfile, account: AccountKey, description: s
   const signed = direction === "credit" ? amount : -amount;
   const currentDb = account === "checking" ? Number(profile.balance) : Number(profile.savings_balance);
   const newBal = Math.round((currentDb + signed) * 100) / 100;
-  // Push to DB (realtime broadcasts to the customer)
+  // Push balance change to profile (realtime broadcasts to the customer)
   await updateProfile(profile.id, account === "checking" ? { balance: newBal } : { savings_balance: newBal });
-  // Also mirror to a local user record so the customer's ledger view (still localStorage-backed) shows the row.
-  const local = loadUsers();
-  const idx = local.findIndex((x) => x.id === profile.id);
-  if (idx === -1) {
-    local.unshift({
-      id: profile.id, name: profile.name, email: profile.email, password: "",
-      phone: profile.phone ?? "", ssn: "", securityQ: "", securityA: "",
-      accountNumber: profile.account_number, account: "•••• " + profile.account_number.slice(-4),
-      tier: (profile.tier as MtUser["tier"]) || "Standard",
-      status: (profile.status as MtUser["status"]) || "Active",
-      balance: account === "checking" ? newBal : Number(profile.balance),
-      savingsBalance: account === "savings" ? newBal : Number(profile.savings_balance),
-      savingsAccountNumber: profile.savings_account_number,
-      verified: profile.verified, createdAt: profile.created_at.slice(0, 10),
-    });
-  } else {
-    local[idx] = { ...local[idx], balance: account === "checking" ? newBal : local[idx].balance, savingsBalance: account === "savings" ? newBal : local[idx].savingsBalance };
-  }
-  saveUsers(local);
-  const entry: LedgerEntry = {
-    id: `led_${Math.random().toString(36).slice(2, 10)}`,
-    userId: profile.id, account, date: dateIso, description, amount: signed, balanceAfter: newBal,
-  };
-  appendLedger(entry);
+  // Write ledger entry to the transactions table so the customer's account page updates live.
+  await insertTransaction({
+    user_id: profile.id,
+    account,
+    posted_at: dateIso,
+    description,
+    amount: signed,
+    balance_after: newBal,
+  });
 }
+
 
 function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; flash: (m: string) => void }) {
   const [targetId, setTargetId] = useState<string>(profiles[0]?.id ?? "");
@@ -829,7 +816,7 @@ function StatusPill({ status }: { status: string }) {
   };
   return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[status] ?? map.Active}`}>{status}</span>;
 }
-function TxStatus({ status }: { status: PendingTx["status"] }) {
+function TxStatus({ status }: { status: DbPending["status"] }) {
   const map = {
     Pending: "border-amber-400/40 bg-amber-400/10 text-amber-300",
     Approved: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
@@ -837,6 +824,7 @@ function TxStatus({ status }: { status: PendingTx["status"] }) {
   } as const;
   return <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${map[status]}`}>{status}</span>;
 }
-function MethodPill({ method }: { method: PendingTx["method"] }) {
+function MethodPill({ method }: { method: DbPending["method"] }) {
   return <span className="inline-block rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">{method}</span>;
+
 }

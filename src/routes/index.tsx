@@ -2,12 +2,14 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
   loadUsers, upsertUser, saveUsers, setCurrentUserId, currentUser,
-  loadQueue, onStoreChange, fmtCurrency, readFileAsDataUrl,
+  onStoreChange, fmtCurrency, readFileAsDataUrl,
   loadChatThread, appendChatMessage,
   genAccountNumber, maskAccount,
   type MtUser, type ChatMessage,
 } from "@/lib/mt-store";
+import { usePendingQueue } from "@/lib/mt-db";
 import { supabase } from "@/integrations/supabase/client";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -226,9 +228,9 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
     setNotEnrolled({ label: item.label });
   }
 
-  const userHistory = loadQueue()
-    .filter((t) => t.userId === user.id)
-    .slice(0, 20);
+  const { queue: userPending } = usePendingQueue({ userId: user.id });
+  const userHistory = userPending.slice(0, 20);
+
 
 
   const serviceMeta: Record<TopNavKey, { label: string; product: string; getBal: () => number }> = {
@@ -425,7 +427,7 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                     : "border-amber-300 bg-amber-50 text-amber-700";
                   return (
                     <tr key={t.id} className={`border-t border-slate-100 ${isPending ? "bg-sky-50/40" : ""}`}>
-                      <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.submitted}</td>
+                      <td className="px-6 py-3 text-slate-600 whitespace-nowrap">{t.submitted_at.slice(0, 10)}</td>
                       <td className="px-6 py-3 text-slate-900 font-mono text-xs">{t.reference}</td>
                       <td className="px-6 py-3 text-slate-600">{t.method}</td>
                       <td className="px-6 py-3">
@@ -438,8 +440,9 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                         t.status === "Failed" ? "text-slate-400 line-through"
                         : isPending ? "text-slate-500 italic"
                         : isCredit ? "text-emerald-600" : "text-slate-900"
-                      }`}>{sign}{fmtCurrency(t.amount)}</td>
+                      }`}>{sign}{fmtCurrency(Number(t.amount))}</td>
                     </tr>
+
                   );
                 })}
               </tbody>

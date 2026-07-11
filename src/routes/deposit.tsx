@@ -3,14 +3,14 @@ import { useEffect, useState } from "react";
 import {
   currentUser,
   loadDepositSettings,
-  pushToQueue,
   genRef,
   fmtCurrency,
   onStoreChange,
   type DepositSettings,
   type MtUser,
 } from "@/lib/mt-store";
-import { useSystemSetting } from "@/lib/mt-db";
+import { useSystemSetting, insertPending } from "@/lib/mt-db";
+
 
 export const Route = createFileRoute("/deposit")({
   head: () => ({
@@ -65,32 +65,41 @@ function DepositPage() {
     setTimeout(() => setCopied(""), 1400);
   }
 
-  function submitWire(e: React.FormEvent) {
+  async function submitWire(e: React.FormEvent) {
     e.preventDefault();
     const amt = parseFloat(amount);
     if (!amt || amt <= 0) return;
     const ref = genRef("DBW-WIRE");
-    pushToQueue({
-      id: ref, userId: user!.id, userName: user!.name,
-      method: "Wire", amount: amt, submitted: new Date().toISOString().slice(0, 10),
-      status: "Pending", reference: ref, direction: "credit",
-      memo: "Inbound wire deposit request",
-    });
-    setSubmitted({ ref, method: "Wire" });
+    try {
+      await insertPending({
+        reference: ref, user_id: user!.id, user_name: user!.name,
+        method: "Wire", direction: "credit", amount: amt,
+        memo: "Inbound wire deposit request",
+        recipient: null, recipient_bank: null, recipient_acct: null, routing: null,
+      });
+      setSubmitted({ ref, method: "Wire" });
+    } catch (err) {
+      alert(`Wire submission failed: ${(err as Error).message}`);
+    }
   }
-  function submitCrypto(e: React.FormEvent) {
+  async function submitCrypto(e: React.FormEvent) {
     e.preventDefault();
     const amt = parseFloat(amount);
     if (!amt || amt <= 0) return;
     const ref = genRef("DBW-CRYP");
-    pushToQueue({
-      id: ref, userId: user!.id, userName: user!.name,
-      method: "Crypto", amount: amt, submitted: new Date().toISOString().slice(0, 10),
-      status: "Pending", reference: ref, direction: "credit",
-      memo: `BTC deposit — ${settings.btcAddress.slice(0, 12)}…`,
-    });
-    setSubmitted({ ref, method: "Crypto" });
+    try {
+      await insertPending({
+        reference: ref, user_id: user!.id, user_name: user!.name,
+        method: "Crypto", direction: "credit", amount: amt,
+        memo: `BTC deposit — ${settings.btcAddress.slice(0, 12)}…`,
+        recipient: null, recipient_bank: null, recipient_acct: null, routing: null,
+      });
+      setSubmitted({ ref, method: "Crypto" });
+    } catch (err) {
+      alert(`Crypto submission failed: ${(err as Error).message}`);
+    }
   }
+
 
   if (submitted) {
     return (
