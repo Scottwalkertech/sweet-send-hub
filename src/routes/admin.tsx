@@ -106,15 +106,34 @@ function OperatorSignIn() {
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
   const [bootBusy, setBootBusy] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [showReset, setShowReset] = useState(false);
   const nav = useNavigate();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true); setErr(""); setInfo("");
+    setBusy(true); setErr(""); setInfo(""); setShowReset(false);
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
     setBusy(false);
-    if (error) { setErr("Invalid credentials or unauthorized account."); return; }
+    if (error) {
+      setErr("Invalid credentials or unauthorized account.");
+      setShowReset(true);
+      return;
+    }
     nav({ to: "/admin" });
+  }
+
+  async function sendReset() {
+    const target = email.trim().toLowerCase();
+    if (!target) { setErr("Enter the operator email above, then try reset again."); return; }
+    setResetBusy(true); setErr(""); setInfo("");
+    const { error } = await supabase.auth.resetPasswordForEmail(target, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResetBusy(false);
+    if (error) { setErr(error.message); return; }
+    setInfo(`Password reset link sent to ${target}. Check your inbox.`);
+    setShowReset(false);
   }
 
   async function bootstrap() {
@@ -170,6 +189,12 @@ function OperatorSignIn() {
               className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none tracking-widest" />
           </div>
           {err && <div className="rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
+          {showReset && (
+            <button type="button" onClick={sendReset} disabled={resetBusy || !email}
+              className="w-full rounded border border-amber-400/40 bg-amber-400/10 px-4 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-400/20 disabled:opacity-40">
+              {resetBusy ? "Sending reset email…" : `Email a password reset link${email ? ` to ${email.trim().toLowerCase()}` : ""}`}
+            </button>
+          )}
           {info && <div className="rounded border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">{info}</div>}
           <button disabled={busy || !email || !password}
             className="w-full rounded bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2.5 text-sm font-bold text-black hover:brightness-110 disabled:opacity-40">
