@@ -156,36 +156,34 @@ function TransferPage() {
                 <Field label="Recipient Full Name" error={errors.name}>
                   <input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="e.g. Jane Carter" className={inputCls} />
                 </Field>
+                <Field label="Routing Code (9 digits)" error={errors.routing}>
+                  <input value={routingCode} onChange={(e) => setRoutingCode(e.target.value.replace(/\D/g, "").slice(0, 9))} inputMode="numeric" placeholder="121000248" className={inputCls} />
+                  {routingComplete && (
+                    routingMatch ? (
+                      <div className="mt-2 flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2.5">
+                        <Building2 className="h-4 w-4 mt-0.5 text-emerald-700 shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-[10px] uppercase tracking-[0.18em] font-semibold text-emerald-700">Verified Financial Institution</div>
+                          <div className="text-sm font-semibold text-slate-900 truncate">{routingMatch.name}</div>
+                          <div className="text-xs text-slate-600">{routingMatch.address}</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-2 flex items-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                        <Shield className="h-4 w-4 mt-0.5 text-slate-500 shrink-0" />
+                        <div className="text-xs text-slate-600 leading-relaxed">
+                          Routing format valid. Institution not in our quick-lookup registry — please confirm the bank name below matches your recipient's statement.
+                        </div>
+                      </div>
+                    )
+                  )}
+                </Field>
                 <Field label="Recipient Bank" error={errors.bank}>
                   <input value={recipientBank} onChange={(e) => setRecipientBank(e.target.value)} placeholder="e.g. Chase Bank" className={inputCls} />
                 </Field>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Routing Code (9 digits)" error={errors.routing}>
-                    <input value={routingCode} onChange={(e) => setRoutingCode(e.target.value.replace(/\D/g, "").slice(0, 9))} inputMode="numeric" placeholder="121000248" className={inputCls} />
-                    {routingComplete && (
-                      routingMatch ? (
-                        <div className="mt-2 flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2.5">
-                          <Building2 className="h-4 w-4 mt-0.5 text-emerald-700 shrink-0" />
-                          <div className="min-w-0">
-                            <div className="text-[10px] uppercase tracking-[0.18em] font-semibold text-emerald-700">Verified Financial Institution</div>
-                            <div className="text-sm font-semibold text-slate-900 truncate">{routingMatch.name}</div>
-                            <div className="text-xs text-slate-600">{routingMatch.address}</div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="mt-2 flex items-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-                          <Shield className="h-4 w-4 mt-0.5 text-slate-500 shrink-0" />
-                          <div className="text-xs text-slate-600 leading-relaxed">
-                            Routing format valid. Institution not in our quick-lookup registry — please confirm the bank name above matches your recipient's statement.
-                          </div>
-                        </div>
-                      )
-                    )}
-                  </Field>
-                  <Field label="Account Number" error={errors.acct}>
-                    <input value={recipientAcct} onChange={(e) => setRecipientAcct(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="000000000000" className={inputCls} />
-                  </Field>
-                </div>
+                <Field label="Account Number" error={errors.acct}>
+                  <input value={recipientAcct} onChange={(e) => setRecipientAcct(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="000000000000" className={inputCls} />
+                </Field>
               </div>
               <Footer>
                 <Link to="/" className="text-sm text-slate-600 hover:text-slate-900">Cancel</Link>
