@@ -1,0 +1,4 @@
+export const EXTERNAL_SUPABASE_URL = "https://dlcmrygwwagpfsybccbo.supabase.co";
+
+export const EXTERNAL_SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsY21yeWd3d2FncGZzeWJjY2JvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MDIyNDEsImV4cCI6MjA5ODk3ODI0MX0.abUYXRVKypndmt1Qa-d9MJdeuj6b5UFXSTmGc2XLcnc";
