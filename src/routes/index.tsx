@@ -406,7 +406,11 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-slate-900">Unified Activity Ledger</h2>
-              <p className="text-xs text-slate-500 mt-0.5">{userHistory.length} entries · checking, savings, and admin-injected transactions combined · newest first</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {showFullLedger
+                  ? `${userHistory.length} entries · checking, savings, and admin-injected transactions combined · newest first`
+                  : `Showing ${Math.min(5, userHistory.length)} most recent of ${userHistory.length}`}
+              </p>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -421,10 +425,10 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                 </tr>
               </thead>
               <tbody>
-                {userHistory.length === 0 && (
+                {visibleHistory.length === 0 && (
                   <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm">No transactions yet.</td></tr>
                 )}
-                {userHistory.map((t) => {
+                {visibleHistory.map((t) => {
                   const isPending = t.status === "Pending";
                   const isCredit = t.direction === "credit" && t.status === "Approved";
                   const sign = t.status === "Failed" ? "" : (t.direction === "credit" ? "+" : "-");
@@ -455,6 +459,17 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
               </tbody>
             </table>
           </div>
+          {userHistory.length > 5 && (
+            <div className="px-6 py-3 border-t border-slate-100 flex justify-center bg-slate-50/60">
+              <button
+                type="button"
+                onClick={() => setShowFullLedger((v) => !v)}
+                className="text-xs uppercase tracking-[0.18em] font-semibold text-amber-700 hover:text-amber-900 transition"
+              >
+                {showFullLedger ? "Show less ↑" : `View full list (${userHistory.length}) →`}
+              </button>
+            </div>
+          )}
         </section>
       </main>
 
