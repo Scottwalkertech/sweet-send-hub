@@ -233,8 +233,8 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
     setNotEnrolled({ label: item.label });
   }
 
-  const { queue: userPending } = usePendingQueue({ userId: user.id });
-  const userHistory = userPending.slice(0, 20);
+  const { items: unifiedActivity } = useUnifiedUserActivity(user.id);
+  const userHistory = unifiedActivity.slice(0, 40);
 
 
 
