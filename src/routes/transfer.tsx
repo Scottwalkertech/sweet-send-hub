@@ -1,12 +1,26 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, CheckCircle2, Download, Shield, Users, DollarSign } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Download, Shield, Users, DollarSign, Building2 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import {
   currentUser, genRef, fmtCurrency, onStoreChange,
   type MtUser, type PendingTx,
 } from "@/lib/mt-store";
 import { insertPending } from "@/lib/mt-db";
+
+// Local ABA routing lookup — extend as needed. Real, verifiable HQ addresses.
+const ROUTING_DB: Record<string, { name: string; address: string }> = {
+  "021000021": { name: "JPMorgan Chase Bank, N.A.", address: "383 Madison Avenue, New York, NY 10179" },
+  "121000248": { name: "Wells Fargo Bank, N.A.",    address: "420 Montgomery Street, San Francisco, CA 94104" },
+  "026009593": { name: "Bank of America, N.A.",     address: "100 North Tryon Street, Charlotte, NC 28255" },
+  "021000089": { name: "Citibank, N.A.",            address: "388 Greenwich Street, New York, NY 10013" },
+  "031176110": { name: "Capital One, N.A.",         address: "1680 Capital One Drive, McLean, VA 22102" },
+  "071000013": { name: "The Northern Trust Company", address: "50 South LaSalle Street, Chicago, IL 60603" },
+  "322271627": { name: "JPMorgan Chase Bank (CA)",  address: "270 Park Avenue, New York, NY 10017" },
+  "011401533": { name: "TD Bank, N.A.",             address: "1701 Route 70 East, Cherry Hill, NJ 08034" },
+  "124003116": { name: "Zions Bank",                address: "One South Main Street, Salt Lake City, UT 84133" },
+  "064000017": { name: "Truist Bank",               address: "214 North Tryon Street, Charlotte, NC 28202" },
+};
 
 
 export const Route = createFileRoute("/transfer")({
