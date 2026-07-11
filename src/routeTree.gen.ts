@@ -17,6 +17,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountTypeRouteImport } from './routes/account.$type'
+import { Route as ApiPublicBootstrapAdminRouteImport } from './routes/api/public/bootstrap-admin'
 
 const TransferConfirmationRoute = TransferConfirmationRouteImport.update({
   id: '/transfer-confirmation',
@@ -58,6 +59,11 @@ const AccountTypeRoute = AccountTypeRouteImport.update({
   path: '/account/$type',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicBootstrapAdminRoute = ApiPublicBootstrapAdminRouteImport.update({
+  id: '/api/public/bootstrap-admin',
+  path: '/api/public/bootstrap-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -68,6 +74,7 @@ export interface FileRoutesByFullPath {
   '/transfer': typeof TransferRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
   '/account/$type': typeof AccountTypeRoute
+  '/api/public/bootstrap-admin': typeof ApiPublicBootstrapAdminRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByTo {
   '/transfer': typeof TransferRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
   '/account/$type': typeof AccountTypeRoute
+  '/api/public/bootstrap-admin': typeof ApiPublicBootstrapAdminRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -89,6 +97,7 @@ export interface FileRoutesById {
   '/transfer': typeof TransferRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
   '/account/$type': typeof AccountTypeRoute
+  '/api/public/bootstrap-admin': typeof ApiPublicBootstrapAdminRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,6 +110,7 @@ export interface FileRouteTypes {
     | '/transfer'
     | '/transfer-confirmation'
     | '/account/$type'
+    | '/api/public/bootstrap-admin'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,6 +121,7 @@ export interface FileRouteTypes {
     | '/transfer'
     | '/transfer-confirmation'
     | '/account/$type'
+    | '/api/public/bootstrap-admin'
   id:
     | '__root__'
     | '/'
@@ -121,6 +132,7 @@ export interface FileRouteTypes {
     | '/transfer'
     | '/transfer-confirmation'
     | '/account/$type'
+    | '/api/public/bootstrap-admin'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -132,6 +144,7 @@ export interface RootRouteChildren {
   TransferRoute: typeof TransferRoute
   TransferConfirmationRoute: typeof TransferConfirmationRoute
   AccountTypeRoute: typeof AccountTypeRoute
+  ApiPublicBootstrapAdminRoute: typeof ApiPublicBootstrapAdminRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -192,6 +205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountTypeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/bootstrap-admin': {
+      id: '/api/public/bootstrap-admin'
+      path: '/api/public/bootstrap-admin'
+      fullPath: '/api/public/bootstrap-admin'
+      preLoaderRoute: typeof ApiPublicBootstrapAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -204,6 +224,7 @@ const rootRouteChildren: RootRouteChildren = {
   TransferRoute: TransferRoute,
   TransferConfirmationRoute: TransferConfirmationRoute,
   AccountTypeRoute: AccountTypeRoute,
+  ApiPublicBootstrapAdminRoute: ApiPublicBootstrapAdminRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
