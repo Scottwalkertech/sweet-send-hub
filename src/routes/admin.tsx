@@ -872,3 +872,29 @@ function MethodPill({ method }: { method: DbPending["method"] }) {
   return <span className="inline-block rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">{method}</span>;
 
 }
+
+function ServicePanel({ title, enrolled, onToggle, balance, onBalance }: {
+  title: string; enrolled: boolean; onToggle: (v: boolean) => void;
+  balance: number; onBalance: (v: number) => void;
+}) {
+  return (
+    <div className={`rounded-lg border p-3 ${enrolled ? "border-emerald-400/40 bg-emerald-500/[0.06]" : "border-white/10 bg-black/40"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-semibold text-white">{title}</div>
+        <label className="inline-flex items-center gap-1.5 text-[10px] text-slate-300 cursor-pointer">
+          <input type="checkbox" checked={enrolled} onChange={(e) => onToggle(e.target.checked)} className="h-3.5 w-3.5 accent-emerald-500" />
+          {enrolled ? "Enrolled" : "Off"}
+        </label>
+      </div>
+      <label className="mt-3 block text-[10px] uppercase tracking-wider text-slate-400">
+        Balance (USD)
+        <input
+          type="number" step="0.01" value={balance}
+          onChange={(e) => onBalance(Number(e.target.value))}
+          disabled={!enrolled}
+          className="mt-1 w-full rounded-md border border-white/10 bg-black/50 px-2 py-1.5 text-xs font-mono text-white focus:border-amber-400 focus:outline-none disabled:opacity-40"
+        />
+      </label>
+    </div>
+  );
+}
