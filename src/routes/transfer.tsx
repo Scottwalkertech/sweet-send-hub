@@ -3,9 +3,11 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, CheckCircle2, Download, Shield, Users, DollarSign } from "lucide-react";
 import { jsPDF } from "jspdf";
 import {
-  currentUser, pushToQueue, genRef, fmtCurrency, onStoreChange,
+  currentUser, genRef, fmtCurrency, onStoreChange,
   type MtUser, type PendingTx,
 } from "@/lib/mt-store";
+import { insertPending } from "@/lib/mt-db";
+
 
 export const Route = createFileRoute("/transfer")({
   head: () => ({
