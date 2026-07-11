@@ -403,8 +403,8 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
         <section className="bg-white border border-slate-200 rounded-xl">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Statement Activity Ledger</h2>
-              <p className="text-xs text-slate-500 mt-0.5">{userHistory.length} entries · pending items settle within 1–2 business days</p>
+              <h2 className="text-sm font-semibold text-slate-900">Unified Activity Ledger</h2>
+              <p className="text-xs text-slate-500 mt-0.5">{userHistory.length} entries · checking, savings, and admin-injected transactions combined · newest first</p>
             </div>
           </div>
           <div className="overflow-x-auto">
