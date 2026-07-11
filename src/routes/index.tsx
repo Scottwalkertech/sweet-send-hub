@@ -7,7 +7,7 @@ import {
   genAccountNumber, maskAccount,
   type MtUser, type ChatMessage,
 } from "@/lib/mt-store";
-import { usePendingQueue } from "@/lib/mt-db";
+import { useUnifiedUserActivity } from "@/lib/mt-db";
 import { supabase } from "@/integrations/supabase/client";
 
 
