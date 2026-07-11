@@ -119,12 +119,13 @@ function AccountPage() {
                 )}
                 {entries.map((e) => (
                   <tr key={e.id} className="border-t border-slate-100">
-                    <td className="px-6 py-3 text-[#333333] whitespace-nowrap">{new Date(e.date).toLocaleDateString()}</td>
+                    <td className="px-6 py-3 text-[#333333] whitespace-nowrap">{new Date(e.posted_at).toLocaleDateString()}</td>
                     <td className="px-6 py-3 text-[#1e3a8a]">{e.description}</td>
-                    <td className={`px-6 py-3 text-right font-mono tabular-nums ${e.amount >= 0 ? "text-emerald-700" : "text-red-700"}`}>
-                      {e.amount >= 0 ? "+" : "-"}{fmtCurrency(Math.abs(e.amount))}
+                    <td className={`px-6 py-3 text-right font-mono tabular-nums ${Number(e.amount) >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                      {Number(e.amount) >= 0 ? "+" : "-"}{fmtCurrency(Math.abs(Number(e.amount)))}
                     </td>
-                    <td className="px-6 py-3 text-right font-mono tabular-nums text-[#1e3a8a]">{fmtCurrency(e.balanceAfter)}</td>
+                    <td className="px-6 py-3 text-right font-mono tabular-nums text-[#1e3a8a]">{fmtCurrency(Number(e.balance_after))}</td>
+
                   </tr>
                 ))}
               </tbody>
