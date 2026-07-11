@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      pending_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          direction: string
+          id: string
+          memo: string | null
+          method: string
+          recipient: string | null
+          recipient_acct: string | null
+          recipient_bank: string | null
+          reference: string
+          resolved_at: string | null
+          routing: string | null
+          status: string
+          submitted_at: string
+          updated_at: string
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          direction: string
+          id?: string
+          memo?: string | null
+          method: string
+          recipient?: string | null
+          recipient_acct?: string | null
+          recipient_bank?: string | null
+          reference: string
+          resolved_at?: string | null
+          routing?: string | null
+          status?: string
+          submitted_at?: string
+          updated_at?: string
+          user_id: string
+          user_name?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          direction?: string
+          id?: string
+          memo?: string | null
+          method?: string
+          recipient?: string | null
+          recipient_acct?: string | null
+          recipient_bank?: string | null
+          reference?: string
+          resolved_at?: string | null
+          routing?: string | null
+          status?: string
+          submitted_at?: string
+          updated_at?: string
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           account_number: string
@@ -113,6 +173,39 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           value?: Json
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          account: string
+          amount: number
+          balance_after: number
+          created_at: string
+          description: string
+          id: string
+          posted_at: string
+          user_id: string
+        }
+        Insert: {
+          account: string
+          amount: number
+          balance_after: number
+          created_at?: string
+          description: string
+          id?: string
+          posted_at?: string
+          user_id: string
+        }
+        Update: {
+          account?: string
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          description?: string
+          id?: string
+          posted_at?: string
+          user_id?: string
         }
         Relationships: []
       }
