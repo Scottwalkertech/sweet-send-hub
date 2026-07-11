@@ -353,11 +353,12 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
                 {queue.map((tx) => (
                   <tr key={tx.id} className="border-t border-white/5 hover:bg-white/[0.03]">
                     <Td className="font-mono text-xs text-amber-300">{tx.reference}</Td>
-                    <Td className="text-white">{tx.userName}</Td>
+                    <Td className="text-white">{tx.user_name}</Td>
                     <Td><MethodPill method={tx.method} /></Td>
                     <Td className="text-xs text-slate-400">{tx.direction === "credit" ? "Credit ↓" : "Debit ↑"}</Td>
-                    <Td className="text-slate-400 text-xs">{tx.submitted}</Td>
-                    <Td className={`text-right font-mono ${tx.direction === "credit" ? "text-emerald-300" : "text-red-300"}`}>{tx.direction === "credit" ? "+" : "-"}{fmtCurrency(tx.amount)}</Td>
+                    <Td className="text-slate-400 text-xs">{tx.submitted_at.slice(0, 10)}</Td>
+                    <Td className={`text-right font-mono ${tx.direction === "credit" ? "text-emerald-300" : "text-red-300"}`}>{tx.direction === "credit" ? "+" : "-"}{fmtCurrency(Number(tx.amount))}</Td>
+
                     <Td><TxStatus status={tx.status} /></Td>
                     <Td className="text-right">
                       <div className="inline-flex gap-2">
