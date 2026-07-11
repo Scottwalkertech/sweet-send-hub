@@ -147,7 +147,7 @@ function InternalTransfer({ user, source }: { user: MtUser; source: AccountKey }
     { key: "savings" as AccountKey, label: "Transfer to Savings" },
   ].filter((o) => o.key !== source)), [source]);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
     const amt = Number(amount);
@@ -158,29 +158,32 @@ function InternalTransfer({ user, source }: { user: MtUser; source: AccountKey }
 
     const newChecking = user.balance + (source === "checking" ? -amt : dest === "checking" ? amt : 0);
     const newSavings = user.savingsBalance + (source === "savings" ? -amt : dest === "savings" ? amt : 0);
-
-    const updated: MtUser = { ...user, balance: newChecking, savingsBalance: newSavings };
-    upsertUser(updated);
-
     const nowIso = new Date().toISOString();
     const destLabel = dest === "checking" ? "Everyday Checking" : "Way2Save Savings";
-    appendLedger({
-      id: `led_${Math.random().toString(36).slice(2, 10)}`,
-      userId: user.id, account: source, date: nowIso,
-      description: `Internal transfer to ${destLabel}`,
-      amount: -amt,
-      balanceAfter: source === "checking" ? newChecking : newSavings,
-    });
-    appendLedger({
-      id: `led_${Math.random().toString(36).slice(2, 10)}`,
-      userId: user.id, account: dest, date: nowIso,
-      description: `Internal transfer from ${srcLabel}`,
-      amount: amt,
-      balanceAfter: dest === "checking" ? newChecking : newSavings,
-    });
-    setAmount("");
-    setMsg({ ok: true, text: `Transferred ${fmtCurrency(amt)} to ${destLabel}.` });
+
+    try {
+      // Persist balances to Supabase profile so admin + realtime dashboards see them.
+      await updateProfile(user.id, { balance: newChecking, savings_balance: newSavings });
+      // Post ledger entries to the transactions table (realtime).
+      await insertTransaction({
+        user_id: user.id, account: source, posted_at: nowIso,
+        description: `Internal transfer to ${destLabel}`,
+        amount: -amt, balance_after: source === "checking" ? newChecking : newSavings,
+      });
+      await insertTransaction({
+        user_id: user.id, account: dest, posted_at: nowIso,
+        description: `Internal transfer from ${srcLabel}`,
+        amount: amt, balance_after: dest === "checking" ? newChecking : newSavings,
+      });
+      // Mirror to local user cache so the header balance updates immediately.
+      upsertUser({ ...user, balance: newChecking, savingsBalance: newSavings });
+      setAmount("");
+      setMsg({ ok: true, text: `Transferred ${fmtCurrency(amt)} to ${destLabel}.` });
+    } catch (err) {
+      setMsg({ ok: false, text: `Transfer failed: ${(err as Error).message}` });
+    }
   }
+
 
   return (
     <section className="rounded-2xl border border-[#1e3a8a] bg-white p-6 shadow-md shadow-[#0a2540]/10">
