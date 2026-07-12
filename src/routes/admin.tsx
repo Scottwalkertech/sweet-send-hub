@@ -392,14 +392,13 @@ function DeleteAccountModal({ profile, onClose, onDeleted }: {
       // Wipe every row keyed to this user across the ops tables. Any failure
       // here (missing admin RLS, etc.) surfaces to the operator immediately.
       const uid = profile.id;
-      const steps: Array<Promise<{ error: { message: string } | null }>> = [
+      const results = await Promise.all([
         supabase.from("chat_messages" as never).delete().eq("thread_user_id", uid),
         supabase.from("transactions").delete().eq("user_id", uid),
         supabase.from("pending_transactions").delete().eq("user_id", uid),
         supabase.from("user_roles").delete().eq("user_id", uid),
         supabase.from("profiles").delete().eq("id", uid),
-      ];
-      const results = await Promise.all(steps);
+      ]);
       const firstError = results.find((r) => r.error)?.error;
       if (firstError) throw new Error(firstError.message);
       onDeleted(`Deleted ${profile.name || profile.email}. Auth login must be revoked from the Supabase Auth dashboard.`);
