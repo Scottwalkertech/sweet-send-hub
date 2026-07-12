@@ -3,11 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import {
   loadUsers, upsertUser, saveUsers, setCurrentUserId, currentUser,
   onStoreChange, fmtCurrency,
-  loadChatThread, appendChatMessage,
   genAccountNumber, maskAccount,
-  type MtUser, type ChatMessage,
+  type MtUser,
 } from "@/lib/mt-store";
-import { useUnifiedUserActivity } from "@/lib/mt-db";
+import { useUnifiedUserActivity, updateProfile } from "@/lib/mt-db";
+import { useChatThread, sendChatMessage } from "@/lib/mt-chat";
 import { supabase } from "@/lib/external-supabase";
 
 
