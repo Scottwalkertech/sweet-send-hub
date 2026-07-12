@@ -305,6 +305,11 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
       </section>
 
       <section className="mx-auto max-w-7xl px-4 mt-10">
+        <SectionHeader title="Live Chat Center" subtitle="Reply to customer secure messages. Threads and replies stream live." />
+        <ChatCenter profiles={profiles} adminUserId={userId} />
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 mt-10">
         <TemplateRepositoryPanel profiles={profiles} flash={flash} />
       </section>
 
