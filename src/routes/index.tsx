@@ -704,14 +704,6 @@ function ProfileModal({ user, onClose }: { user: MtUser; onClose: () => void }) 
   );
 }
 
-function ProfRowRO({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{label}</div>
-      <div className="text-sm text-slate-900 mt-0.5">{value || <span className="text-slate-400 italic">Not set</span>}</div>
-    </div>
-  );
-}
 
 
 function EditablePersonalInfo({ user }: { user: MtUser }) {
