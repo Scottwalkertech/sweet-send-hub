@@ -711,7 +711,77 @@ function ProfRowRO({ label, value }: { label: string; value: string }) {
       <div className="text-sm text-slate-900 mt-0.5">{value || <span className="text-slate-400 italic">Not set</span>}</div>
     </div>
   );
+
+function EditablePersonalInfo({ user }: { user: MtUser }) {
+  const [name, setName] = useState(user.name ?? "");
+  const [phone, setPhone] = useState(user.phone ?? "");
+  const [address, setAddress] = useState(user.address ?? "");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    setName(user.name ?? "");
+    setPhone(user.phone ?? "");
+    setAddress(user.address ?? "");
+  }, [user.id, user.name, user.phone, user.address]);
+
+  const dirty = name !== (user.name ?? "") || phone !== (user.phone ?? "") || address !== (user.address ?? "");
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (saving || !dirty) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      await updateProfile(user.id, { name, phone: phone || null, address: address || null });
+      upsertUser({ ...user, name, phone, address });
+      setMsg({ ok: true, text: "Profile updated." });
+      setTimeout(() => setMsg(null), 2400);
+    } catch (err) {
+      setMsg({ ok: false, text: `Update failed: ${(err as Error).message}` });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="px-6 py-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Personal Information</div>
+        <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 bg-emerald-50">
+          ✎ Editable
+        </span>
+      </div>
+      <label className="block">
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Full Name</div>
+        <input value={name} onChange={(e) => setName(e.target.value)} required
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+      </label>
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Email</div>
+        <div className="mt-1 text-sm text-slate-500">{user.email} <span className="text-[10px] text-slate-400">(contact support to change)</span></div>
+      </div>
+      <label className="block">
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Phone Number</div>
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="+1 (555) 123-4567"
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+      </label>
+      <label className="block">
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Address</div>
+        <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} placeholder="Street, City, State ZIP"
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none" />
+      </label>
+      {msg && (
+        <div className={`text-xs rounded px-3 py-2 border ${msg.ok ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-red-50 border-red-200 text-red-700"}`}>{msg.text}</div>
+      )}
+      <button type="submit" disabled={saving || !dirty}
+        className="w-full rounded-md bg-gradient-to-r from-amber-400 to-amber-600 text-black text-sm font-semibold py-2.5 hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed">
+        {saving ? "Updating…" : "Update Profile"}
+      </button>
+    </form>
+  );
 }
+
 
 function DebitCardModal({ user, onClose }: { user: MtUser; onClose: () => void }) {
   const [frozen, setFrozen] = useState(!!user.debitFrozen);
