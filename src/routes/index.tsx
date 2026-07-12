@@ -711,6 +711,8 @@ function ProfRowRO({ label, value }: { label: string; value: string }) {
       <div className="text-sm text-slate-900 mt-0.5">{value || <span className="text-slate-400 italic">Not set</span>}</div>
     </div>
   );
+}
+
 
 function EditablePersonalInfo({ user }: { user: MtUser }) {
   const [name, setName] = useState(user.name ?? "");
