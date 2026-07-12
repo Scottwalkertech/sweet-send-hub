@@ -3,11 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import {
   loadUsers, upsertUser, saveUsers, setCurrentUserId, currentUser,
   onStoreChange, fmtCurrency,
-  loadChatThread, appendChatMessage,
   genAccountNumber, maskAccount,
-  type MtUser, type ChatMessage,
+  type MtUser,
 } from "@/lib/mt-store";
-import { useUnifiedUserActivity } from "@/lib/mt-db";
+import { useUnifiedUserActivity, updateProfile } from "@/lib/mt-db";
+import { useChatThread, sendChatMessage } from "@/lib/mt-chat";
 import { supabase } from "@/lib/external-supabase";
 
 
@@ -517,40 +517,42 @@ function NotEnrolledModal({ label, onClose }: { label: string; onClose: () => vo
 }
 
 function ChatDrawer({ open, onClose, userId, userName }: { open: boolean; onClose: () => void; userId: string; userName: string }) {
-  const [msgs, setMsgs] = useState<ChatMessage[]>([]);
+  const { messages, error } = useChatThread(userId);
   const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Post a one-time greeting from the concierge if the thread is empty.
   useEffect(() => {
-    function refresh() {
-      const thread = loadChatThread(userId);
-      if (thread.length === 0) {
-        const greeting: ChatMessage = {
-          id: `m_${Date.now()}`,
-          from: "agent",
-          text: `Hello ${userName.split(" ")[0]}, this channel is encrypted end-to-end. How can our secure messaging team help you today?`,
-          ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        };
-        appendChatMessage(userId, greeting);
-        setMsgs([greeting]);
-      } else {
-        setMsgs(thread);
-      }
+    if (!open || !userId || error) return;
+    if (messages.length === 0) {
+      const greet = `Hello ${userName.split(" ")[0]}, this channel is encrypted end-to-end. How can our secure messaging team help you today?`;
+      sendChatMessage(userId, "admin", greet).catch(() => { /* silent — table may be missing */ });
     }
-    refresh();
-    return onStoreChange(refresh);
-  }, [userId, userName]);
+  }, [open, userId, userName, messages.length, error]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [msgs, open]);
+  }, [messages, open]);
 
-  function send() {
-    const v = text.trim(); if (!v) return;
-    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    appendChatMessage(userId, { id: `m_${Date.now()}`, from: "user", text: v, ts: now });
-    setText("");
+  async function send() {
+    const v = text.trim();
+    if (!v || sending) return;
+    setSending(true);
+    try {
+      await sendChatMessage(userId, "user", v);
+      setText("");
+    } catch (e) {
+      console.error("chat send failed", e);
+    } finally {
+      setSending(false);
+    }
   }
+
+  function fmtTs(iso: string) {
+    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
   return (
     <div className={`fixed bottom-6 right-6 z-40 transition-all duration-300 ${open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 translate-y-4 pointer-events-none"}`}>
       <div className="w-[340px] rounded-2xl border border-slate-800 bg-white shadow-2xl overflow-hidden flex flex-col" style={{ height: 460 }}>
@@ -562,11 +564,16 @@ function ChatDrawer({ open, onClose, userId, userName }: { open: boolean; onClos
           <button onClick={onClose} className="text-white/60 hover:text-white text-xl leading-none">×</button>
         </div>
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50">
-          {msgs.map((m) => (
-            <div key={m.id} className={`flex ${m.from === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.from === "user" ? "bg-slate-900 text-white rounded-br-sm" : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"}`}>
-                <div>{m.text}</div>
-                <div className={`text-[10px] mt-1 ${m.from === "user" ? "text-white/50" : "text-slate-400"}`}>{m.ts}</div>
+          {error && (
+            <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5">
+              Chat unavailable: {error}
+            </div>
+          )}
+          {messages.map((m) => (
+            <div key={m.id} className={`flex ${m.sender === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.sender === "user" ? "bg-slate-900 text-white rounded-br-sm" : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"}`}>
+                <div>{m.body}</div>
+                <div className={`text-[10px] mt-1 ${m.sender === "user" ? "text-white/50" : "text-slate-400"}`}>{fmtTs(m.created_at)}</div>
               </div>
             </div>
           ))}
@@ -574,12 +581,13 @@ function ChatDrawer({ open, onClose, userId, userName }: { open: boolean; onClos
         <div className="border-t border-slate-200 p-2 flex items-center gap-2 bg-white">
           <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }}
             placeholder="Write a secure message…" className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
-          <button onClick={send} className="rounded-md bg-gradient-to-r from-amber-400 to-amber-600 text-black text-xs font-semibold px-3 py-2 hover:brightness-110">Send</button>
+          <button onClick={send} disabled={sending} className="rounded-md bg-gradient-to-r from-amber-400 to-amber-600 text-black text-xs font-semibold px-3 py-2 hover:brightness-110 disabled:opacity-50">Send</button>
         </div>
       </div>
     </div>
   );
 }
+
 
 
 function QuickAction({ to, title, subtitle }: { to: string; title: string; subtitle: string }) {
@@ -664,21 +672,8 @@ function ProfileModal({ user, onClose }: { user: MtUser; onClose: () => void }) 
           </div>
         </div>
 
-        <div className="px-6 py-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Personal Information</div>
-            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-slate-500 border border-slate-200 rounded-full px-2 py-0.5 bg-slate-50">
-              🔒 Read-only
-            </span>
-          </div>
-          <ProfRowRO label="Full Name" value={user.name} />
-          <ProfRowRO label="Email" value={user.email} />
-          <ProfRowRO label="Phone" value={user.phone} />
-          <ProfRowRO label="Address" value={user.address ?? ""} />
-          <div className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-md px-3 py-2 leading-relaxed">
-            For your security, only Dynamic Bank of West operators can modify identity fields. Submit a written request through Secure Messages to update your profile.
-          </div>
-        </div>
+        <EditablePersonalInfo user={user} />
+
 
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/60">
           {!pwOpen
@@ -709,14 +704,78 @@ function ProfileModal({ user, onClose }: { user: MtUser; onClose: () => void }) 
   );
 }
 
-function ProfRowRO({ label, value }: { label: string; value: string }) {
+
+
+function EditablePersonalInfo({ user }: { user: MtUser }) {
+  const [name, setName] = useState(user.name ?? "");
+  const [phone, setPhone] = useState(user.phone ?? "");
+  const [address, setAddress] = useState(user.address ?? "");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    setName(user.name ?? "");
+    setPhone(user.phone ?? "");
+    setAddress(user.address ?? "");
+  }, [user.id, user.name, user.phone, user.address]);
+
+  const dirty = name !== (user.name ?? "") || phone !== (user.phone ?? "") || address !== (user.address ?? "");
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (saving || !dirty) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      await updateProfile(user.id, { name, phone: phone || null, address: address || null });
+      upsertUser({ ...user, name, phone, address });
+      setMsg({ ok: true, text: "Profile updated." });
+      setTimeout(() => setMsg(null), 2400);
+    } catch (err) {
+      setMsg({ ok: false, text: `Update failed: ${(err as Error).message}` });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <div>
-      <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{label}</div>
-      <div className="text-sm text-slate-900 mt-0.5">{value || <span className="text-slate-400 italic">Not set</span>}</div>
-    </div>
+    <form onSubmit={submit} className="px-6 py-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Personal Information</div>
+        <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 bg-emerald-50">
+          ✎ Editable
+        </span>
+      </div>
+      <label className="block">
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Full Name</div>
+        <input value={name} onChange={(e) => setName(e.target.value)} required
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+      </label>
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Email</div>
+        <div className="mt-1 text-sm text-slate-500">{user.email} <span className="text-[10px] text-slate-400">(contact support to change)</span></div>
+      </div>
+      <label className="block">
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Phone Number</div>
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="+1 (555) 123-4567"
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+      </label>
+      <label className="block">
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Address</div>
+        <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} placeholder="Street, City, State ZIP"
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none" />
+      </label>
+      {msg && (
+        <div className={`text-xs rounded px-3 py-2 border ${msg.ok ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-red-50 border-red-200 text-red-700"}`}>{msg.text}</div>
+      )}
+      <button type="submit" disabled={saving || !dirty}
+        className="w-full rounded-md bg-gradient-to-r from-amber-400 to-amber-600 text-black text-sm font-semibold py-2.5 hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed">
+        {saving ? "Updating…" : "Update Profile"}
+      </button>
+    </form>
   );
 }
+
 
 function DebitCardModal({ user, onClose }: { user: MtUser; onClose: () => void }) {
   const [frozen, setFrozen] = useState(!!user.debitFrozen);
