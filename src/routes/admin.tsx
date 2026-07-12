@@ -172,6 +172,7 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
   const banner = useSystemSetting("banner");
   const { queue } = usePendingQueue({ adminAll: true });
   const [editing, setEditing] = useState<DbProfile | null>(null);
+  const [deleting, setDeleting] = useState<DbProfile | null>(null);
   const [toast, setToast] = useState("");
 
   function flash(m: string) { setToast(m); setTimeout(() => setToast(""), 2600); }
