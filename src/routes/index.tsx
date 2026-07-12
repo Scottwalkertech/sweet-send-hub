@@ -672,21 +672,8 @@ function ProfileModal({ user, onClose }: { user: MtUser; onClose: () => void }) 
           </div>
         </div>
 
-        <div className="px-6 py-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Personal Information</div>
-            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-slate-500 border border-slate-200 rounded-full px-2 py-0.5 bg-slate-50">
-              🔒 Read-only
-            </span>
-          </div>
-          <ProfRowRO label="Full Name" value={user.name} />
-          <ProfRowRO label="Email" value={user.email} />
-          <ProfRowRO label="Phone" value={user.phone} />
-          <ProfRowRO label="Address" value={user.address ?? ""} />
-          <div className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-md px-3 py-2 leading-relaxed">
-            For your security, only Dynamic Bank of West operators can modify identity fields. Submit a written request through Secure Messages to update your profile.
-          </div>
-        </div>
+        <EditablePersonalInfo user={user} />
+
 
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/60">
           {!pwOpen
