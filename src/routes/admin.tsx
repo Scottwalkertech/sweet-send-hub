@@ -358,9 +358,226 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
         />
       )}
 
+      {deleting && (
+        <DeleteAccountModal
+          profile={deleting}
+          onClose={() => setDeleting(null)}
+          onDeleted={(msg) => { setDeleting(null); flash(msg); }}
+        />
+      )}
+
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-4 py-2 text-sm text-emerald-200 shadow-lg backdrop-blur">{toast}</div>
       )}
+    </div>
+  );
+}
+
+// -- Delete account modal ----------------------------------------------------
+
+function DeleteAccountModal({ profile, onClose, onDeleted }: {
+  profile: DbProfile;
+  onClose: () => void;
+  onDeleted: (msg: string) => void;
+}) {
+  const [confirmText, setConfirmText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const canConfirm = confirmText.trim().toUpperCase() === "DELETE";
+
+  async function submit() {
+    if (!canConfirm || busy) return;
+    setBusy(true); setErr(null);
+    try {
+      // Wipe every row keyed to this user across the ops tables. Any failure
+      // here (missing admin RLS, etc.) surfaces to the operator immediately.
+      const uid = profile.id;
+      const steps: Array<Promise<{ error: { message: string } | null }>> = [
+        supabase.from("chat_messages" as never).delete().eq("thread_user_id", uid),
+        supabase.from("transactions").delete().eq("user_id", uid),
+        supabase.from("pending_transactions").delete().eq("user_id", uid),
+        supabase.from("user_roles").delete().eq("user_id", uid),
+        supabase.from("profiles").delete().eq("id", uid),
+      ];
+      const results = await Promise.all(steps);
+      const firstError = results.find((r) => r.error)?.error;
+      if (firstError) throw new Error(firstError.message);
+      onDeleted(`Deleted ${profile.name || profile.email}. Auth login must be revoked from the Supabase Auth dashboard.`);
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center px-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-xl border border-red-500/30 bg-[#12161f] p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="text-xs uppercase tracking-[0.2em] text-red-400 font-semibold">Danger Zone</div>
+        <h3 className="mt-2 text-lg font-semibold text-white">Are you sure you want to permanently delete this user?</h3>
+        <p className="mt-2 text-sm text-slate-400">
+          <span className="text-white font-medium">{profile.name || "(no name)"}</span> — {profile.email}
+        </p>
+        <ul className="mt-4 text-xs text-slate-400 space-y-1 list-disc pl-5">
+          <li>Profile, roles, transactions, pending requests, and chat threads will be permanently deleted.</li>
+          <li>The auth login itself can only be removed with the service-role key from the Supabase Auth dashboard.</li>
+        </ul>
+        <label className="mt-4 block text-xs uppercase tracking-wider text-slate-400">
+          Type <span className="text-red-300 font-mono">DELETE</span> to confirm
+          <input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} autoFocus
+            className="mt-1 w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:border-red-400 focus:outline-none" />
+        </label>
+        {err && <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} disabled={busy} className="rounded border border-white/10 px-4 py-2 text-xs hover:bg-white/5">Cancel</button>
+          <button onClick={submit} disabled={!canConfirm || busy}
+            className="rounded bg-gradient-to-r from-red-500 to-red-700 px-4 py-2 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-40">
+            {busy ? "Deleting…" : "Permanently Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -- Live chat center --------------------------------------------------------
+
+function ChatCenter({ profiles, adminUserId }: { profiles: DbProfile[]; adminUserId: string }) {
+  const { threads, error } = useAllChatThreads(true);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const { messages } = useChatThread(selected);
+
+  useEffect(() => {
+    if (!selected && threads[0]) setSelected(threads[0].thread_user_id);
+  }, [threads, selected]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [messages, selected]);
+
+  const profileById = useMemo(() => {
+    const m = new Map<string, DbProfile>();
+    for (const p of profiles) m.set(p.id, p);
+    return m;
+  }, [profiles]);
+
+  async function reply() {
+    const body = text.trim();
+    if (!body || !selected || sending) return;
+    setSending(true);
+    try {
+      await sendChatMessage(selected, "admin", body);
+      setText("");
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function clearThread() {
+    if (!selected) return;
+    if (!confirm("Delete all messages in this thread? This cannot be undone.")) return;
+    await deleteChatThread(selected);
+  }
+
+  const selProfile = selected ? profileById.get(selected) : null;
+
+  return (
+    <div className="mt-4 rounded-xl border border-white/10 bg-[#0f1420] overflow-hidden">
+      {error && (
+        <div className="px-4 py-2 text-xs text-red-300 border-b border-red-400/30 bg-red-500/10">
+          Chat unavailable: {error}. Ensure the `chat_messages` table exists on the connected Supabase project.
+        </div>
+      )}
+      <div className="grid md:grid-cols-[280px_1fr] min-h-[420px]">
+        {/* Threads */}
+        <div className="border-r border-white/10 bg-black/30 max-h-[520px] overflow-y-auto">
+          <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-slate-400 border-b border-white/10">Threads ({threads.length})</div>
+          {threads.length === 0 && !error && (
+            <div className="p-4 text-xs text-slate-500">No customer messages yet.</div>
+          )}
+          {threads.map((t) => {
+            const p = profileById.get(t.thread_user_id);
+            const active = t.thread_user_id === selected;
+            return (
+              <button key={t.thread_user_id} onClick={() => setSelected(t.thread_user_id)}
+                className={`w-full text-left px-3 py-3 border-b border-white/5 hover:bg-white/[0.04] ${active ? "bg-amber-400/10" : ""}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-medium text-white truncate">{p?.name || p?.email || t.thread_user_id.slice(0, 8)}</div>
+                  {t.unread_admin > 0 && (
+                    <span className="rounded-full bg-red-500 text-white text-[10px] px-1.5 py-0.5 font-semibold">{t.unread_admin}</span>
+                  )}
+                </div>
+                <div className="mt-0.5 text-[11px] text-slate-500 truncate">
+                  <span className={t.last_sender === "admin" ? "text-amber-300" : "text-slate-400"}>
+                    {t.last_sender === "admin" ? "You: " : ""}
+                  </span>
+                  {t.last_body}
+                </div>
+                <div className="text-[10px] text-slate-600 mt-0.5">{new Date(t.last_at).toLocaleString()}</div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Conversation */}
+        <div className="flex flex-col">
+          {!selected ? (
+            <div className="flex-1 flex items-center justify-center text-sm text-slate-500">Select a thread to reply.</div>
+          ) : (
+            <>
+              <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+                <div>
+                  <div className="text-sm font-semibold text-white">{selProfile?.name || selProfile?.email || "Customer"}</div>
+                  <div className="text-[11px] text-slate-500">{selProfile?.email}</div>
+                </div>
+                <button onClick={clearThread} className="text-[11px] text-red-300 hover:text-red-200 border border-red-400/30 rounded px-2 py-1">
+                  Clear thread
+                </button>
+              </div>
+              <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#0a0d14] max-h-[420px]">
+                {messages.map((m) => (
+                  <div key={m.id} className={`flex ${m.sender === "admin" ? "justify-end" : "justify-start"}`}>
+                    <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
+                      m.sender === "admin"
+                        ? "bg-gradient-to-br from-amber-400 to-amber-600 text-black rounded-br-sm shadow-lg shadow-amber-500/20"
+                        : "bg-white/[0.06] border border-white/10 text-slate-200 rounded-bl-sm"
+                    }`}>
+                      <div className="text-[10px] font-semibold uppercase tracking-wider opacity-70 mb-0.5">
+                        {m.sender === "admin" ? "Operator" : (selProfile?.name?.split(" ")[0] || "Customer")}
+                      </div>
+                      <div className="whitespace-pre-wrap">{m.body}</div>
+                      <div className={`text-[10px] mt-1 ${m.sender === "admin" ? "text-black/60" : "text-slate-500"}`}>
+                        {new Date(m.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {messages.length === 0 && (
+                  <div className="text-xs text-slate-500 text-center py-6">No messages yet.</div>
+                )}
+              </div>
+              <div className="border-t border-white/10 p-3 bg-black/40 flex items-end gap-2">
+                <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); reply(); } }}
+                  placeholder="Type a reply as Operator… (Shift+Enter for newline)"
+                  className="flex-1 rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none resize-none" />
+                <button onClick={reply} disabled={!text.trim() || sending}
+                  className="rounded-md bg-gradient-to-r from-amber-400 to-amber-600 text-black text-xs font-bold px-4 py-2 hover:brightness-110 disabled:opacity-40">
+                  {sending ? "Sending…" : "Reply"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+      <div className="px-4 py-2 text-[10px] text-slate-500 border-t border-white/10 bg-black/20">
+        Signed in as operator <span className="text-amber-300 font-mono">{adminUserId.slice(0, 8)}</span> · replies are labeled "Operator" and highlighted for customers.
+      </div>
     </div>
   );
 }
