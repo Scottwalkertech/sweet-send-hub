@@ -25,6 +25,8 @@ type Form = {
   email: string;
   password: string;
   confirm: string;
+  securityQ: string;
+  securityA: string;
 };
 
 function SignupPage() {
