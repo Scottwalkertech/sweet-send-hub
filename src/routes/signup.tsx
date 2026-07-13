@@ -8,6 +8,7 @@ import {
   saveUsers,
   type MtUser,
 } from "@/lib/mt-store";
+import { SECURITY_QUESTIONS, normalizeSecurityAnswer } from "@/lib/security-questions";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
@@ -24,10 +25,12 @@ type Form = {
   email: string;
   password: string;
   confirm: string;
+  securityQ: string;
+  securityA: string;
 };
 
 function SignupPage() {
-  const [form, setForm] = useState<Form>({ name: "", email: "", password: "", confirm: "" });
+  const [form, setForm] = useState<Form>({ name: "", email: "", password: "", confirm: "", securityQ: SECURITY_QUESTIONS[0], securityA: "" });
   const [err, setErr] = useState("");
   const [agree, setAgree] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -44,6 +47,8 @@ function SignupPage() {
     if (!/^\S+@\S+\.\S+$/.test(form.email)) return setErr("Enter a valid email address.");
     if (form.password.length < 8) return setErr("Password must be at least 8 characters.");
     if (form.password !== form.confirm) return setErr("Passwords do not match.");
+    if (!form.securityQ) return setErr("Please choose a security question.");
+    if (normalizeSecurityAnswer(form.securityA).length < 2) return setErr("Please provide an answer to your security question.");
     if (!agree) return setErr("You must agree to the disclosures to open an account.");
 
     setSubmitting(true);
@@ -71,8 +76,8 @@ function SignupPage() {
         password: form.password, // legacy shim; real auth is via Supabase
         phone: "",
         ssn: "",
-        securityQ: "",
-        securityA: "",
+        securityQ: form.securityQ,
+        securityA: normalizeSecurityAnswer(form.securityA),
         accountNumber: acctFull,
         account: maskAccount(acctFull),
         tier: "Standard",
@@ -118,6 +123,22 @@ function SignupPage() {
             <Field label="Email address" type="email" value={form.email} onChange={(v) => update("email", v)} placeholder="you@email.com" />
             <Field label="Password" type="password" value={form.password} onChange={(v) => update("password", v)} placeholder="At least 8 characters" />
             <Field label="Confirm password" type="password" value={form.confirm} onChange={(v) => update("confirm", v)} placeholder="Repeat password" />
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Security question</label>
+              <select
+                value={form.securityQ}
+                onChange={(e) => update("securityQ", e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+              >
+                {SECURITY_QUESTIONS.map((q) => (
+                  <option key={q} value={q}>{q}</option>
+                ))}
+              </select>
+            </div>
+            <Field label="Your answer" value={form.securityA} onChange={(v) => update("securityA", v)} placeholder="Used to verify sign-ins" />
           </div>
 
           <label className="flex items-start gap-2 text-xs text-slate-600">
