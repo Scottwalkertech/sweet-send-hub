@@ -90,6 +90,10 @@ function Login({ onAuth }: { onAuth: (u: MtUser) => void }) {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  // Phase 2 state: after valid credentials, verify (or set) the security answer.
+  const [pending, setPending] = useState<{ user: MtUser; mode: "verify" | "setup" } | null>(null);
+  const [answer, setAnswer] = useState("");
+  const [setupQ, setSetupQ] = useState(SECURITY_QUESTIONS[0]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -141,8 +145,96 @@ function Login({ onAuth }: { onAuth: (u: MtUser) => void }) {
     }
 
     if (match.status === "Frozen") { setErr("This account is frozen. Contact support at 1-800-DBW-BANK."); return; }
+
+    // Mandatory security-question phase before granting dashboard access.
+    const hasSecurity = !!match.securityQ && !!match.securityA;
+    setAnswer("");
+    setPending({ user: match, mode: hasSecurity ? "verify" : "setup" });
+  }
+
+  function completeAuth(u: MtUser) {
     window.dispatchEvent(new Event("ptl:show"));
-    setTimeout(() => onAuth(match!), 700);
+    setTimeout(() => onAuth(u), 700);
+  }
+
+  function verifyAnswer(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pending) return;
+    if (pending.mode === "verify") {
+      if (normalizeSecurityAnswer(answer) !== normalizeSecurityAnswer(pending.user.securityA)) {
+        setErr("That answer doesn't match our records. Please try again.");
+        return;
+      }
+      setErr("");
+      completeAuth(pending.user);
+    } else {
+      const norm = normalizeSecurityAnswer(answer);
+      if (norm.length < 2) { setErr("Please provide an answer."); return; }
+      const updated: MtUser = { ...pending.user, securityQ: setupQ, securityA: norm };
+      upsertUser(updated);
+      setErr("");
+      completeAuth(updated);
+    }
+  }
+
+  if (pending) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+        <div className="w-full max-w-md">
+          <div className="flex items-center gap-3 justify-center mb-8">
+            <div className="h-10 w-10 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-[11px] tracking-wide">DBW</div>
+            <div>
+              <div className="text-xl font-semibold text-slate-900">Additional verification</div>
+              <div className="text-xs text-slate-500">One more step to protect your account</div>
+            </div>
+          </div>
+          <form onSubmit={verifyAnswer} className="bg-white border border-slate-200 rounded-xl p-8 shadow-sm space-y-5">
+            {pending.mode === "verify" ? (
+              <>
+                <h1 className="text-sm font-semibold text-slate-900">Security question</h1>
+                <div className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
+                  {pending.user.securityQ}
+                </div>
+              </>
+            ) : (
+              <>
+                <h1 className="text-sm font-semibold text-slate-900">Set your security question</h1>
+                <p className="text-xs text-slate-500 -mt-2">We'll ask this to verify future sign-ins.</p>
+                <select
+                  value={setupQ}
+                  onChange={(e) => setSetupQ(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                >
+                  {SECURITY_QUESTIONS.map((q) => <option key={q} value={q}>{q}</option>)}
+                </select>
+              </>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Your answer</label>
+              <input
+                type="text"
+                autoFocus
+                value={answer}
+                onChange={(e) => { setAnswer(e.target.value); setErr(""); }}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                placeholder="Not case sensitive"
+              />
+            </div>
+            {err && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{err}</div>}
+            <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium py-2.5 rounded-md">
+              {pending.mode === "verify" ? "Verify & continue" : "Save & continue"}
+            </button>
+            <button
+              type="button"
+              onClick={async () => { await supabase.auth.signOut(); setPending(null); setAnswer(""); }}
+              className="w-full text-xs text-slate-500 hover:text-slate-800"
+            >
+              Cancel and sign out
+            </button>
+          </form>
+        </div>
+      </div>
+    );
   }
 
   return (
