@@ -170,7 +170,7 @@ function FloatingChatBubble() {
       <button
         type="button"
         aria-label={open ? "Close live chat" : "Open live chat"}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen((v: boolean) => !v)}
         style={{ position: "fixed", right: 16, bottom: 16, zIndex: 9998 }}
         className="h-14 w-14 rounded-full bg-gradient-to-b from-amber-300 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-700 text-slate-900 shadow-xl border border-amber-700/40 flex items-center justify-center text-2xl transition-transform active:scale-95"
       >
