@@ -30,7 +30,7 @@ type Form = {
 };
 
 function SignupPage() {
-  const [form, setForm] = useState<Form>({ name: "", email: "", password: "", confirm: "" });
+  const [form, setForm] = useState<Form>({ name: "", email: "", password: "", confirm: "", securityQ: SECURITY_QUESTIONS[0], securityA: "" });
   const [err, setErr] = useState("");
   const [agree, setAgree] = useState(false);
   const [submitting, setSubmitting] = useState(false);
