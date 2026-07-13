@@ -8,6 +8,7 @@ import {
   saveUsers,
   type MtUser,
 } from "@/lib/mt-store";
+import { SECURITY_QUESTIONS, normalizeSecurityAnswer } from "@/lib/security-questions";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
