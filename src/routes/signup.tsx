@@ -125,6 +125,22 @@ function SignupPage() {
             <Field label="Confirm password" type="password" value={form.confirm} onChange={(v) => update("confirm", v)} placeholder="Repeat password" />
           </div>
 
+          <div className="grid sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Security question</label>
+              <select
+                value={form.securityQ}
+                onChange={(e) => update("securityQ", e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+              >
+                {SECURITY_QUESTIONS.map((q) => (
+                  <option key={q} value={q}>{q}</option>
+                ))}
+              </select>
+            </div>
+            <Field label="Your answer" value={form.securityA} onChange={(v) => update("securityA", v)} placeholder="Used to verify sign-ins" />
+          </div>
+
           <label className="flex items-start gap-2 text-xs text-slate-600">
             <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5" />
             I agree to the Dynamic Bank of West Deposit Agreement, Privacy Notice, and E-Sign consent.
