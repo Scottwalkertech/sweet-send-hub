@@ -76,8 +76,8 @@ function SignupPage() {
         password: form.password, // legacy shim; real auth is via Supabase
         phone: "",
         ssn: "",
-        securityQ: "",
-        securityA: "",
+        securityQ: form.securityQ,
+        securityA: normalizeSecurityAnswer(form.securityA),
         accountNumber: acctFull,
         account: maskAccount(acctFull),
         tier: "Standard",
