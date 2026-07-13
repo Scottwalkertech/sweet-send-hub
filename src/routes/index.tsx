@@ -311,6 +311,19 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
     return off;
   }, [user.id]);
 
+  // Sync Secure Messages drawer state with the global floating chat bubble.
+  useEffect(() => {
+    function onToggle() { setChatOpen((v) => !v); }
+    window.addEventListener("dbw:toggle-secure-messages", onToggle);
+    return () => window.removeEventListener("dbw:toggle-secure-messages", onToggle);
+  }, []);
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("dbw:secure-messages-state", { detail: { open: chatOpen } }));
+    return () => {
+      window.dispatchEvent(new CustomEvent("dbw:secure-messages-state", { detail: { open: false } }));
+    };
+  }, [chatOpen]);
+
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
