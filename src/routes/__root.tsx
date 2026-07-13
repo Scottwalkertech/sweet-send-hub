@@ -141,9 +141,65 @@ function RootComponent() {
       <GlobalBanner />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <SiteFooter />
       <PageTransitionLoader />
+      <FloatingChatBubble />
       <AdminUnlockCorner onUnlock={() => unlockAdmin(router)} />
     </QueryClientProvider>
+  );
+}
+
+function SiteFooter() {
+  return (
+    <footer className="w-full border-t border-slate-200 bg-white text-slate-600">
+      <div className="max-w-5xl mx-auto px-6 py-6 text-center text-xs sm:text-sm leading-relaxed">
+        Need assistance? Contact our secure support team directly at{" "}
+        <a href="mailto:info@dynamicbankofwest.com" className="font-medium text-slate-900 hover:text-amber-700">
+          info@dynamicbankofwest.com
+        </a>
+        . Available 24/7 for account verifications, wire processing, and customer inquiries.
+      </div>
+    </footer>
+  );
+}
+
+function FloatingChatBubble() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={open ? "Close live chat" : "Open live chat"}
+        onClick={() => setOpen((v) => !v)}
+        style={{ position: "fixed", right: 16, bottom: 16, zIndex: 9998 }}
+        className="h-14 w-14 rounded-full bg-gradient-to-b from-amber-300 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-700 text-slate-900 shadow-xl border border-amber-700/40 flex items-center justify-center text-2xl transition-transform active:scale-95"
+      >
+        {open ? "✕" : "💬"}
+      </button>
+      {open && (
+        <div
+          style={{ position: "fixed", right: 16, bottom: 88, zIndex: 9998, width: "min(360px, calc(100vw - 32px))" }}
+          className="bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
+        >
+          <div className="bg-slate-900 text-white px-4 py-3">
+            <div className="text-sm font-semibold">DBW Live Support</div>
+            <div className="text-[11px] text-white/60">Secure 24/7 concierge</div>
+          </div>
+          <div className="p-4 text-sm text-slate-700 space-y-3">
+            <p>Hello! Our support team is available 24/7 to help with account verifications, wire processing, and inquiries.</p>
+            <a
+              href="mailto:info@dynamicbankofwest.com"
+              className="block text-center bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium py-2 rounded-md"
+            >
+              Email info@dynamicbankofwest.com
+            </a>
+            <p className="text-[11px] text-slate-500 text-center">
+              Signed-in customers can also use Secure Messages inside their account for real-time chat with an operator.
+            </p>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
