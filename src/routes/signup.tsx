@@ -47,6 +47,8 @@ function SignupPage() {
     if (!/^\S+@\S+\.\S+$/.test(form.email)) return setErr("Enter a valid email address.");
     if (form.password.length < 8) return setErr("Password must be at least 8 characters.");
     if (form.password !== form.confirm) return setErr("Passwords do not match.");
+    if (!form.securityQ) return setErr("Please choose a security question.");
+    if (normalizeSecurityAnswer(form.securityA).length < 2) return setErr("Please provide an answer to your security question.");
     if (!agree) return setErr("You must agree to the disclosures to open an account.");
 
     setSubmitting(true);
