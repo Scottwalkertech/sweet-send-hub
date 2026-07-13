@@ -9,6 +9,7 @@ import {
 import { useUnifiedUserActivity, updateProfile } from "@/lib/mt-db";
 import { useChatThread, sendChatMessage } from "@/lib/mt-chat";
 import { supabase } from "@/lib/external-supabase";
+import { SECURITY_QUESTIONS, normalizeSecurityAnswer } from "@/lib/security-questions";
 
 
 export const Route = createFileRoute("/")({
