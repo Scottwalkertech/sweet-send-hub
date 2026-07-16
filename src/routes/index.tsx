@@ -659,6 +659,26 @@ function ChatDrawer({ open, onClose, userId, userName }: { open: boolean; onClos
     return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 
+  const QUICK_REPLIES = [
+    "Account balance",
+    "Transfer status",
+    "Security question help",
+    "Report fraud",
+    "Reset password",
+  ];
+
+  async function sendQuickReply(body: string) {
+    if (sending) return;
+    setSending(true);
+    try {
+      await sendChatMessage(userId, "user", body);
+    } catch (e) {
+      console.error("quick reply failed", e);
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
     <div
       className={`fixed z-40 transition-all duration-300 ease-out
