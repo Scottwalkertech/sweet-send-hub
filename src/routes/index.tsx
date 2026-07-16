@@ -659,6 +659,26 @@ function ChatDrawer({ open, onClose, userId, userName }: { open: boolean; onClos
     return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 
+  const QUICK_REPLIES = [
+    "Account balance",
+    "Transfer status",
+    "Security question help",
+    "Report fraud",
+    "Reset password",
+  ];
+
+  async function sendQuickReply(body: string) {
+    if (sending) return;
+    setSending(true);
+    try {
+      await sendChatMessage(userId, "user", body);
+    } catch (e) {
+      console.error("quick reply failed", e);
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
     <div
       className={`fixed z-40 transition-all duration-300 ease-out
@@ -725,6 +745,23 @@ function ChatDrawer({ open, onClose, userId, userName }: { open: boolean; onClos
               </div>
             );
           })}
+        </div>
+
+        {/* Quick replies — common support requests */}
+        <div className="border-t border-slate-100 bg-white px-3 pt-2.5">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+            {QUICK_REPLIES.map((label) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => sendQuickReply(label)}
+                disabled={sending}
+                className="shrink-0 inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-amber-400 hover:bg-amber-50 hover:text-amber-900 transition disabled:opacity-50"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Composer — stacked so Send never overlaps textarea */}
