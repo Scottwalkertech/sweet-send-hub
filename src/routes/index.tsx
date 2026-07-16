@@ -660,34 +660,102 @@ function ChatDrawer({ open, onClose, userId, userName }: { open: boolean; onClos
   }
 
   return (
-    <div className={`fixed bottom-6 right-6 z-40 transition-all duration-300 ${open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 translate-y-4 pointer-events-none"}`}>
-      <div className="w-[340px] rounded-2xl border border-slate-800 bg-white shadow-2xl overflow-hidden flex flex-col" style={{ height: 460 }}>
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-4 py-3 flex items-center justify-between">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300 font-semibold">🔒 Secure Messages</div>
-            <div className="text-sm font-semibold">DBW Concierge</div>
+    <div
+      className={`fixed z-40 transition-all duration-300 ease-out
+        inset-x-3 bottom-24 sm:inset-x-auto sm:right-6 sm:bottom-24
+        ${open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 translate-y-4 pointer-events-none"}`}
+    >
+      <div
+        className="mx-auto sm:mx-0 w-full sm:w-[380px] max-w-full rounded-3xl border border-slate-800/60 bg-white shadow-[0_25px_60px_-15px_rgba(15,23,42,0.5)] overflow-hidden flex flex-col ring-1 ring-black/5"
+        style={{ height: "min(560px, calc(100vh - 140px))" }}
+      >
+        {/* Header — premium slate/amber banking aesthetic */}
+        <div className="relative px-4 py-3.5 text-white bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.18),transparent_60%)]" />
+          <div className="relative flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-300 to-amber-600 grid place-items-center text-slate-900 font-bold shadow-inner shadow-amber-900/30 shrink-0">
+              DBW
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold tracking-wide truncate">Dynamic Bank of West</div>
+              <div className="flex items-center gap-1.5 text-[11px] text-amber-200/90">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                </span>
+                Support Assistant · Online
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              aria-label="Close chat"
+              className="shrink-0 h-8 w-8 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition grid place-items-center text-lg leading-none"
+            >
+              ×
+            </button>
           </div>
-          <button onClick={onClose} className="text-white/60 hover:text-white text-xl leading-none">×</button>
         </div>
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50">
+
+        {/* Messages */}
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto px-3.5 py-3 space-y-2.5"
+          style={{ background: "linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%)" }}
+        >
           {error && (
-            <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5">
+            <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5">
               Chat unavailable: {error}
             </div>
           )}
-          {messages.map((m) => (
-            <div key={m.id} className={`flex ${m.sender === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.sender === "user" ? "bg-slate-900 text-white rounded-br-sm" : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"}`}>
-                <div>{m.body}</div>
-                <div className={`text-[10px] mt-1 ${m.sender === "user" ? "text-white/50" : "text-slate-400"}`}>{fmtTs(m.created_at)}</div>
+          {messages.map((m) => {
+            const isUser = m.sender === "user";
+            return (
+              <div key={m.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[82%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-sm ring-1 break-words
+                    ${isUser
+                      ? "bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-br-md ring-slate-900/10"
+                      : "bg-white text-slate-800 rounded-bl-md ring-slate-200"}`}
+                >
+                  <div className="whitespace-pre-wrap">{m.body}</div>
+                  <div className={`text-[10px] mt-1 tabular-nums ${isUser ? "text-amber-200/70" : "text-slate-400"}`}>
+                    {fmtTs(m.created_at)}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
-        <div className="border-t border-slate-200 p-2 flex items-center gap-2 bg-white">
-          <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }}
-            placeholder="Write a secure message…" className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
-          <button onClick={send} disabled={sending} className="rounded-md bg-gradient-to-r from-amber-400 to-amber-600 text-black text-xs font-semibold px-3 py-2 hover:brightness-110 disabled:opacity-50">Send</button>
+
+        {/* Composer — stacked so Send never overlaps textarea */}
+        <div className="border-t border-slate-200 bg-white px-3 pt-2.5 pb-3">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            rows={2}
+            placeholder="Write a secure message…"
+            className="block w-full resize-none rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:bg-white transition"
+            style={{ maxHeight: 120 }}
+          />
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-medium truncate">
+              🔒 End-to-end encrypted
+            </div>
+            <button
+              onClick={send}
+              disabled={sending || !text.trim()}
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-amber-300 via-amber-400 to-amber-600 text-slate-900 text-xs font-bold uppercase tracking-wider px-4 py-2 shadow-md shadow-amber-900/20 hover:brightness-105 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              {sending ? "Sending…" : "Send"}
+              <span aria-hidden>→</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
