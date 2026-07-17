@@ -390,6 +390,10 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                   </button>
                 );
               })}
+              <Link to="/loans"
+                className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] uppercase tracking-[0.14em] rounded transition-colors whitespace-nowrap text-white/80 hover:text-amber-300 hover:bg-white/[0.04]">
+                Loans
+              </Link>
               <Link to="/about"
                 className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] uppercase tracking-[0.14em] rounded transition-colors whitespace-nowrap text-white/80 hover:text-amber-300 hover:bg-white/[0.04]">
                 About Us

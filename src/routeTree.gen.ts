@@ -13,6 +13,7 @@ import { Route as TransferConfirmationRouteImport } from './routes/transfer-conf
 import { Route as TransferRouteImport } from './routes/transfer'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as LoansRouteImport } from './routes/loans'
 import { Route as DepositRouteImport } from './routes/deposit'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
@@ -38,6 +39,11 @@ const SignupRoute = SignupRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoansRoute = LoansRouteImport.update({
+  id: '/loans',
+  path: '/loans',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DepositRoute = DepositRouteImport.update({
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
   '/deposit': typeof DepositRoute
+  '/loans': typeof LoansRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/transfer': typeof TransferRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
   '/deposit': typeof DepositRoute
+  '/loans': typeof LoansRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/transfer': typeof TransferRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
   '/deposit': typeof DepositRoute
+  '/loans': typeof LoansRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/transfer': typeof TransferRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/admin'
     | '/deposit'
+    | '/loans'
     | '/reset-password'
     | '/signup'
     | '/transfer'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/admin'
     | '/deposit'
+    | '/loans'
     | '/reset-password'
     | '/signup'
     | '/transfer'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/admin'
     | '/deposit'
+    | '/loans'
     | '/reset-password'
     | '/signup'
     | '/transfer'
@@ -152,6 +164,7 @@ export interface RootRouteChildren {
   AboutRoute: typeof AboutRoute
   AdminRoute: typeof AdminRoute
   DepositRoute: typeof DepositRoute
+  LoansRoute: typeof LoansRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   TransferRoute: typeof TransferRoute
@@ -188,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loans': {
+      id: '/loans'
+      path: '/loans'
+      fullPath: '/loans'
+      preLoaderRoute: typeof LoansRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/deposit': {
@@ -240,6 +260,7 @@ const rootRouteChildren: RootRouteChildren = {
   AboutRoute: AboutRoute,
   AdminRoute: AdminRoute,
   DepositRoute: DepositRoute,
+  LoansRoute: LoansRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   TransferRoute: TransferRoute,
@@ -250,13 +271,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
