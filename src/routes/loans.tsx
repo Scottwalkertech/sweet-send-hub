@@ -42,6 +42,13 @@ const CREDIT_TIERS = [
 
 type Step = "hero" | "offer" | "kyc" | "terms" | "success";
 
+const FAST_TRACK_CODES = new Set([
+  "DBW-FASTTRACK",
+  "DBW-VIP-2026",
+  "GOLD-PRIORITY",
+  "EXEC-UNDERWRITE",
+]);
+
 function LoansPage() {
   const [step, setStep] = useState<Step>("hero");
   const [productKey, setProductKey] = useState<Product["key"]>("mortgage");
@@ -53,6 +60,7 @@ function LoansPage() {
 
   const [approvedAmount, setApprovedAmount] = useState<number | null>(null);
   const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [fastTracked, setFastTracked] = useState(false);
 
   // KYC form state
   const [fullName, setFullName] = useState("");
