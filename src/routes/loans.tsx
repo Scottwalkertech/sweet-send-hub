@@ -137,8 +137,7 @@ function LoansPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
     return null;
   }
-
-
+  async function handleKycNext() {
     setErrorMsg(null);
     if (!fullName.trim() || !email.trim() || !occupation.trim() || ssn.replace(/\D/g, "").length !== 9) {
       setErrorMsg("Please complete all fields. SSN must be 9 digits.");
