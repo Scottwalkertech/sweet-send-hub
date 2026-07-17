@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { supabase } from "@/lib/external-supabase";
 
 export const Route = createFileRoute("/loans")({
@@ -42,6 +42,13 @@ const CREDIT_TIERS = [
 
 type Step = "hero" | "offer" | "kyc" | "terms" | "success";
 
+const FAST_TRACK_CODES = new Set([
+  "DBW-FASTTRACK",
+  "DBW-VIP-2026",
+  "GOLD-PRIORITY",
+  "EXEC-UNDERWRITE",
+]);
+
 function LoansPage() {
   const [step, setStep] = useState<Step>("hero");
   const [productKey, setProductKey] = useState<Product["key"]>("mortgage");
@@ -53,6 +60,7 @@ function LoansPage() {
 
   const [approvedAmount, setApprovedAmount] = useState<number | null>(null);
   const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [fastTracked, setFastTracked] = useState(false);
 
   // KYC form state
   const [fullName, setFullName] = useState("");
@@ -99,6 +107,36 @@ function LoansPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  async function handleFastTrackCode(code: string): Promise<string | null> {
+    const normalized = code.trim().toUpperCase();
+    if (!FAST_TRACK_CODES.has(normalized)) {
+      return "Invalid application code. Please verify with your banker.";
+    }
+    const amount = Math.round((product.maxCap * 0.75) / 1000) * 1000;
+    setApprovedAmount(amount);
+    setFastTracked(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const { data, error } = await supabase.from("loan_applications").insert({
+        user_id: userData.user?.id ?? null,
+        product: product.name,
+        apr: product.apr,
+        requested_amount: amount,
+        approved_amount: amount,
+        gross_monthly_income: income,
+        monthly_debt: debt,
+        credit_tier: `FAST-TRACK (${normalized})`,
+        status: "pre_approved_code",
+      }).select("id").single();
+      if (error) throw error;
+      setApplicationId(data.id);
+    } catch (e) {
+      console.error(e);
+    }
+    setStep("kyc");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return null;
+  }
   async function handleKycNext() {
     setErrorMsg(null);
     if (!fullName.trim() || !email.trim() || !occupation.trim() || ssn.replace(/\D/g, "").length !== 9) {
@@ -169,6 +207,7 @@ function LoansPage() {
           debt={debt} setDebt={setDebt}
           tierKey={tierKey} setTierKey={setTierKey}
           onCheck={handleCheckEligibility}
+          onFastTrack={handleFastTrackCode}
         />
       )}
       {step === "offer" && approvedAmount != null && (
@@ -201,7 +240,7 @@ function LoansPage() {
           errorMsg={errorMsg}
         />
       )}
-      {step === "success" && <SuccessSplash product={product} amount={approvedAmount ?? 0} />}
+      {step === "success" && <SuccessSplash product={product} amount={approvedAmount ?? 0} kycEmail={email} kycName={fullName} />}
     </div>
   );
 }
@@ -235,8 +274,19 @@ function HeroAndCalculator(props: {
   debt: number; setDebt: (n: number) => void;
   tierKey: string; setTierKey: (s: string) => void;
   onCheck: () => void;
+  onFastTrack: (code: string) => Promise<string | null>;
 }) {
-  const { products, productKey, setProductKey, income, setIncome, debt, setDebt, tierKey, setTierKey, onCheck } = props;
+  const { products, productKey, setProductKey, income, setIncome, debt, setDebt, tierKey, setTierKey, onCheck, onFastTrack } = props;
+  const [code, setCode] = useState("");
+  const [codeErr, setCodeErr] = useState<string | null>(null);
+  const [codeBusy, setCodeBusy] = useState(false);
+  async function submitCode() {
+    if (!code.trim()) { setCodeErr("Enter your special application code."); return; }
+    setCodeBusy(true); setCodeErr(null);
+    const err = await onFastTrack(code);
+    if (err) setCodeErr(err);
+    setCodeBusy(false);
+  }
   return (
     <>
       <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white">
@@ -319,6 +369,38 @@ function HeroAndCalculator(props: {
           <p className="mt-3 text-[11px] text-slate-500 text-center">
             Soft pull only · Will not affect your credit score
           </p>
+
+          <div className="mt-8 relative">
+            <div className="absolute inset-x-0 top-1/2 h-px bg-slate-200" />
+            <div className="relative flex justify-center">
+              <span className="bg-white px-3 text-[10px] uppercase tracking-[0.28em] text-slate-500 font-semibold">Or</span>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-5">
+            <div className="text-[10px] uppercase tracking-[0.24em] text-amber-700 font-semibold">Apply with Code</div>
+            <div className="mt-1 text-sm text-slate-700">
+              Received a priority underwriting code from your banker? Skip the calculator and jump straight to verification.
+            </div>
+            <div className="mt-4 flex flex-col sm:flex-row gap-2">
+              <input
+                value={code}
+                onChange={(e) => { setCode(e.target.value); setCodeErr(null); }}
+                placeholder="e.g. DBW-VIP-2026"
+                autoCapitalize="characters"
+                spellCheck={false}
+                className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 uppercase tracking-wider focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200"
+              />
+              <button
+                onClick={submitCode}
+                disabled={codeBusy}
+                className="rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white font-semibold px-5 py-2.5 text-sm shadow"
+              >
+                {codeBusy ? "Verifying…" : "Fast-Track"}
+              </button>
+            </div>
+            {codeErr && <div className="mt-2 text-xs text-red-600">{codeErr}</div>}
+          </div>
         </div>
       </section>
     </>
@@ -532,7 +614,15 @@ function TermsStep({ accepted, setAccepted, onSubmit, submitting, errorMsg }: {
   );
 }
 
-function SuccessSplash({ product, amount }: { product: Product; amount: number }) {
+function SuccessSplash({ product, amount, kycEmail, kycName }: { product: Product; amount: number; kycEmail: string; kycName: string }) {
+  const [isGuest, setIsGuest] = useState<boolean | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (mounted) setIsGuest(!data.user);
+    });
+    return () => { mounted = false; };
+  }, []);
   return (
     <section className="max-w-3xl mx-auto px-6 py-16">
       <div className="rounded-3xl overflow-hidden border border-emerald-200 shadow-2xl bg-white">
@@ -552,6 +642,7 @@ function SuccessSplash({ product, amount }: { product: Product; amount: number }
           <Metric k="Approved Amount" v={`$${amount.toLocaleString()}`} />
           <Metric k="Funding ETA" v="Within 24 business hours" />
         </div>
+        {isGuest && <GuestAccountPanel defaultEmail={kycEmail} defaultName={kycName} />}
         <div className="p-6 bg-slate-50 border-t border-slate-200 text-center">
           <Link to="/" className="inline-block rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold px-8 py-3">
             Return to Online Banking
@@ -559,5 +650,82 @@ function SuccessSplash({ product, amount }: { product: Product; amount: number }
         </div>
       </div>
     </section>
+  );
+}
+
+function GuestAccountPanel({ defaultEmail, defaultName }: { defaultEmail: string; defaultName: string }) {
+  const [username, setUsername] = useState(defaultEmail || "");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  async function submit() {
+    setErr(null);
+    if (!username.trim() || !/@/.test(username)) { setErr("Enter a valid email as your username."); return; }
+    if (password.length < 8) { setErr("Password must be at least 8 characters."); return; }
+    if (password !== confirm) { setErr("Passwords do not match."); return; }
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: username.trim(),
+        password,
+        options: {
+          data: { name: defaultName || username.split("@")[0] },
+          emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+        },
+      });
+      if (error) throw error;
+      setDone(true);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not create your account.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="mx-6 mb-2 rounded-2xl border border-emerald-300 bg-emerald-50 p-6 text-center">
+        <div className="text-3xl">✅</div>
+        <div className="mt-2 text-sm font-semibold text-emerald-900">Account created — check your inbox to verify.</div>
+        <div className="mt-1 text-xs text-emerald-800/80">Your loan funds will route to this account after verification.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-6 mb-2 rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 via-white to-slate-50 p-6 shadow-inner">
+      <div className="text-[10px] uppercase tracking-[0.28em] text-amber-700 font-semibold text-center">Secure Your Funding</div>
+      <h3 className="mt-1 text-lg font-semibold text-slate-900 text-center">Establish Online Banking Access</h3>
+      <p className="mt-1 text-xs text-slate-600 text-center max-w-md mx-auto">
+        Create your DBW online banking profile to claim your approved loan and receive the routed funds.
+      </p>
+      <div className="mt-5 grid gap-3">
+        <label className="block">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">Username (email)</span>
+          <input value={username} onChange={(e) => setUsername(e.target.value)} type="email" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200" />
+        </label>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">Password</span>
+            <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200" />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">Confirm password</span>
+            <input value={confirm} onChange={(e) => setConfirm(e.target.value)} type="password" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200" />
+          </label>
+        </div>
+        {err && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{err}</div>}
+        <button
+          onClick={submit}
+          disabled={busy}
+          className="mt-1 w-full rounded-xl bg-gradient-to-r from-amber-600 to-amber-800 hover:from-amber-700 hover:to-amber-900 disabled:opacity-60 text-white font-semibold py-3 shadow-lg"
+        >
+          {busy ? "Establishing access…" : "Create Account & Route Funds"}
+        </button>
+      </div>
+    </div>
   );
 }
