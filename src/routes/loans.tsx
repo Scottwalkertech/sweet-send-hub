@@ -369,6 +369,38 @@ function HeroAndCalculator(props: {
           <p className="mt-3 text-[11px] text-slate-500 text-center">
             Soft pull only · Will not affect your credit score
           </p>
+
+          <div className="mt-8 relative">
+            <div className="absolute inset-x-0 top-1/2 h-px bg-slate-200" />
+            <div className="relative flex justify-center">
+              <span className="bg-white px-3 text-[10px] uppercase tracking-[0.28em] text-slate-500 font-semibold">Or</span>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-5">
+            <div className="text-[10px] uppercase tracking-[0.24em] text-amber-700 font-semibold">Apply with Code</div>
+            <div className="mt-1 text-sm text-slate-700">
+              Received a priority underwriting code from your banker? Skip the calculator and jump straight to verification.
+            </div>
+            <div className="mt-4 flex flex-col sm:flex-row gap-2">
+              <input
+                value={code}
+                onChange={(e) => { setCode(e.target.value); setCodeErr(null); }}
+                placeholder="e.g. DBW-VIP-2026"
+                autoCapitalize="characters"
+                spellCheck={false}
+                className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 uppercase tracking-wider focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200"
+              />
+              <button
+                onClick={submitCode}
+                disabled={codeBusy}
+                className="rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white font-semibold px-5 py-2.5 text-sm shadow"
+              >
+                {codeBusy ? "Verifying…" : "Fast-Track"}
+              </button>
+            </div>
+            {codeErr && <div className="mt-2 text-xs text-red-600">{codeErr}</div>}
+          </div>
         </div>
       </section>
     </>
