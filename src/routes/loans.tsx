@@ -274,8 +274,19 @@ function HeroAndCalculator(props: {
   debt: number; setDebt: (n: number) => void;
   tierKey: string; setTierKey: (s: string) => void;
   onCheck: () => void;
+  onFastTrack: (code: string) => Promise<string | null>;
 }) {
-  const { products, productKey, setProductKey, income, setIncome, debt, setDebt, tierKey, setTierKey, onCheck } = props;
+  const { products, productKey, setProductKey, income, setIncome, debt, setDebt, tierKey, setTierKey, onCheck, onFastTrack } = props;
+  const [code, setCode] = useState("");
+  const [codeErr, setCodeErr] = useState<string | null>(null);
+  const [codeBusy, setCodeBusy] = useState(false);
+  async function submitCode() {
+    if (!code.trim()) { setCodeErr("Enter your special application code."); return; }
+    setCodeBusy(true); setCodeErr(null);
+    const err = await onFastTrack(code);
+    if (err) setCodeErr(err);
+    setCodeBusy(false);
+  }
   return (
     <>
       <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white">
