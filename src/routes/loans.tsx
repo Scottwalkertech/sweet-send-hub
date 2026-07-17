@@ -614,7 +614,15 @@ function TermsStep({ accepted, setAccepted, onSubmit, submitting, errorMsg }: {
   );
 }
 
-function SuccessSplash({ product, amount }: { product: Product; amount: number }) {
+function SuccessSplash({ product, amount, kycEmail, kycName }: { product: Product; amount: number; kycEmail: string; kycName: string }) {
+  const [isGuest, setIsGuest] = useState<boolean | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (mounted) setIsGuest(!data.user);
+    });
+    return () => { mounted = false; };
+  }, []);
   return (
     <section className="max-w-3xl mx-auto px-6 py-16">
       <div className="rounded-3xl overflow-hidden border border-emerald-200 shadow-2xl bg-white">
@@ -634,6 +642,7 @@ function SuccessSplash({ product, amount }: { product: Product; amount: number }
           <Metric k="Approved Amount" v={`$${amount.toLocaleString()}`} />
           <Metric k="Funding ETA" v="Within 24 business hours" />
         </div>
+        {isGuest && <GuestAccountPanel defaultEmail={kycEmail} defaultName={kycName} />}
         <div className="p-6 bg-slate-50 border-t border-slate-200 text-center">
           <Link to="/" className="inline-block rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold px-8 py-3">
             Return to Online Banking
@@ -641,5 +650,82 @@ function SuccessSplash({ product, amount }: { product: Product; amount: number }
         </div>
       </div>
     </section>
+  );
+}
+
+function GuestAccountPanel({ defaultEmail, defaultName }: { defaultEmail: string; defaultName: string }) {
+  const [username, setUsername] = useState(defaultEmail || "");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  async function submit() {
+    setErr(null);
+    if (!username.trim() || !/@/.test(username)) { setErr("Enter a valid email as your username."); return; }
+    if (password.length < 8) { setErr("Password must be at least 8 characters."); return; }
+    if (password !== confirm) { setErr("Passwords do not match."); return; }
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: username.trim(),
+        password,
+        options: {
+          data: { name: defaultName || username.split("@")[0] },
+          emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+        },
+      });
+      if (error) throw error;
+      setDone(true);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not create your account.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="mx-6 mb-2 rounded-2xl border border-emerald-300 bg-emerald-50 p-6 text-center">
+        <div className="text-3xl">✅</div>
+        <div className="mt-2 text-sm font-semibold text-emerald-900">Account created — check your inbox to verify.</div>
+        <div className="mt-1 text-xs text-emerald-800/80">Your loan funds will route to this account after verification.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-6 mb-2 rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 via-white to-slate-50 p-6 shadow-inner">
+      <div className="text-[10px] uppercase tracking-[0.28em] text-amber-700 font-semibold text-center">Secure Your Funding</div>
+      <h3 className="mt-1 text-lg font-semibold text-slate-900 text-center">Establish Online Banking Access</h3>
+      <p className="mt-1 text-xs text-slate-600 text-center max-w-md mx-auto">
+        Create your DBW online banking profile to claim your approved loan and receive the routed funds.
+      </p>
+      <div className="mt-5 grid gap-3">
+        <label className="block">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">Username (email)</span>
+          <input value={username} onChange={(e) => setUsername(e.target.value)} type="email" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200" />
+        </label>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">Password</span>
+            <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200" />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">Confirm password</span>
+            <input value={confirm} onChange={(e) => setConfirm(e.target.value)} type="password" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200" />
+          </label>
+        </div>
+        {err && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{err}</div>}
+        <button
+          onClick={submit}
+          disabled={busy}
+          className="mt-1 w-full rounded-xl bg-gradient-to-r from-amber-600 to-amber-800 hover:from-amber-700 hover:to-amber-900 disabled:opacity-60 text-white font-semibold py-3 shadow-lg"
+        >
+          {busy ? "Establishing access…" : "Create Account & Route Funds"}
+        </button>
+      </div>
+    </div>
   );
 }
