@@ -107,7 +107,38 @@ function LoansPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function handleKycNext() {
+  async function handleFastTrackCode(code: string): Promise<string | null> {
+    const normalized = code.trim().toUpperCase();
+    if (!FAST_TRACK_CODES.has(normalized)) {
+      return "Invalid application code. Please verify with your banker.";
+    }
+    const amount = Math.round((product.maxCap * 0.75) / 1000) * 1000;
+    setApprovedAmount(amount);
+    setFastTracked(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const { data, error } = await supabase.from("loan_applications").insert({
+        user_id: userData.user?.id ?? null,
+        product: product.name,
+        apr: product.apr,
+        requested_amount: amount,
+        approved_amount: amount,
+        gross_monthly_income: income,
+        monthly_debt: debt,
+        credit_tier: `FAST-TRACK (${normalized})`,
+        status: "pre_approved_code",
+      }).select("id").single();
+      if (error) throw error;
+      setApplicationId(data.id);
+    } catch (e) {
+      console.error(e);
+    }
+    setStep("kyc");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return null;
+  }
+
+
     setErrorMsg(null);
     if (!fullName.trim() || !email.trim() || !occupation.trim() || ssn.replace(/\D/g, "").length !== 9) {
       setErrorMsg("Please complete all fields. SSN must be 9 digits.");
