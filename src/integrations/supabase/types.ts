@@ -14,6 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      loan_applications: {
+        Row: {
+          approved_amount: number
+          apr: number
+          created_at: string
+          credit_tier: string
+          email: string | null
+          full_name: string | null
+          government_id_name: string | null
+          gross_monthly_income: number
+          id: string
+          monthly_debt: number
+          occupation: string | null
+          product: string
+          proof_of_income_name: string | null
+          requested_amount: number
+          ssn_encrypted: string | null
+          ssn_last4: string | null
+          status: string
+          terms_accepted: boolean
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          approved_amount: number
+          apr: number
+          created_at?: string
+          credit_tier: string
+          email?: string | null
+          full_name?: string | null
+          government_id_name?: string | null
+          gross_monthly_income: number
+          id?: string
+          monthly_debt: number
+          occupation?: string | null
+          product: string
+          proof_of_income_name?: string | null
+          requested_amount: number
+          ssn_encrypted?: string | null
+          ssn_last4?: string | null
+          status?: string
+          terms_accepted?: boolean
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          approved_amount?: number
+          apr?: number
+          created_at?: string
+          credit_tier?: string
+          email?: string | null
+          full_name?: string | null
+          government_id_name?: string | null
+          gross_monthly_income?: number
+          id?: string
+          monthly_debt?: number
+          occupation?: string | null
+          product?: string
+          proof_of_income_name?: string | null
+          requested_amount?: number
+          ssn_encrypted?: string | null
+          ssn_last4?: string | null
+          status?: string
+          terms_accepted?: boolean
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       pending_transactions: {
         Row: {
           amount: number
