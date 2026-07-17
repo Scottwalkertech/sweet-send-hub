@@ -207,6 +207,7 @@ function LoansPage() {
           debt={debt} setDebt={setDebt}
           tierKey={tierKey} setTierKey={setTierKey}
           onCheck={handleCheckEligibility}
+          onFastTrack={handleFastTrackCode}
         />
       )}
       {step === "offer" && approvedAmount != null && (
