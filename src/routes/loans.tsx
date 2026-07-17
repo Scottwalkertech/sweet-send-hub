@@ -240,7 +240,7 @@ function LoansPage() {
           errorMsg={errorMsg}
         />
       )}
-      {step === "success" && <SuccessSplash product={product} amount={approvedAmount ?? 0} />}
+      {step === "success" && <SuccessSplash product={product} amount={approvedAmount ?? 0} kycEmail={email} kycName={fullName} />}
     </div>
   );
 }
