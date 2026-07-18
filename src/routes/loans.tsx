@@ -42,12 +42,8 @@ const CREDIT_TIERS = [
 
 type Step = "hero" | "offer" | "kyc" | "terms" | "success";
 
-const FAST_TRACK_CODES = new Set([
-  "DBW-FASTTRACK",
-  "DBW-VIP-2026",
-  "GOLD-PRIORITY",
-  "EXEC-UNDERWRITE",
-]);
+// Fast-track codes now live in the loan_application_codes table. Admins
+// create/manage them from the Special Application Code Management Portal.
 
 function LoansPage() {
   const [step, setStep] = useState<Step>("hero");
