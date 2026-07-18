@@ -155,6 +155,14 @@ function LoansPage() {
       const last4 = digits.slice(-4);
       const encoded = typeof window !== "undefined" ? window.btoa(digits) : digits;
       if (applicationId) {
+        const { data: userData } = await supabase.auth.getUser();
+        const folder = userData.user?.id ?? "anon";
+        const incPath = `${folder}/${applicationId}/proof-of-income-${Date.now()}-${incomeFile.name}`;
+        const idPath = `${folder}/${applicationId}/government-id-${Date.now()}-${idFile.name}`;
+        const upA = await supabase.storage.from("loan-docs").upload(incPath, incomeFile, { upsert: true });
+        const upB = await supabase.storage.from("loan-docs").upload(idPath, idFile, { upsert: true });
+        if (upA.error) throw upA.error;
+        if (upB.error) throw upB.error;
         const { error } = await supabase.from("loan_applications").update({
           full_name: fullName.trim(),
           email: email.trim(),
@@ -163,6 +171,8 @@ function LoansPage() {
           ssn_encrypted: encoded,
           proof_of_income_name: incomeFile.name,
           government_id_name: idFile.name,
+          proof_of_income_path: incPath,
+          government_id_path: idPath,
           status: "kyc_submitted",
         }).eq("id", applicationId);
         if (error) throw error;
