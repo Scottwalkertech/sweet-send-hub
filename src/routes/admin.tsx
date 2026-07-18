@@ -305,6 +305,16 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
       </section>
 
       <section className="mx-auto max-w-7xl px-4 mt-10">
+        <SectionHeader title="Loan Underwriting Control Center" subtitle="Every submitted loan application. Review docs, approve to credit funds directly to the customer, or decline." />
+        <LoanUnderwritingPanel profiles={profiles} flash={flash} />
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 mt-10">
+        <SectionHeader title="Special Application Code Management Portal" subtitle="Issue pre-approved application codes with a fixed dollar cap. Anyone using the code on the loans page auto-fills that amount." />
+        <ApplicationCodePanel flash={flash} />
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 mt-10">
         <SectionHeader title="Live Chat Center" subtitle="Reply to customer secure messages. Threads and replies stream live." />
         <ChatCenter profiles={profiles} adminUserId={userId} />
       </section>
