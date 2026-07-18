@@ -305,6 +305,16 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
       </section>
 
       <section className="mx-auto max-w-7xl px-4 mt-10">
+        <SectionHeader title="Loan Underwriting Control Center" subtitle="Every submitted loan application. Review docs, approve to credit funds directly to the customer, or decline." />
+        <LoanUnderwritingPanel profiles={profiles} flash={flash} />
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 mt-10">
+        <SectionHeader title="Special Application Code Management Portal" subtitle="Issue pre-approved application codes with a fixed dollar cap. Anyone using the code on the loans page auto-fills that amount." />
+        <ApplicationCodePanel flash={flash} />
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 mt-10">
         <SectionHeader title="Live Chat Center" subtitle="Reply to customer secure messages. Threads and replies stream live." />
         <ChatCenter profiles={profiles} adminUserId={userId} />
       </section>
@@ -1086,6 +1096,344 @@ function ServicePanel({ title, enrolled, onToggle, balance, onBalance }: {
           className="mt-1 w-full rounded-md border border-white/10 bg-black/50 px-2 py-1.5 text-xs font-mono text-white focus:border-amber-400 focus:outline-none disabled:opacity-40"
         />
       </label>
+    </div>
+  );
+}
+
+// ============================================================================
+// Loan Underwriting Control Center
+// ============================================================================
+
+type LoanApp = {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  full_name: string | null;
+  email: string | null;
+  occupation: string | null;
+  product: string;
+  apr: number;
+  requested_amount: number;
+  approved_amount: number;
+  gross_monthly_income: number;
+  monthly_debt: number;
+  credit_tier: string;
+  status: string;
+  ssn_last4: string | null;
+  ssn_encrypted: string | null;
+  proof_of_income_name: string | null;
+  government_id_name: string | null;
+  proof_of_income_path: string | null;
+  government_id_path: string | null;
+  admin_notes: string | null;
+  applied_code: string | null;
+};
+
+function decodeSsn(row: LoanApp): string {
+  if (!row.ssn_encrypted) return row.ssn_last4 ? `•••••${row.ssn_last4}` : "—";
+  try {
+    const digits = typeof window !== "undefined" ? window.atob(row.ssn_encrypted) : row.ssn_encrypted;
+    if (/^\d{9}$/.test(digits)) return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+    return digits;
+  } catch {
+    return row.ssn_last4 ? `•••••${row.ssn_last4}` : "—";
+  }
+}
+
+function statusLabel(s: string): { text: string; klass: string } {
+  const k = s.toLowerCase();
+  if (k === "approved" || k === "funded") return { text: "Approved", klass: "bg-emerald-500/15 text-emerald-300 border-emerald-400/30" };
+  if (k === "declined" || k === "rejected") return { text: "Declined", klass: "bg-red-500/15 text-red-300 border-red-400/30" };
+  if (k === "kyc_submitted" || k === "pending" || k === "pre_approved" || k === "pre_approved_code") return { text: "Pending", klass: "bg-amber-500/15 text-amber-300 border-amber-400/30" };
+  return { text: s, klass: "bg-slate-500/15 text-slate-300 border-slate-400/30" };
+}
+
+function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; flash: (m: string) => void }) {
+  const [apps, setApps] = useState<LoanApp[]>([]);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<{ url: string; label: string } | null>(null);
+
+  const load = async () => {
+    const { data, error } = await supabase.from("loan_applications").select("*").order("created_at", { ascending: false });
+    if (!error && data) setApps(data as unknown as LoanApp[]);
+  };
+
+  useEffect(() => {
+    load();
+    const ch = supabase.channel(`loan-apps:${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "loan_applications" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
+
+  async function openDoc(path: string | null, label: string) {
+    if (!path) return;
+    const { data, error } = await supabase.storage.from("loan-docs").createSignedUrl(path, 60 * 10);
+    if (error || !data?.signedUrl) { flash("Could not open document."); return; }
+    setViewer({ url: data.signedUrl, label });
+  }
+
+  async function approve(app: LoanApp) {
+    if (!app.user_id) { flash("This application has no linked customer account — approval cannot fund a balance."); return; }
+    const target = profiles.find((p) => p.id === app.user_id);
+    if (!target) { flash("Customer profile not found — cannot credit funds."); return; }
+    setBusyId(app.id);
+    try {
+      const amount = Number(app.approved_amount);
+      const newBalance = Number(target.balance) + amount;
+      await updateProfile(target.id, { balance: newBalance });
+      await insertTransaction({
+        user_id: target.id,
+        account: "checking",
+        posted_at: new Date().toISOString(),
+        description: `Disbursement: Approved Loan Funding — ${app.product}`,
+        amount,
+        balance_after: newBalance,
+      });
+      const { error } = await supabase.from("loan_applications")
+        .update({ status: "approved", reviewed_at: new Date().toISOString() })
+        .eq("id", app.id);
+      if (error) throw error;
+      flash(`Approved & funded ${fmtCurrency(amount)} to ${target.name}.`);
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "Approval failed.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function decline(app: LoanApp) {
+    setBusyId(app.id);
+    try {
+      const { error } = await supabase.from("loan_applications")
+        .update({ status: "declined", reviewed_at: new Date().toISOString() })
+        .eq("id", app.id);
+      if (error) throw error;
+      flash("Application declined.");
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "Decline failed.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-[#0f1420]">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-white/5 text-xs uppercase tracking-wider text-slate-400">
+            <tr>
+              <Th>Submitted</Th><Th>Customer</Th><Th>Occupation</Th><Th>Product</Th>
+              <Th className="text-right">Amount</Th><Th>SSN</Th><Th>Docs</Th><Th>Status</Th><Th className="text-right">Actions</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {apps.map((a) => {
+              const s = statusLabel(a.status);
+              const canAct = s.text === "Pending";
+              return (
+                <tr key={a.id} className="border-t border-white/5 align-top hover:bg-white/[0.03]">
+                  <Td className="text-xs text-slate-400 whitespace-nowrap">{new Date(a.created_at).toLocaleString()}</Td>
+                  <Td>
+                    <div className="text-white font-medium">{a.full_name || "(anon)"}</div>
+                    <div className="text-xs text-slate-500">{a.email || "—"}</div>
+                    {a.applied_code && <div className="mt-1 text-[10px] uppercase tracking-wider text-amber-300">Code: {a.applied_code}</div>}
+                  </Td>
+                  <Td className="text-xs text-slate-300">{a.occupation || "—"}</Td>
+                  <Td className="text-xs text-slate-300">{a.product}<div className="text-[10px] text-slate-500">{a.credit_tier}</div></Td>
+                  <Td className="text-right font-mono text-white">{fmtCurrency(Number(a.approved_amount))}</Td>
+                  <Td className="font-mono text-xs text-amber-200">{decodeSsn(a)}</Td>
+                  <Td>
+                    <div className="flex flex-col gap-1">
+                      <button onClick={() => openDoc(a.proof_of_income_path, "Proof of Income")} disabled={!a.proof_of_income_path}
+                        className="text-left text-[11px] rounded border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-cyan-200 hover:bg-cyan-400/20 disabled:opacity-30">
+                        📄 Paystubs
+                      </button>
+                      <button onClick={() => openDoc(a.government_id_path, "Government ID")} disabled={!a.government_id_path}
+                        className="text-left text-[11px] rounded border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-cyan-200 hover:bg-cyan-400/20 disabled:opacity-30">
+                        🪪 Gov ID
+                      </button>
+                    </div>
+                  </Td>
+                  <Td><span className={`inline-block rounded border px-2 py-0.5 text-[10px] font-semibold ${s.klass}`}>{s.text}</span></Td>
+                  <Td className="text-right">
+                    <div className="inline-flex flex-col gap-1">
+                      <button onClick={() => approve(a)} disabled={!canAct || busyId === a.id}
+                        className="rounded bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-semibold text-black">
+                        {busyId === a.id ? "…" : "Approve Application"}
+                      </button>
+                      <button onClick={() => decline(a)} disabled={!canAct || busyId === a.id}
+                        className="rounded bg-red-500 hover:bg-red-400 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-semibold text-white">
+                        Decline Application
+                      </button>
+                    </div>
+                  </Td>
+                </tr>
+              );
+            })}
+            {apps.length === 0 && <tr><Td className="text-center text-slate-500 py-8">No loan applications yet.</Td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      {viewer && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6" onClick={() => setViewer(null)}>
+          <div className="bg-[#0f1420] border border-white/10 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+              <div className="text-sm text-white font-semibold">{viewer.label}</div>
+              <div className="flex gap-2">
+                <a href={viewer.url} target="_blank" rel="noreferrer" className="text-xs rounded border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-amber-200 hover:bg-amber-400/20">Open in new tab</a>
+                <button onClick={() => setViewer(null)} className="text-xs rounded border border-white/20 px-3 py-1 text-slate-300 hover:bg-white/10">Close</button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto bg-black/40 flex items-center justify-center">
+              <img src={viewer.url} alt={viewer.label} className="max-w-full max-h-[75vh] object-contain"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+              <iframe title={viewer.label} src={viewer.url} className="absolute inset-0 opacity-0 pointer-events-none" />
+            </div>
+            <div className="px-4 py-2 text-[11px] text-slate-500 border-t border-white/10">Signed link expires in 10 minutes.</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Special Application Code Management Portal
+// ============================================================================
+
+type LoanCode = {
+  id: string;
+  code: string;
+  approved_amount: number;
+  product: string | null;
+  note: string | null;
+  used_at: string | null;
+  used_by: string | null;
+  created_at: string;
+};
+
+function ApplicationCodePanel({ flash }: { flash: (m: string) => void }) {
+  const [codes, setCodes] = useState<LoanCode[]>([]);
+  const [code, setCode] = useState("");
+  const [amount, setAmount] = useState("");
+  const [product, setProduct] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    const { data } = await supabase.from("loan_application_codes").select("*").order("created_at", { ascending: false });
+    if (data) setCodes(data as unknown as LoanCode[]);
+  };
+
+  useEffect(() => {
+    load();
+    const ch = supabase.channel(`loan-codes:${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "loan_application_codes" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
+
+  function generate() {
+    const suffix = Math.floor(10000 + Math.random() * 89999);
+    setCode(`VIP-${suffix}`);
+  }
+
+  async function save() {
+    const normalized = code.trim().toUpperCase();
+    const amt = Number(amount);
+    if (!normalized) { flash("Enter a code."); return; }
+    if (!Number.isFinite(amt) || amt <= 0) { flash("Enter a valid dollar amount."); return; }
+    setBusy(true);
+    try {
+      const { error } = await supabase.from("loan_application_codes").insert({
+        code: normalized,
+        approved_amount: amt,
+        product: product.trim() || null,
+        note: note.trim() || null,
+      });
+      if (error) throw error;
+      flash(`Code ${normalized} issued for ${fmtCurrency(amt)}.`);
+      setCode(""); setAmount(""); setProduct(""); setNote("");
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "Could not save code.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id: string) {
+    const { error } = await supabase.from("loan_application_codes").delete().eq("id", id);
+    if (error) { flash(error.message); return; }
+    flash("Code removed.");
+  }
+
+  return (
+    <div className="mt-4 grid gap-4 lg:grid-cols-[380px_1fr]">
+      <div className="rounded-xl border border-white/10 bg-[#0f1420] p-5">
+        <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Issue new code</div>
+        <div className="mt-4 grid gap-3">
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">Application Code</span>
+            <div className="mt-1 flex gap-2">
+              <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="VIP-99281"
+                className="flex-1 rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm font-mono text-white focus:border-amber-400 focus:outline-none" />
+              <button onClick={generate} className="rounded border border-amber-400/40 bg-amber-400/10 px-3 text-[11px] text-amber-200 hover:bg-amber-400/20">Generate</button>
+            </div>
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">Pre-Approved Amount (USD)</span>
+            <input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" step="0.01" placeholder="25000"
+              className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm font-mono text-white focus:border-amber-400 focus:outline-none" />
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">Product (optional)</span>
+            <input value={product} onChange={(e) => setProduct(e.target.value)} placeholder="Executive Auto Loan"
+              className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none" />
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">Note (optional)</span>
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Priority customer, referred by branch mgr"
+              className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-amber-400 focus:outline-none" />
+          </label>
+          <button onClick={save} disabled={busy}
+            className="mt-2 rounded bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-60">
+            {busy ? "Saving…" : "Save & Activate Code"}
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-white/10 bg-[#0f1420] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-white/5 text-xs uppercase tracking-wider text-slate-400">
+              <tr>
+                <Th>Code</Th><Th className="text-right">Amount</Th><Th>Product</Th><Th>Note</Th><Th>Status</Th><Th className="text-right">Action</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {codes.map((c) => (
+                <tr key={c.id} className="border-t border-white/5">
+                  <Td className="font-mono text-xs text-amber-300">{c.code}</Td>
+                  <Td className="text-right font-mono text-white">{fmtCurrency(Number(c.approved_amount))}</Td>
+                  <Td className="text-xs text-slate-300">{c.product || "—"}</Td>
+                  <Td className="text-xs text-slate-400">{c.note || "—"}</Td>
+                  <Td>
+                    {c.used_at
+                      ? <span className="text-[10px] rounded border border-slate-400/30 bg-slate-500/10 px-2 py-0.5 text-slate-300">Redeemed</span>
+                      : <span className="text-[10px] rounded border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-emerald-300">Active</span>}
+                  </Td>
+                  <Td className="text-right">
+                    <button onClick={() => remove(c.id)} className="rounded border border-red-400/40 bg-red-400/10 px-3 py-1 text-xs text-red-300 hover:bg-red-400/20">Delete</button>
+                  </Td>
+                </tr>
+              ))}
+              {codes.length === 0 && <tr><Td className="text-center text-slate-500 py-8">No codes yet — issue one on the left.</Td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
