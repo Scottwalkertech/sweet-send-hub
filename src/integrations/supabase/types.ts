@@ -14,8 +14,49 @@ export type Database = {
   }
   public: {
     Tables: {
+      loan_application_codes: {
+        Row: {
+          approved_amount: number
+          code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          product: string | null
+          updated_at: string
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          approved_amount: number
+          code: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          product?: string | null
+          updated_at?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          approved_amount?: number
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          product?: string | null
+          updated_at?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: []
+      }
       loan_applications: {
         Row: {
+          admin_notes: string | null
+          applied_code: string | null
           approved_amount: number
           apr: number
           created_at: string
@@ -23,13 +64,16 @@ export type Database = {
           email: string | null
           full_name: string | null
           government_id_name: string | null
+          government_id_path: string | null
           gross_monthly_income: number
           id: string
           monthly_debt: number
           occupation: string | null
           product: string
           proof_of_income_name: string | null
+          proof_of_income_path: string | null
           requested_amount: number
+          reviewed_at: string | null
           ssn_encrypted: string | null
           ssn_last4: string | null
           status: string
@@ -38,6 +82,8 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          admin_notes?: string | null
+          applied_code?: string | null
           approved_amount: number
           apr: number
           created_at?: string
@@ -45,13 +91,16 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           government_id_name?: string | null
+          government_id_path?: string | null
           gross_monthly_income: number
           id?: string
           monthly_debt: number
           occupation?: string | null
           product: string
           proof_of_income_name?: string | null
+          proof_of_income_path?: string | null
           requested_amount: number
+          reviewed_at?: string | null
           ssn_encrypted?: string | null
           ssn_last4?: string | null
           status?: string
@@ -60,6 +109,8 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          admin_notes?: string | null
+          applied_code?: string | null
           approved_amount?: number
           apr?: number
           created_at?: string
@@ -67,13 +118,16 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           government_id_name?: string | null
+          government_id_path?: string | null
           gross_monthly_income?: number
           id?: string
           monthly_debt?: number
           occupation?: string | null
           product?: string
           proof_of_income_name?: string | null
+          proof_of_income_path?: string | null
           requested_amount?: number
+          reviewed_at?: string | null
           ssn_encrypted?: string | null
           ssn_last4?: string | null
           status?: string
