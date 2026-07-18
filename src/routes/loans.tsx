@@ -105,10 +105,15 @@ function LoansPage() {
 
   async function handleFastTrackCode(code: string): Promise<string | null> {
     const normalized = code.trim().toUpperCase();
-    if (!FAST_TRACK_CODES.has(normalized)) {
-      return "Invalid application code. Please verify with your banker.";
-    }
-    const amount = Math.round((product.maxCap * 0.75) / 1000) * 1000;
+    if (!normalized) return "Enter your special application code.";
+    const { data: codeRow, error: codeErr } = await supabase
+      .from("loan_application_codes")
+      .select("code, approved_amount, used_at")
+      .eq("code", normalized)
+      .maybeSingle();
+    if (codeErr || !codeRow) return "Invalid application code. Please verify with your banker.";
+    if (codeRow.used_at) return "This application code has already been redeemed.";
+    const amount = Number(codeRow.approved_amount);
     setApprovedAmount(amount);
     setFastTracked(true);
     try {
@@ -123,6 +128,7 @@ function LoansPage() {
         monthly_debt: debt,
         credit_tier: `FAST-TRACK (${normalized})`,
         status: "pre_approved_code",
+        applied_code: normalized,
       }).select("id").single();
       if (error) throw error;
       setApplicationId(data.id);
