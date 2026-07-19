@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/external-supabase";
 
 export const Route = createFileRoute("/loans")({
@@ -63,8 +63,6 @@ function LoansPage() {
   const [email, setEmail] = useState("");
   const [occupation, setOccupation] = useState("");
   const [ssn, setSsn] = useState("");
-  const [incomeFile, setIncomeFile] = useState<File | null>(null);
-  const [idFile, setIdFile] = useState<File | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -142,34 +140,18 @@ function LoansPage() {
       setErrorMsg("Please complete all fields. SSN must be 9 digits.");
       return;
     }
-    if (!incomeFile || !idFile) {
-      setErrorMsg("Please upload both proof of income and government ID.");
-      return;
-    }
     setSubmitting(true);
     try {
       const digits = ssn.replace(/\D/g, "");
       const last4 = digits.slice(-4);
       const encoded = typeof window !== "undefined" ? window.btoa(digits) : digits;
       if (applicationId) {
-        const { data: userData } = await supabase.auth.getUser();
-        const folder = userData.user?.id ?? "anon";
-        const incPath = `${folder}/${applicationId}/proof-of-income-${Date.now()}-${incomeFile.name}`;
-        const idPath = `${folder}/${applicationId}/government-id-${Date.now()}-${idFile.name}`;
-        const upA = await supabase.storage.from("loan-docs").upload(incPath, incomeFile, { upsert: true });
-        const upB = await supabase.storage.from("loan-docs").upload(idPath, idFile, { upsert: true });
-        if (upA.error) throw upA.error;
-        if (upB.error) throw upB.error;
         const { error } = await supabase.from("loan_applications").update({
           full_name: fullName.trim(),
           email: email.trim(),
           occupation: occupation.trim(),
           ssn_last4: last4,
           ssn_encrypted: encoded,
-          proof_of_income_name: incomeFile.name,
-          government_id_name: idFile.name,
-          proof_of_income_path: incPath,
-          government_id_path: idPath,
           status: "kyc_submitted",
         }).eq("id", applicationId);
         if (error) throw error;
