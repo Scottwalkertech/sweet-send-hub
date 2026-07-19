@@ -1175,26 +1175,13 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
 
   async function approve(app: LoanApp) {
     if (!app.user_id) { flash("This application has no linked customer account — approval cannot fund a balance."); return; }
-    const target = profiles.find((p) => p.id === app.user_id);
-    if (!target) { flash("Customer profile not found — cannot credit funds."); return; }
     setBusyId(app.id);
     try {
-      const amount = Number(app.approved_amount);
-      const newBalance = Number(target.balance) + amount;
-      await updateProfile(target.id, { balance: newBalance });
-      await insertTransaction({
-        user_id: target.id,
-        account: "checking",
-        posted_at: new Date().toISOString(),
-        description: `Disbursement: Approved Loan Funding — ${app.product}`,
-        amount,
-        balance_after: newBalance,
-      });
-      const { error } = await supabase.from("loan_applications")
-        .update({ status: "approved", reviewed_at: new Date().toISOString() })
-        .eq("id", app.id);
+      const { data, error } = await supabase.rpc("process_loan_disbursement", { app_id: app.id });
       if (error) throw error;
-      flash(`Approved & funded ${fmtCurrency(amount)} to ${target.name}.`);
+      const amount = Number((data as { amount?: number } | null)?.amount ?? app.approved_amount);
+      const target = profiles.find((p) => p.id === app.user_id);
+      flash(`Approved & funded ${fmtCurrency(amount)}${target ? ` to ${target.name}` : ""}.`);
     } catch (e) {
       flash(e instanceof Error ? e.message : "Approval failed.");
     } finally {
