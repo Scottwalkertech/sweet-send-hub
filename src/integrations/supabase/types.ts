@@ -371,6 +371,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      process_loan_disbursement: { Args: { app_id: string }; Returns: Json }
+      verify_loan_code: {
+        Args: { code_string: string }
+        Returns: {
+          approved_amount: number
+          code: string
+          product: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "customer"
