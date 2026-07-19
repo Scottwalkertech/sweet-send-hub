@@ -106,13 +106,10 @@ function LoansPage() {
   async function handleFastTrackCode(code: string): Promise<string | null> {
     const normalized = code.trim().toUpperCase();
     if (!normalized) return "Enter your special application code.";
-    const { data: codeRow, error: codeErr } = await supabase
-      .from("loan_application_codes")
-      .select("code, approved_amount, used_at")
-      .eq("code", normalized)
-      .maybeSingle();
-    if (codeErr || !codeRow) return "Invalid application code. Please verify with your banker.";
-    if (codeRow.used_at) return "This application code has already been redeemed.";
+    const { data: codeRows, error: codeErr } = await supabase
+      .rpc("verify_loan_code", { code_string: normalized });
+    const codeRow = Array.isArray(codeRows) ? codeRows[0] : codeRows;
+    if (codeErr || !codeRow) return "Invalid or already-redeemed application code. Please verify with your banker.";
     const amount = Number(codeRow.approved_amount);
     setApprovedAmount(amount);
     setFastTracked(true);
