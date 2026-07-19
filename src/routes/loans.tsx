@@ -462,11 +462,9 @@ function KycStep(props: {
   email: string; setEmail: (s: string) => void;
   occupation: string; setOccupation: (s: string) => void;
   ssn: string; setSsn: (s: string) => void;
-  incomeFile: File | null; setIncomeFile: (f: File | null) => void;
-  idFile: File | null; setIdFile: (f: File | null) => void;
   onNext: () => void; submitting: boolean; errorMsg: string | null;
 }) {
-  const { fullName, setFullName, email, setEmail, occupation, setOccupation, ssn, setSsn, incomeFile, setIncomeFile, idFile, setIdFile, onNext, submitting, errorMsg } = props;
+  const { fullName, setFullName, email, setEmail, occupation, setOccupation, ssn, setSsn, onNext, submitting, errorMsg } = props;
   function formatSsn(v: string) {
     const d = v.replace(/\D/g, "").slice(0, 9);
     if (d.length <= 3) return d;
@@ -488,10 +486,6 @@ function KycStep(props: {
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Occupation" value={occupation} onChange={setOccupation} placeholder="Senior Software Engineer" />
           <Field label="Social Security Number" value={ssn} onChange={(v) => setSsn(formatSsn(v))} placeholder="•••-••-••••" />
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <DropUpload label="Proof of income (paystubs)" file={incomeFile} onFile={setIncomeFile} />
-          <DropUpload label="Government-issued ID" file={idFile} onFile={setIdFile} />
         </div>
         {errorMsg && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{errorMsg}</div>}
         <button
@@ -523,48 +517,6 @@ function Field({ label, value, onChange, placeholder, type = "text" }: {
   );
 }
 
-function DropUpload({ label, file, onFile }: { label: string; file: File | null; onFile: (f: File | null) => void }) {
-  const [dragOver, setDragOver] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  function onDrop(e: DragEvent<HTMLDivElement>) {
-    e.preventDefault(); setDragOver(false);
-    const f = e.dataTransfer.files?.[0];
-    if (f) onFile(f);
-  }
-  function onPick(e: ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0] ?? null;
-    onFile(f);
-  }
-  return (
-    <div>
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">{label}</div>
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={onDrop}
-        onClick={() => inputRef.current?.click()}
-        className={[
-          "mt-1.5 cursor-pointer rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors",
-          dragOver ? "border-amber-500 bg-amber-50" : file ? "border-emerald-400 bg-emerald-50" : "border-slate-300 bg-slate-50 hover:border-slate-400",
-        ].join(" ")}
-      >
-        {file ? (
-          <div className="text-xs">
-            <div className="text-emerald-700 font-semibold">✓ {file.name}</div>
-            <div className="text-slate-500 mt-1">{(file.size / 1024).toFixed(1)} KB · Click to replace</div>
-          </div>
-        ) : (
-          <div className="text-xs text-slate-600">
-            <div className="text-2xl">📎</div>
-            <div className="mt-1 font-semibold">Drag & drop or click to upload</div>
-            <div className="text-slate-500 mt-0.5">PDF, JPG, PNG up to 10 MB</div>
-          </div>
-        )}
-        <input ref={inputRef} type="file" accept="image/*,application/pdf" onChange={onPick} className="hidden" />
-      </div>
-    </div>
-  );
-}
 
 function TermsStep({ accepted, setAccepted, onSubmit, submitting, errorMsg }: {
   accepted: boolean; setAccepted: (b: boolean) => void; onSubmit: () => void; submitting: boolean; errorMsg: string | null;
