@@ -215,8 +215,6 @@ function LoansPage() {
           email={email} setEmail={setEmail}
           occupation={occupation} setOccupation={setOccupation}
           ssn={ssn} setSsn={setSsn}
-          incomeFile={incomeFile} setIncomeFile={setIncomeFile}
-          idFile={idFile} setIdFile={setIdFile}
           onNext={handleKycNext}
           submitting={submitting}
           errorMsg={errorMsg}
