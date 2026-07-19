@@ -55,8 +55,290 @@ function App() {
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!booted) return null;
-  if (!user) return <Login onAuth={(u) => { setCurrentUserId(u.id); setUser(u); }} />;
+  if (!user) return <Landing onAuth={(u) => { setCurrentUserId(u.id); setUser(u); }} />;
   return <Dashboard user={user} onLogout={() => { setCurrentUserId(null); setUser(null); }} />;
+}
+
+// ============================================================================
+// Public Marketing Landing (BMO-style) — corporate hero with overlay sign-in
+// ============================================================================
+function Landing({ onAuth }: { onAuth: (u: MtUser) => void }) {
+  // Auth form state
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<{ user: MtUser; mode: "verify" | "setup" } | null>(null);
+  const [answer, setAnswer] = useState("");
+  const [setupQ, setSetupQ] = useState(SECURITY_QUESTIONS[0]);
+
+  function completeAuth(u: MtUser) {
+    window.dispatchEvent(new Event("ptl:show"));
+    setTimeout(() => onAuth(u), 700);
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true); setErr("");
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    setBusy(false);
+    if (error) {
+      setErr(/email.*not.*confirm/i.test(error.message)
+        ? "Please confirm your email using the secure link we sent you."
+        : "Invalid credentials. Please try again.");
+      return;
+    }
+    const users = loadUsers();
+    let match = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    if (!match) {
+      const acctFull = genAccountNumber();
+      match = {
+        id: data.user?.id ?? "u_" + Math.floor(1000 + Math.random() * 9000),
+        name: (data.user?.user_metadata?.full_name as string) || email.split("@")[0],
+        email, password, phone: "", ssn: "", securityQ: "", securityA: "",
+        accountNumber: acctFull, account: maskAccount(acctFull),
+        tier: "Standard", status: "Active", balance: 0, savingsBalance: 0,
+        savingsAccountNumber: genAccountNumber(), verified: true,
+        createdAt: new Date().toISOString().slice(0, 10),
+      };
+      saveUsers([match, ...users]);
+    } else if (!match.verified) {
+      match = { ...match, verified: true };
+      upsertUser(match);
+    }
+    if (match.status === "Frozen") { setErr("This account is frozen. Contact support at 1-800-DBW-BANK."); return; }
+    const hasSecurity = !!match.securityQ && !!match.securityA;
+    setAnswer("");
+    setPending({ user: match, mode: hasSecurity ? "verify" : "setup" });
+  }
+
+  function verifyAnswer(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pending) return;
+    if (pending.mode === "verify") {
+      if (normalizeSecurityAnswer(answer) !== normalizeSecurityAnswer(pending.user.securityA)) {
+        setErr("That answer doesn't match our records. Please try again.");
+        return;
+      }
+      setErr(""); completeAuth(pending.user);
+    } else {
+      const norm = normalizeSecurityAnswer(answer);
+      if (norm.length < 2) { setErr("Please provide an answer."); return; }
+      const updated: MtUser = { ...pending.user, securityQ: setupQ, securityA: norm };
+      upsertUser(updated);
+      setErr(""); completeAuth(updated);
+    }
+  }
+
+  if (pending) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+        <div className="w-full max-w-md">
+          <div className="flex items-center gap-3 justify-center mb-8">
+            <div className="h-10 w-10 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-[11px] tracking-wide">DBW</div>
+            <div>
+              <div className="text-xl font-semibold text-slate-900">Additional verification</div>
+              <div className="text-xs text-slate-500">One more step to protect your account</div>
+            </div>
+          </div>
+          <form onSubmit={verifyAnswer} className="bg-white border border-slate-200 rounded-xl p-8 shadow-sm space-y-5">
+            {pending.mode === "verify" ? (
+              <>
+                <h1 className="text-sm font-semibold text-slate-900">Security question</h1>
+                <div className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">{pending.user.securityQ}</div>
+              </>
+            ) : (
+              <>
+                <h1 className="text-sm font-semibold text-slate-900">Set your security question</h1>
+                <p className="text-xs text-slate-500 -mt-2">We'll ask this to verify future sign-ins.</p>
+                <select value={setupQ} onChange={(e) => setSetupQ(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white">
+                  {SECURITY_QUESTIONS.map((q) => <option key={q} value={q}>{q}</option>)}
+                </select>
+              </>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Your answer</label>
+              <input type="text" autoFocus value={answer} onChange={(e) => { setAnswer(e.target.value); setErr(""); }}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" placeholder="Not case sensitive" />
+            </div>
+            {err && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{err}</div>}
+            <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium py-2.5 rounded-md">
+              {pending.mode === "verify" ? "Verify & continue" : "Save & continue"}
+            </button>
+            <button type="button" onClick={async () => { await supabase.auth.signOut(); setPending(null); setAnswer(""); }}
+              className="w-full text-xs text-slate-500 hover:text-slate-800">Cancel and sign out</button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Top corporate navigation */}
+      <header className="w-full bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+          <Link to="/" className="flex items-center gap-2.5 shrink-0">
+            <div className="h-9 w-9 rounded-lg bg-slate-900 flex items-center justify-center text-white font-black text-[10px] tracking-wide">DBW</div>
+            <div className="hidden sm:block">
+              <div className="text-sm font-bold text-slate-900 tracking-tight leading-tight">Dynamic Bank of West</div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-amber-700 font-semibold">Member FDIC</div>
+            </div>
+          </Link>
+          <nav className="hidden md:flex items-center gap-1">
+            <a href="#checking" className="px-3 py-2 text-sm font-medium text-slate-700 hover:text-amber-700 transition">Personal Checking</a>
+            <a href="#savings" className="px-3 py-2 text-sm font-medium text-slate-700 hover:text-amber-700 transition">Savings</a>
+            <Link to="/loans" className="px-3 py-2 text-sm font-medium text-slate-700 hover:text-amber-700 transition">Loans</Link>
+            <Link to="/about" className="px-3 py-2 text-sm font-medium text-slate-700 hover:text-amber-700 transition">About</Link>
+          </nav>
+          <a href="#signin" className="inline-flex items-center rounded-md bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-4 sm:px-5 py-2 shadow-sm transition">
+            Sign In
+          </a>
+        </div>
+      </header>
+
+      {/* Hero with overlay sign-in widget */}
+      <section className="relative bg-slate-900 text-white overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(15,23,42,0.85) 0%, rgba(15,23,42,0.55) 55%, rgba(15,23,42,0.25) 100%), url('https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=1920&q=80')",
+          }}
+        />
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-14 md:py-24 lg:py-28">
+          <div className="grid lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] gap-8 lg:gap-16 items-center">
+            {/* Overlay Sign-In Widget (left) */}
+            <div id="signin" className="order-2 lg:order-1 w-full max-w-md mx-auto lg:mx-0">
+              <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+                <div className="px-6 pt-6 pb-2">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-amber-700 font-bold">Secure Access</div>
+                  <h2 className="mt-1 text-xl font-bold text-slate-900">Sign in to Online Banking</h2>
+                </div>
+                <form onSubmit={submit} className="px-6 pb-6 pt-4 space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Username</label>
+                    <input type="email" autoComplete="username" value={email}
+                      onChange={(e) => { setEmail(e.target.value); setErr(""); }}
+                      className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                      placeholder="you@email.com" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+                    <input type="password" autoComplete="current-password" value={password}
+                      onChange={(e) => { setPassword(e.target.value); setErr(""); }}
+                      className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 tracking-widest"
+                      placeholder="••••••••" />
+                  </div>
+                  {err && <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{err}</div>}
+                  <button type="submit" disabled={busy}
+                    className="w-full rounded-md bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:opacity-60 text-white text-sm font-bold py-2.5 shadow transition">
+                    {busy ? "Signing in…" : "Secure Login"}
+                  </button>
+                  <div className="pt-2 border-t border-slate-100 text-center">
+                    <Link to="/signup" className="text-sm font-semibold text-amber-700 hover:text-amber-900">
+                      Create an Account / Register →
+                    </Link>
+                  </div>
+                  <div className="text-[10px] text-slate-500 text-center">🔒 256-bit TLS · FDIC Insured</div>
+                </form>
+              </div>
+            </div>
+
+            {/* Hero copy (right) */}
+            <div className="order-1 lg:order-2 text-center lg:text-left">
+              <div className="text-[11px] uppercase tracking-[0.28em] text-amber-300 font-bold">Private Banking · Est. 1974</div>
+              <h1 className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight tracking-tight">
+                Banking that keeps pace with your ambition.
+              </h1>
+              <p className="mt-5 text-base sm:text-lg text-slate-200/90 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+                Premium checking, high-yield savings, and instant-approval lending — engineered for professionals, entrepreneurs, and families building generational wealth.
+              </p>
+              <div className="mt-7 flex flex-wrap justify-center lg:justify-start gap-3">
+                <Link to="/signup" className="rounded-md bg-white text-slate-900 hover:bg-slate-100 text-sm font-bold px-5 py-2.5 shadow">Open an Account</Link>
+                <Link to="/loans" className="rounded-md border border-white/30 text-white hover:bg-white/10 text-sm font-semibold px-5 py-2.5">Explore Loans</Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Top 3 Products Grid */}
+      <section className="w-full bg-slate-50 py-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-10">
+            <div className="text-[11px] uppercase tracking-[0.28em] text-amber-700 font-bold">Featured Products</div>
+            <h2 className="mt-2 text-3xl font-bold text-slate-900 tracking-tight">Choose the account that fits your life.</h2>
+          </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            <ProductCard
+              id="checking"
+              icon="💳"
+              tag="Personal Checking"
+              title="Premium Personal Checking"
+              desc="No monthly fees, unlimited transactions, and priority ATM access nationwide."
+              cta="Open Checking"
+              to="/signup"
+            />
+            <ProductCard
+              id="savings"
+              icon="🏦"
+              tag="High-Yield Savings"
+              title="High-Yield Savings"
+              desc="Earn up to 4.85% APY with no minimum balance and automatic goal-based sweeps."
+              cta="Start Saving"
+              to="/signup"
+            />
+            <ProductCard
+              id="loans"
+              icon="⚡"
+              tag="Elite Loan Matrix"
+              title="Elite Loan Matrix"
+              desc="Instant pre-approval for mortgages, auto, and personal lines — funded in days."
+              cta="Get Pre-Approved"
+              to="/loans"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Trust strip */}
+      <section className="w-full bg-white border-t border-slate-200 py-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+          <TrustBadge k="FDIC Insured" v="Up to $250,000" />
+          <TrustBadge k="24/7 Support" v="Live secure chat" />
+          <TrustBadge k="256-bit TLS" v="Bank-grade security" />
+          <TrustBadge k="0 Hidden Fees" v="Transparent by design" />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ProductCard({ id, icon, tag, title, desc, cta, to }: {
+  id: string; icon: string; tag: string; title: string; desc: string; cta: string; to: string;
+}) {
+  return (
+    <div id={id} className="group relative rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-xl hover:border-amber-300 transition-all flex flex-col">
+      <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 border border-amber-300/60 flex items-center justify-center text-2xl">{icon}</div>
+      <div className="mt-4 text-[10px] uppercase tracking-[0.22em] text-amber-700 font-bold">{tag}</div>
+      <h3 className="mt-1 text-lg font-bold text-slate-900">{title}</h3>
+      <p className="mt-2 text-sm text-slate-600 leading-relaxed flex-1">{desc}</p>
+      <Link to={to} className="mt-5 inline-flex items-center justify-center rounded-md bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-4 py-2.5 shadow-sm transition">
+        {cta} →
+      </Link>
+    </div>
+  );
+}
+
+function TrustBadge({ k, v }: { k: string; v: string }) {
+  return (
+    <div>
+      <div className="text-sm font-bold text-slate-900">{k}</div>
+      <div className="mt-1 text-xs text-slate-500">{v}</div>
+    </div>
+  );
 }
 
 function applyProfilePatch(user: MtUser, row: Record<string, unknown>) {
