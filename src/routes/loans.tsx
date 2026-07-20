@@ -173,7 +173,7 @@ function LoansPage() {
       if (applicationId) {
         const { error } = await supabase.from("loan_applications").update({
           terms_accepted: true,
-          status: "approved",
+          status: "pending",
         }).eq("id", applicationId);
         if (error) throw error;
       }
