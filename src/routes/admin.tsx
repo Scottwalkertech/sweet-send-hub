@@ -201,10 +201,11 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
   }
   async function decline(tx: DbPending) {
     if (tx.status !== "Pending") return;
-    // Optimistically remove the row from the visible queue immediately.
+    // Optimistically wipe the row from the pending_transactions queue immediately.
     setRemovedIds((prev) => new Set(prev).add(tx.id));
     try {
-      await updatePendingStatus(tx.id, "Failed");
+      const { error } = await supabase.from("pending_transactions").delete().eq("id", tx.id);
+      if (error) throw error;
       flash(`Declined ${tx.reference} — removed from queue`);
     } catch (e) {
       // Restore the row on error so the operator can retry.
