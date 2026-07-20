@@ -556,14 +556,6 @@ function TermsStep({ accepted, setAccepted, onSubmit, submitting, errorMsg }: {
 }
 
 function SuccessSplash({ product, amount }: { product: Product; amount: number; kycEmail: string; kycName: string }) {
-  const [isGuest, setIsGuest] = useState<boolean | null>(null);
-  useEffect(() => {
-    let mounted = true;
-    supabase.auth.getUser().then(({ data }) => {
-      if (mounted) setIsGuest(!data.user);
-    });
-    return () => { mounted = false; };
-  }, []);
   return (
     <section className="max-w-3xl mx-auto px-6 py-16">
       <div className="rounded-3xl overflow-hidden border border-emerald-200 shadow-2xl bg-white">
