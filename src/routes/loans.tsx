@@ -280,7 +280,7 @@ function HeroAndCalculator(props: {
     <>
       <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.22),transparent_60%)]" />
-        <div className="relative max-w-6xl mx-auto px-6 pt-28 pb-20">
+        <div className="relative max-w-6xl mx-auto px-6 pt-32 pb-12 mt-12">
           <div className="text-[10px] uppercase tracking-[0.32em] text-amber-300 font-semibold">Lending Division · FDIC #48291</div>
           <h1 className="mt-4 text-4xl sm:text-5xl font-semibold tracking-tight max-w-3xl">Capital, delivered at the pace of ambition.</h1>
           <p className="mt-5 text-lg text-slate-200/85 max-w-2xl leading-relaxed">
