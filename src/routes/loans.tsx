@@ -280,7 +280,7 @@ function HeroAndCalculator(props: {
     <>
       <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.22),transparent_60%)]" />
-        <div className="relative max-w-6xl mx-auto px-6 pt-28 pb-20">
+        <div className="relative max-w-6xl mx-auto px-6 pt-32 pb-12 mt-12">
           <div className="text-[10px] uppercase tracking-[0.32em] text-amber-300 font-semibold">Lending Division · FDIC #48291</div>
           <h1 className="mt-4 text-4xl sm:text-5xl font-semibold tracking-tight max-w-3xl">Capital, delivered at the pace of ambition.</h1>
           <p className="mt-5 text-lg text-slate-200/85 max-w-2xl leading-relaxed">
@@ -308,8 +308,8 @@ function HeroAndCalculator(props: {
         </div>
       </section>
 
-      <section className="max-w-4xl mx-auto px-6 -mt-10 pb-20">
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-xl p-6 sm:p-8">
+      <section className="relative z-10 max-w-4xl mx-auto px-6 -mt-10 pb-20" style={{ position: "relative", zIndex: 10 }}>
+        <div className="relative z-10 rounded-2xl bg-white border border-slate-200 shadow-xl p-6 sm:p-8">
           <div className="text-[10px] uppercase tracking-[0.28em] text-amber-700 font-semibold">Instant Pre-Approval Calculator</div>
           <h2 className="mt-2 text-2xl font-semibold text-slate-900">Check your eligibility in under 60 seconds.</h2>
 
@@ -556,14 +556,6 @@ function TermsStep({ accepted, setAccepted, onSubmit, submitting, errorMsg }: {
 }
 
 function SuccessSplash({ product, amount }: { product: Product; amount: number; kycEmail: string; kycName: string }) {
-  const [isGuest, setIsGuest] = useState<boolean | null>(null);
-  useEffect(() => {
-    let mounted = true;
-    supabase.auth.getUser().then(({ data }) => {
-      if (mounted) setIsGuest(!data.user);
-    });
-    return () => { mounted = false; };
-  }, []);
   return (
     <section className="max-w-3xl mx-auto px-6 py-16">
       <div className="rounded-3xl overflow-hidden border border-emerald-200 shadow-2xl bg-white">
@@ -583,19 +575,17 @@ function SuccessSplash({ product, amount }: { product: Product; amount: number; 
           <Metric k="Approved Amount" v={`$${amount.toLocaleString()}`} />
           <Metric k="Funding ETA" v="Within 24 business hours" />
         </div>
-        {isGuest && (
-          <div className="px-8 pb-8">
-            <Link
-              to="/signup"
-              className="block w-full text-center rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white font-semibold px-8 py-4 shadow-lg text-base tracking-wide"
-            >
-              Create Your Account to Get Funded
-            </Link>
-            <p className="mt-3 text-center text-xs text-slate-500">
-              Establish your DBW online banking profile to receive your approved funds.
-            </p>
-          </div>
-        )}
+        <div className="px-8 pb-8">
+          <Link
+            to="/signup"
+            className="block w-full text-center rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white font-semibold px-8 py-4 shadow-lg text-base tracking-wide"
+          >
+            Create Your Account to Proceed
+          </Link>
+          <p className="mt-3 text-center text-xs text-slate-500">
+            Establish your DBW online banking profile to receive your approved funds.
+          </p>
+        </div>
         <div className="p-6 bg-slate-50 border-t border-slate-200 text-center">
           <Link to="/" className="inline-block rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold px-8 py-3">
             Return to Online Banking
