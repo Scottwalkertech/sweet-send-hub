@@ -1204,6 +1204,11 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
 
   async function decline(app: LoanApp) {
     setBusyId(app.id);
+    setRemovedIds((prev) => {
+      const next = new Set(prev);
+      next.add(app.id);
+      return next;
+    });
     try {
       const { error } = await supabase.from("loan_applications")
         .update({ status: "declined", reviewed_at: new Date().toISOString() })
@@ -1211,6 +1216,11 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
       if (error) throw error;
       flash("Application declined.");
     } catch (e) {
+      setRemovedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(app.id);
+        return next;
+      });
       flash(e instanceof Error ? e.message : "Decline failed.");
     } finally {
       setBusyId(null);
