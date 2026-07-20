@@ -1281,7 +1281,7 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
                 </tr>
               );
             })}
-            {apps.length === 0 && <tr><Td className="text-center text-slate-500 py-8">No loan applications yet.</Td></tr>}
+            {apps.filter((a) => !removedIds.has(a.id) && a.status !== "declined").length === 0 && <tr><Td className="text-center text-slate-500 py-8">No loan applications yet.</Td></tr>}
           </tbody>
         </table>
       </div>
