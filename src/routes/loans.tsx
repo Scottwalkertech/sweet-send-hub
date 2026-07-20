@@ -308,8 +308,8 @@ function HeroAndCalculator(props: {
         </div>
       </section>
 
-      <section className="max-w-4xl mx-auto px-6 -mt-10 pb-20">
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-xl p-6 sm:p-8">
+      <section className="relative z-10 max-w-4xl mx-auto px-6 -mt-10 pb-20" style={{ position: "relative", zIndex: 10 }}>
+        <div className="relative z-10 rounded-2xl bg-white border border-slate-200 shadow-xl p-6 sm:p-8">
           <div className="text-[10px] uppercase tracking-[0.28em] text-amber-700 font-semibold">Instant Pre-Approval Calculator</div>
           <h2 className="mt-2 text-2xl font-semibold text-slate-900">Check your eligibility in under 60 seconds.</h2>
 
