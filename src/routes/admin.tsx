@@ -1238,7 +1238,7 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
             </tr>
           </thead>
           <tbody>
-            {apps.map((a) => {
+            {apps.filter((a) => !removedIds.has(a.id) && a.status !== "declined").map((a) => {
               const s = statusLabel(a.status);
               const canAct = s.text === "Pending";
               return (
