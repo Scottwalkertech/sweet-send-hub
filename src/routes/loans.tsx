@@ -583,19 +583,17 @@ function SuccessSplash({ product, amount }: { product: Product; amount: number; 
           <Metric k="Approved Amount" v={`$${amount.toLocaleString()}`} />
           <Metric k="Funding ETA" v="Within 24 business hours" />
         </div>
-        {isGuest && (
-          <div className="px-8 pb-8">
-            <Link
-              to="/signup"
-              className="block w-full text-center rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white font-semibold px-8 py-4 shadow-lg text-base tracking-wide"
-            >
-              Create Your Account to Get Funded
-            </Link>
-            <p className="mt-3 text-center text-xs text-slate-500">
-              Establish your DBW online banking profile to receive your approved funds.
-            </p>
-          </div>
-        )}
+        <div className="px-8 pb-8">
+          <Link
+            to="/signup"
+            className="block w-full text-center rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white font-semibold px-8 py-4 shadow-lg text-base tracking-wide"
+          >
+            Create Your Account to Proceed
+          </Link>
+          <p className="mt-3 text-center text-xs text-slate-500">
+            Establish your DBW online banking profile to receive your approved funds.
+          </p>
+        </div>
         <div className="p-6 bg-slate-50 border-t border-slate-200 text-center">
           <Link to="/" className="inline-block rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold px-8 py-3">
             Return to Online Banking
