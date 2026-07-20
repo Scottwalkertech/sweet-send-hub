@@ -174,6 +174,7 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
   const [editing, setEditing] = useState<DbProfile | null>(null);
   const [deleting, setDeleting] = useState<DbProfile | null>(null);
   const [toast, setToast] = useState("");
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
 
   function flash(m: string) { setToast(m); setTimeout(() => setToast(""), 2600); }
 
@@ -198,13 +199,21 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
       flash(`Approve failed: ${(e as Error).message}`);
     }
   }
-  async function fail(tx: DbPending) {
+  async function decline(tx: DbPending) {
     if (tx.status !== "Pending") return;
+    // Optimistically remove the row from the visible queue immediately.
+    setRemovedIds((prev) => new Set(prev).add(tx.id));
     try {
       await updatePendingStatus(tx.id, "Failed");
-      flash(`Marked ${tx.reference} as failed`);
+      flash(`Declined ${tx.reference} — removed from queue`);
     } catch (e) {
-      flash(`Mark-failed failed: ${(e as Error).message}`);
+      // Restore the row on error so the operator can retry.
+      setRemovedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(tx.id);
+        return next;
+      });
+      flash(`Decline failed: ${(e as Error).message}`);
     }
   }
 
@@ -335,25 +344,27 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
                 </tr>
               </thead>
               <tbody>
-                {queue.map((tx) => (
-                  <tr key={tx.id} className="border-t border-white/5 hover:bg-white/[0.03]">
-                    <Td className="font-mono text-xs text-amber-300">{tx.reference}</Td>
-                    <Td className="text-white">{tx.user_name}</Td>
-                    <Td><MethodPill method={tx.method} /></Td>
-                    <Td className="text-xs text-slate-400">{tx.direction === "credit" ? "Credit ↓" : "Debit ↑"}</Td>
-                    <Td className="text-slate-400 text-xs">{tx.submitted_at.slice(0, 10)}</Td>
-                    <Td className={`text-right font-mono ${tx.direction === "credit" ? "text-emerald-300" : "text-red-300"}`}>{tx.direction === "credit" ? "+" : "-"}{fmtCurrency(Number(tx.amount))}</Td>
+                {queue
+                  .filter((tx) => !removedIds.has(tx.id) && tx.status !== "Failed")
+                  .map((tx) => (
+                    <tr key={tx.id} className="border-t border-white/5 hover:bg-white/[0.03]">
+                      <Td className="font-mono text-xs text-amber-300">{tx.reference}</Td>
+                      <Td className="text-white">{tx.user_name}</Td>
+                      <Td><MethodPill method={tx.method} /></Td>
+                      <Td className="text-xs text-slate-400">{tx.direction === "credit" ? "Credit ↓" : "Debit ↑"}</Td>
+                      <Td className="text-slate-400 text-xs">{tx.submitted_at.slice(0, 10)}</Td>
+                      <Td className={`text-right font-mono ${tx.direction === "credit" ? "text-emerald-300" : "text-red-300"}`}>{tx.direction === "credit" ? "+" : "-"}{fmtCurrency(Number(tx.amount))}</Td>
 
-                    <Td><TxStatus status={tx.status} /></Td>
-                    <Td className="text-right">
-                      <div className="inline-flex gap-2">
-                        <button disabled={tx.status !== "Pending"} onClick={() => approve(tx)} className="rounded border border-emerald-400/40 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300 hover:bg-emerald-400/20 disabled:opacity-30">Approve</button>
-                        <button disabled={tx.status !== "Pending"} onClick={() => fail(tx)} className="rounded border border-red-400/40 bg-red-400/10 px-3 py-1 text-xs text-red-300 hover:bg-red-400/20 disabled:opacity-30">Fail</button>
-                      </div>
-                    </Td>
-                  </tr>
-                ))}
-                {queue.length === 0 && <tr><Td className="text-center text-slate-500 py-8">No transactions in queue.</Td></tr>}
+                      <Td><TxStatus status={tx.status} /></Td>
+                      <Td className="text-right">
+                        <div className="inline-flex gap-2">
+                          <button disabled={tx.status !== "Pending"} onClick={() => approve(tx)} className="rounded border border-emerald-400/40 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300 hover:bg-emerald-400/20 disabled:opacity-30">Approve</button>
+                          <button disabled={tx.status !== "Pending"} onClick={() => decline(tx)} className="rounded border border-red-400/40 bg-red-400/10 px-3 py-1 text-xs text-red-300 hover:bg-red-400/20 disabled:opacity-30">Decline Transaction</button>
+                        </div>
+                      </Td>
+                    </tr>
+                  ))}
+                {queue.filter((tx) => !removedIds.has(tx.id) && tx.status !== "Failed").length === 0 && <tr><Td className="text-center text-slate-500 py-8">No transactions in queue.</Td></tr>}
               </tbody>
             </table>
           </div>
