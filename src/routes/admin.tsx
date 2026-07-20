@@ -174,6 +174,7 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
   const [editing, setEditing] = useState<DbProfile | null>(null);
   const [deleting, setDeleting] = useState<DbProfile | null>(null);
   const [toast, setToast] = useState("");
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
 
   function flash(m: string) { setToast(m); setTimeout(() => setToast(""), 2600); }
 
@@ -198,13 +199,21 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
       flash(`Approve failed: ${(e as Error).message}`);
     }
   }
-  async function fail(tx: DbPending) {
+  async function decline(tx: DbPending) {
     if (tx.status !== "Pending") return;
+    // Optimistically remove the row from the visible queue immediately.
+    setRemovedIds((prev) => new Set(prev).add(tx.id));
     try {
       await updatePendingStatus(tx.id, "Failed");
-      flash(`Marked ${tx.reference} as failed`);
+      flash(`Declined ${tx.reference} — removed from queue`);
     } catch (e) {
-      flash(`Mark-failed failed: ${(e as Error).message}`);
+      // Restore the row on error so the operator can retry.
+      setRemovedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(tx.id);
+        return next;
+      });
+      flash(`Decline failed: ${(e as Error).message}`);
     }
   }
 
