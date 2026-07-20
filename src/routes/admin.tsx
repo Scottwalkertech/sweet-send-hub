@@ -1163,6 +1163,7 @@ function statusLabel(s: string): { text: string; klass: string } {
 function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; flash: (m: string) => void }) {
   const [apps, setApps] = useState<LoanApp[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [viewer, setViewer] = useState<{ url: string; label: string } | null>(null);
 
   const load = async () => {
