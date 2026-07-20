@@ -1163,6 +1163,7 @@ function statusLabel(s: string): { text: string; klass: string } {
 function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; flash: (m: string) => void }) {
   const [apps, setApps] = useState<LoanApp[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [viewer, setViewer] = useState<{ url: string; label: string } | null>(null);
 
   const load = async () => {
@@ -1203,6 +1204,11 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
 
   async function decline(app: LoanApp) {
     setBusyId(app.id);
+    setRemovedIds((prev) => {
+      const next = new Set(prev);
+      next.add(app.id);
+      return next;
+    });
     try {
       const { error } = await supabase.from("loan_applications")
         .update({ status: "declined", reviewed_at: new Date().toISOString() })
@@ -1210,6 +1216,11 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
       if (error) throw error;
       flash("Application declined.");
     } catch (e) {
+      setRemovedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(app.id);
+        return next;
+      });
       flash(e instanceof Error ? e.message : "Decline failed.");
     } finally {
       setBusyId(null);
@@ -1227,7 +1238,7 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
             </tr>
           </thead>
           <tbody>
-            {apps.map((a) => {
+            {apps.filter((a) => !removedIds.has(a.id) && a.status !== "declined").map((a) => {
               const s = statusLabel(a.status);
               const canAct = s.text === "Pending";
               return (
@@ -1270,7 +1281,7 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
                 </tr>
               );
             })}
-            {apps.length === 0 && <tr><Td className="text-center text-slate-500 py-8">No loan applications yet.</Td></tr>}
+            {apps.filter((a) => !removedIds.has(a.id) && a.status !== "declined").length === 0 && <tr><Td className="text-center text-slate-500 py-8">No loan applications yet.</Td></tr>}
           </tbody>
         </table>
       </div>
