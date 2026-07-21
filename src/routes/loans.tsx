@@ -104,8 +104,11 @@ function LoansPage() {
   async function handleFastTrackCode(code: string): Promise<string | null> {
     const normalized = code.trim().toUpperCase();
     if (!normalized) return "Enter your special application code.";
-    const { data: codeRows, error: codeErr } = await supabase
-      .rpc("verify_loan_code", { code_string: normalized });
+    const { data: codeRows, error: codeErr } = await (supabase as any)
+      .from("loan_application_codes_view")
+      .select("code, approved_amount, product")
+      .eq("code", normalized)
+      .limit(1);
     const codeRow = Array.isArray(codeRows) ? codeRows[0] : codeRows;
     if (codeErr || !codeRow) return "Invalid or already-redeemed application code. Please verify with your banker.";
     const amount = Number(codeRow.approved_amount);
