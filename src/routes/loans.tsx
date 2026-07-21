@@ -212,6 +212,12 @@ function LoansPage() {
           onBack={() => setStep("hero")}
         />
       )}
+      {step === "code_preapproval" && approvedAmount != null && (
+        <CodePreApprovalBridge
+          amount={approvedAmount}
+          onProceed={() => { setStep("kyc"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+        />
+      )}
       {step === "kyc" && (
         <KycStep
           fullName={fullName} setFullName={setFullName}
