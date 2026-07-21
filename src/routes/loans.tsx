@@ -40,7 +40,7 @@ const CREDIT_TIERS = [
   { key: "building", label: "Building (600–639)", factor: 0.3 },
 ];
 
-type Step = "hero" | "offer" | "kyc" | "terms" | "success";
+type Step = "hero" | "offer" | "code_preapproval" | "kyc" | "terms" | "success";
 
 // Fast-track codes now live in the loan_application_codes table. Admins
 // create/manage them from the Special Application Code Management Portal.
