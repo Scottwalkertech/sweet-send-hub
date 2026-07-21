@@ -133,7 +133,7 @@ function LoansPage() {
     } catch (e) {
       console.error(e);
     }
-    setStep("kyc");
+    setStep("code_preapproval");
     window.scrollTo({ top: 0, behavior: "smooth" });
     return null;
   }
