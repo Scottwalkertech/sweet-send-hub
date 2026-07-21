@@ -243,6 +243,35 @@ function LoansPage() {
   );
 }
 
+function CodePreApprovalBridge({ amount, onProceed }: { amount: number; onProceed: () => void }) {
+  return (
+    <section className="pt-28 pb-16 px-6">
+      <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl border border-emerald-100 overflow-hidden">
+        <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 px-8 py-10 text-center text-white">
+          <div className="mx-auto h-16 w-16 rounded-full bg-white/15 flex items-center justify-center mb-4 text-3xl">✓</div>
+          <div className="text-xs uppercase tracking-[0.28em] text-emerald-100 mb-2">Priority Code Verified</div>
+          <h1 className="text-3xl md:text-4xl font-black">Congratulations!</h1>
+        </div>
+        <div className="px-8 py-10 text-center">
+          <p className="text-slate-700 text-lg leading-relaxed">
+            Your special application code has been verified. You have been pre-approved for
+          </p>
+          <div className="my-6 text-5xl md:text-6xl font-black text-emerald-700 tracking-tight">
+            ${amount.toLocaleString()}
+          </div>
+          <p className="text-sm text-slate-500 mb-8">
+            Complete a brief verification step to secure your funding disbursement.
+          </p>
+          <button onClick={onProceed}
+            className="w-full md:w-auto md:px-12 py-4 rounded-lg bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold shadow-lg transition">
+            Click to Proceed and Secure Your Funding →
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SiteHeader() {
   return (
     <header className="bg-gradient-to-b from-slate-900 to-slate-800 text-white">
