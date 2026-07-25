@@ -43,7 +43,7 @@ function AboutPage() {
           <h1 className="mt-4 text-4xl sm:text-5xl font-semibold tracking-tight">About Dynamic Bank of West</h1>
           <p className="mt-6 text-lg text-slate-200/85 leading-relaxed max-w-3xl mx-auto">
             DYNAMIC BANK OF WEST, N.A. operates under FDIC certificate #48291, managing global digital retail and secure
-            institutional capital reserves across the Western United States. For over a quarter century we have paired
+            institutional capital reserves across the Western Cayman Islands. For over a quarter century we have paired
             community-first values with enterprise-grade security.
           </p>
         </div>
