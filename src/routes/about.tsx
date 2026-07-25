@@ -6,7 +6,7 @@ export const Route = createFileRoute("/about")({
       { title: "About Dynamic Bank of West" },
       { name: "description", content: "DYNAMIC BANK OF WEST — established 1998, FDIC certificate #48291. Serving western communities with secure, community-focused banking." },
       { property: "og:title", content: "About Dynamic Bank of West" },
-      { property: "og:description", content: "Established 1998 · FDIC #48291 · Community-focused retail and institutional banking across the Western United States." },
+      { property: "og:description", content: "Established 1998 · FDIC #48291 · Community-focused retail and institutional banking across the Western Cayman Islands." },
     ],
   }),
   component: AboutPage,
@@ -43,7 +43,7 @@ function AboutPage() {
           <h1 className="mt-4 text-4xl sm:text-5xl font-semibold tracking-tight">About Dynamic Bank of West</h1>
           <p className="mt-6 text-lg text-slate-200/85 leading-relaxed max-w-3xl mx-auto">
             DYNAMIC BANK OF WEST, N.A. operates under FDIC certificate #48291, managing global digital retail and secure
-            institutional capital reserves across the Western United States. For over a quarter century we have paired
+            institutional capital reserves across the Western Cayman Islands. For over a quarter century we have paired
             community-first values with enterprise-grade security.
           </p>
         </div>
@@ -88,7 +88,7 @@ function AboutPage() {
         <h2 className="mt-2 text-3xl font-semibold text-slate-900">A quarter century of trusted service.</h2>
         <div className="mt-6 space-y-4 text-slate-700 leading-relaxed text-lg">
           <p>
-            Dynamic Bank of West was founded in 1998 in Los Angeles with a single premise — that western families and
+            Dynamic Bank of West was founded in 1998 in Cayman Islands with a single premise — that western families and
             businesses deserve a bank that understood them by name. That founding branch became the seed of a federally
             insured national institution, now serving customers across every western state.
           </p>
@@ -106,7 +106,7 @@ function AboutPage() {
         <div className="mt-8 rounded-xl border border-slate-200 bg-slate-50 px-6 py-4 text-xs text-slate-600 grid sm:grid-cols-3 gap-3">
           <Fact k="Founded" v="1998" />
           <Fact k="FDIC Certificate" v="#48291" />
-          <Fact k="Headquarters" v="Los Angeles, CA" />
+          <Fact k="Headquarters" v="Cayman Islands" />
         </div>
       </section>
 
