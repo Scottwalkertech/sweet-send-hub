@@ -6,7 +6,7 @@ export const Route = createFileRoute("/about")({
       { title: "About Dynamic Bank of West" },
       { name: "description", content: "DYNAMIC BANK OF WEST — established 1998, FDIC certificate #48291. Serving western communities with secure, community-focused banking." },
       { property: "og:title", content: "About Dynamic Bank of West" },
-      { property: "og:description", content: "Established 1998 · FDIC #48291 · Community-focused retail and institutional banking across the Western United States." },
+      { property: "og:description", content: "Established 1998 · FDIC #48291 · Community-focused retail and institutional banking across the Western Cayman Islands." },
     ],
   }),
   component: AboutPage,
