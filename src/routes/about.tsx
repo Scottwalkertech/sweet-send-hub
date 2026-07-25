@@ -88,7 +88,7 @@ function AboutPage() {
         <h2 className="mt-2 text-3xl font-semibold text-slate-900">A quarter century of trusted service.</h2>
         <div className="mt-6 space-y-4 text-slate-700 leading-relaxed text-lg">
           <p>
-            Dynamic Bank of West was founded in 1998 in Los Angeles with a single premise — that western families and
+            Dynamic Bank of West was founded in 1998 in Cayman Islands with a single premise — that western families and
             businesses deserve a bank that understood them by name. That founding branch became the seed of a federally
             insured national institution, now serving customers across every western state.
           </p>
