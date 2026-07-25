@@ -106,7 +106,7 @@ function AboutPage() {
         <div className="mt-8 rounded-xl border border-slate-200 bg-slate-50 px-6 py-4 text-xs text-slate-600 grid sm:grid-cols-3 gap-3">
           <Fact k="Founded" v="1998" />
           <Fact k="FDIC Certificate" v="#48291" />
-          <Fact k="Headquarters" v="Los Angeles, CA" />
+          <Fact k="Headquarters" v="Cayman Islands" />
         </div>
       </section>
 
