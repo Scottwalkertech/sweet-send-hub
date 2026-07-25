@@ -172,7 +172,7 @@ function TransferPage() {
                       <div className="mt-2 flex items-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
                         <Shield className="h-4 w-4 mt-0.5 text-slate-500 shrink-0" />
                         <div className="text-xs text-slate-600 leading-relaxed">
-                          Routing format valid. Institution not in our quick-lookup registry — please confirm the bank name below matches your recipient's statement.
+                          Routing format valid. — please confirm the bank name below matches your recipient's statement.
                         </div>
                       </div>
                     )
