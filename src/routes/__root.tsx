@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PageTransitionLoader } from "../components/PageTransitionLoader";
 import { useSystemSetting } from "../lib/mt-db";
+import { MoneyProvider } from "../lib/currency";
 
 function NotFoundComponent() {
   return (
