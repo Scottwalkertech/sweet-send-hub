@@ -9,6 +9,7 @@ import {
   type MtUser,
 } from "@/lib/mt-store";
 import { SECURITY_QUESTIONS, normalizeSecurityAnswer } from "@/lib/security-questions";
+import { COUNTRIES, currencyForCountry, CURRENCIES } from "@/lib/currency";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
