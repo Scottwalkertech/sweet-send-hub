@@ -24,6 +24,7 @@ function AccountPage() {
   const account = (type === "savings" ? "savings" : "checking") as AccountKey;
   const [user, setUser] = useState<MtUser | null>(null);
   const { entries } = useUserLedger(user?.id, account);
+  const { format: fmt } = useMoney();
 
   useEffect(() => {
     function refresh() { setUser(currentUser()); }
