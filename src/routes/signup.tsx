@@ -9,6 +9,7 @@ import {
   type MtUser,
 } from "@/lib/mt-store";
 import { SECURITY_QUESTIONS, normalizeSecurityAnswer } from "@/lib/security-questions";
+import { COUNTRIES, currencyForCountry, CURRENCIES } from "@/lib/currency";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
@@ -27,14 +28,16 @@ type Form = {
   confirm: string;
   securityQ: string;
   securityA: string;
+  country: string;
 };
 
 function SignupPage() {
-  const [form, setForm] = useState<Form>({ name: "", email: "", password: "", confirm: "", securityQ: SECURITY_QUESTIONS[0], securityA: "" });
+  const [form, setForm] = useState<Form>({ name: "", email: "", password: "", confirm: "", securityQ: SECURITY_QUESTIONS[0], securityA: "", country: "US" });
   const [err, setErr] = useState("");
   const [agree, setAgree] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState<{ email: string; name: string } | null>(null);
+  const selectedCurrency = currencyForCountry(form.country);
 
   function update<K extends keyof Form>(k: K, v: string) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -57,7 +60,7 @@ function SignupPage() {
       password: form.password,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
-        data: { full_name: form.name.trim() },
+        data: { full_name: form.name.trim(), name: form.name.trim(), country: form.country, currency: selectedCurrency },
       },
     });
     setSubmitting(false);
@@ -123,6 +126,29 @@ function SignupPage() {
             <Field label="Email address" type="email" value={form.email} onChange={(v) => update("email", v)} placeholder="you@email.com" />
             <Field label="Password" type="password" value={form.password} onChange={(v) => update("password", v)} placeholder="At least 8 characters" />
             <Field label="Confirm password" type="password" value={form.confirm} onChange={(v) => update("confirm", v)} placeholder="Repeat password" />
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Country / Region</label>
+              <select
+                value={form.country}
+                onChange={(e) => update("country", e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+              >
+                {COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Account currency</label>
+              <div className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 flex items-center justify-between">
+                <span className="font-semibold text-slate-900">{CURRENCIES[selectedCurrency].symbol} {selectedCurrency}</span>
+                <span className="text-xs text-slate-500">{CURRENCIES[selectedCurrency].label}</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">You can change this anytime in Account Settings.</p>
+            </div>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">

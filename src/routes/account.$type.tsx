@@ -5,6 +5,7 @@ import {
   fmtCurrency, type MtUser, type AccountKey,
 } from "@/lib/mt-store";
 import { useUserLedger, insertTransaction, updateProfile } from "@/lib/mt-db";
+import { useMoney } from "@/lib/currency";
 
 export const Route = createFileRoute("/account/$type")({
   head: () => ({
@@ -23,6 +24,7 @@ function AccountPage() {
   const account = (type === "savings" ? "savings" : "checking") as AccountKey;
   const [user, setUser] = useState<MtUser | null>(null);
   const { entries } = useUserLedger(user?.id, account);
+  const { format: fmt } = useMoney();
 
   useEffect(() => {
     function refresh() { setUser(currentUser()); }
@@ -83,7 +85,7 @@ function AccountPage() {
             <div className="text-right">
               <div className="text-[10px] uppercase tracking-[0.24em] text-[#333333]">Available Balance</div>
               <div className="text-4xl font-semibold tabular-nums mt-1 bg-gradient-to-b from-amber-500 to-amber-700 bg-clip-text text-transparent">
-                {fmtCurrency(meta.balance)}
+                {fmt(meta.balance)}
               </div>
             </div>
           </div>
@@ -122,9 +124,9 @@ function AccountPage() {
                     <td className="px-6 py-3 text-[#333333] whitespace-nowrap">{new Date(e.posted_at).toLocaleDateString()}</td>
                     <td className="px-6 py-3 text-[#1e3a8a]">{e.description}</td>
                     <td className={`px-6 py-3 text-right font-mono tabular-nums ${Number(e.amount) >= 0 ? "text-emerald-700" : "text-red-700"}`}>
-                      {Number(e.amount) >= 0 ? "+" : "-"}{fmtCurrency(Math.abs(Number(e.amount)))}
+                      {Number(e.amount) >= 0 ? "+" : "-"}{fmt(Math.abs(Number(e.amount)))}
                     </td>
-                    <td className="px-6 py-3 text-right font-mono tabular-nums text-[#1e3a8a]">{fmtCurrency(Number(e.balance_after))}</td>
+                    <td className="px-6 py-3 text-right font-mono tabular-nums text-[#1e3a8a]">{fmt(Number(e.balance_after))}</td>
 
                   </tr>
                 ))}
@@ -138,6 +140,7 @@ function AccountPage() {
 }
 
 function InternalTransfer({ user, source }: { user: MtUser; source: AccountKey }) {
+  const { format: fmt } = useMoney();
   const [dest, setDest] = useState<AccountKey>(source === "checking" ? "savings" : "checking");
   const [amount, setAmount] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -179,7 +182,7 @@ function InternalTransfer({ user, source }: { user: MtUser; source: AccountKey }
       // Mirror to local user cache so the header balance updates immediately.
       upsertUser({ ...user, balance: newChecking, savingsBalance: newSavings });
       setAmount("");
-      setMsg({ ok: true, text: `Transferred ${fmtCurrency(amt)} to ${destLabel}.` });
+      setMsg({ ok: true, text: `Transferred ${fmt(amt)} to ${destLabel}.` });
     } catch (err) {
       setMsg({ ok: false, text: `Transfer failed: ${(err as Error).message}` });
     }

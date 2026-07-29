@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PageTransitionLoader } from "../components/PageTransitionLoader";
 import { useSystemSetting } from "../lib/mt-db";
+import { MoneyProvider } from "../lib/currency";
 
 function NotFoundComponent() {
   return (
@@ -141,13 +142,15 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <GlobalBanner />
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      <SiteFooter />
-      <PageTransitionLoader />
-      <FloatingChatBubble />
-      <AdminUnlockCorner onUnlock={() => unlockAdmin(router)} />
+      <MoneyProvider>
+        <GlobalBanner />
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+        <SiteFooter />
+        <PageTransitionLoader />
+        <FloatingChatBubble />
+        <AdminUnlockCorner onUnlock={() => unlockAdmin(router)} />
+      </MoneyProvider>
     </QueryClientProvider>
   );
 }

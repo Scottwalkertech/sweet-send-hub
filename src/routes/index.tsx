@@ -7,6 +7,7 @@ import {
   type MtUser,
 } from "@/lib/mt-store";
 import { useUnifiedUserActivity, updateProfile } from "@/lib/mt-db";
+import { useMoney } from "@/lib/currency";
 import { useChatThread, sendChatMessage } from "@/lib/mt-chat";
 import { supabase } from "@/lib/external-supabase";
 import { SECURITY_QUESTIONS, normalizeSecurityAnswer } from "@/lib/security-questions";
@@ -621,7 +622,8 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
   }
 
   const { items: unifiedActivity } = useUnifiedUserActivity(user.id);
-  const userHistory = unifiedActivity.slice(0, 40);
+  const money = useMoney();
+  const userHistory = unifiedActivity; // show every entry so old + new admin injections all appear
   const [showFullLedger, setShowFullLedger] = useState(false);
   const visibleHistory = showFullLedger ? userHistory : userHistory.slice(0, 5);
 
@@ -721,6 +723,11 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                   <DbwItem icon="💳" label="Debit Card Controls" onClick={() => { setDbwOpen(false); setShowCard(true); }} />
                   <DbwItem icon="📋" label="Routing & Account Info" onClick={() => { setDbwOpen(false); setShowRouting(true); }} />
                   <DbwItem icon="🔒" label="Open Secure Messages" onClick={() => { setDbwOpen(false); setChatOpen(true); }} />
+                  <Link to="/settings" onClick={() => setDbwOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition">
+                    <span className="text-base">⚙️</span>
+                    <span>Account Settings</span>
+                  </Link>
+
 
                 </div>
               )}
@@ -765,7 +772,7 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                 <div className="text-right">
                   <div className="text-xs uppercase tracking-wider text-amber-200/80">Available Balance</div>
                   <div className="text-4xl font-semibold tabular-nums mt-1 bg-gradient-to-b from-amber-200 to-amber-400 bg-clip-text text-transparent">
-                    {fmtCurrency(displayedBalance)}
+                    {money.format(displayedBalance)}
                   </div>
                 </div>
               </div>
@@ -842,7 +849,7 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                         t.status === "Failed" ? "text-slate-400 line-through"
                         : isPending ? "text-slate-500 italic"
                         : isCredit ? "text-emerald-600" : "text-slate-900"
-                      }`}>{sign}{fmtCurrency(Number(t.amount))}</td>
+                      }`}>{sign}{money.format(Number(t.amount))}</td>
                     </tr>
 
                   );
@@ -1100,6 +1107,7 @@ function AccountCard({ to, params, product, tag, accountMasked, balance }: {
   to: "/account/$type"; params: { type: "checking" | "savings" };
   product: string; tag: string; accountMasked: string; balance: number;
 }) {
+  const { format } = useMoney();
   return (
     <Link to={to} params={params}
       className="group block rounded-2xl overflow-hidden border border-slate-800 shadow-xl hover:border-amber-400 hover:shadow-2xl transition-all">
@@ -1116,7 +1124,7 @@ function AccountCard({ to, params, product, tag, accountMasked, balance }: {
           <div className="text-right">
             <div className="text-[10px] uppercase tracking-widest text-amber-200/80">Balance</div>
             <div className="text-3xl font-semibold tabular-nums mt-1 bg-gradient-to-b from-amber-200 to-amber-500 bg-clip-text text-transparent">
-              {fmtCurrency(balance)}
+              {format(balance)}
             </div>
           </div>
         </div>
@@ -1278,6 +1286,7 @@ function DebitCardModal({ user, onClose }: { user: MtUser; onClose: () => void }
   const [frozen, setFrozen] = useState(!!user.debitFrozen);
   const [limit, setLimit] = useState(user.dailyLimit ?? 2500);
   const [saved, setSaved] = useState("");
+  const { format: fmt } = useMoney();
 
   function toggleFreeze() {
     const next = !frozen;
@@ -1356,7 +1365,7 @@ function DebitCardModal({ user, onClose }: { user: MtUser; onClose: () => void }
               className="flex-1 rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 tabular-nums" />
             <button onClick={saveLimit} className="rounded-md bg-slate-900 text-white text-xs font-semibold px-3 py-2 hover:bg-slate-800">Save</button>
           </div>
-          <div className="text-xs text-slate-500">Current: {fmtCurrency(user.dailyLimit ?? 2500)} per day</div>
+          <div className="text-xs text-slate-500">Current: {fmt(user.dailyLimit ?? 2500)} per day</div>
           {saved && <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-1.5">{saved}</div>}
         </div>
 

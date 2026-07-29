@@ -10,6 +10,7 @@ import {
   type MtUser,
 } from "@/lib/mt-store";
 import { useSystemSetting, insertPending } from "@/lib/mt-db";
+import { useMoney } from "@/lib/currency";
 
 
 export const Route = createFileRoute("/deposit")({
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/deposit")({
 
 function DepositPage() {
   const navigate = useNavigate();
+  const { format: fmt } = useMoney();
   const [user, setUser] = useState<MtUser | null>(null);
   const dbSettings = useSystemSetting("deposit");
   const [localSettings, setLocalSettings] = useState<DepositSettings>(loadDepositSettings());
@@ -140,7 +142,7 @@ function DepositPage() {
       <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Make a deposit</h1>
-          <p className="text-sm text-slate-500 mt-1">Depositing to <span className="font-semibold text-slate-900">{user.name}</span> · Account {user.account} · Current balance <span className="font-semibold">{fmtCurrency(user.balance)}</span></p>
+          <p className="text-sm text-slate-500 mt-1">Depositing to <span className="font-semibold text-slate-900">{user.name}</span> · Account {user.account} · Current balance <span className="font-semibold">{fmt(user.balance)}</span></p>
         </div>
 
         <div className="flex gap-2">

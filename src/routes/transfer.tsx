@@ -7,6 +7,7 @@ import {
   type MtUser, type PendingTx,
 } from "@/lib/mt-store";
 import { insertPending } from "@/lib/mt-db";
+import { useMoney } from "@/lib/currency";
 
 // Local ABA routing lookup — extend as needed. Real, verifiable HQ addresses.
 const ROUTING_DB: Record<string, { name: string; address: string }> = {
@@ -35,6 +36,7 @@ export const Route = createFileRoute("/transfer")({
 
 function TransferPage() {
   const navigate = useNavigate();
+  const money = useMoney();
   const [user, setUser] = useState<MtUser | null>(null);
   const [recipientName, setRecipientName] = useState("");
   const [recipientAcct, setRecipientAcct] = useState("");
@@ -204,13 +206,13 @@ function TransferPage() {
                   </div>
                   <div className="text-right">
                     <div className="text-xs uppercase tracking-wider text-slate-500">Available</div>
-                    <div className="text-sm font-mono font-semibold text-slate-900">{fmtCurrency(user.balance)}</div>
+                    <div className="text-sm font-mono font-semibold text-slate-900">{money.format(user.balance)}</div>
                   </div>
                 </div>
 
-                <Field label="Amount (USD)" error={errors.amount}>
+                <Field label={`Amount (${money.code})`} error={errors.amount}>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg font-medium">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg font-medium">{money.symbol}</span>
                     <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="0.00"
                       className="w-full h-14 pl-9 pr-4 rounded-lg border border-slate-300 bg-white text-slate-900 text-2xl tabular-nums font-semibold focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 outline-none" />
                   </div>
@@ -235,7 +237,7 @@ function TransferPage() {
                 <Row label="Bank" value={recipientBank} />
                 <Row label="Routing" value={routingCode} mono />
                 <Row label="Account" value={`•••• ${recipientAcct.slice(-4)}`} mono />
-                <Row label="Amount" value={fmtCurrency(amountNum)} mono strong />
+                <Row label="Amount" value={money.format(amountNum)} mono strong />
                 {memo && <Row label="Memo" value={memo} />}
               </div>
               <Footer>
@@ -257,6 +259,7 @@ function TransferPage() {
 }
 
 function TransferInitiated({ tx, onDone }: { tx: PendingTx; onDone: () => void }) {
+  const money = useMoney();
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden">
@@ -273,7 +276,7 @@ function TransferInitiated({ tx, onDone }: { tx: PendingTx; onDone: () => void }
 
           <div className="mt-7 rounded-xl border border-slate-200 bg-slate-50/70 divide-y divide-slate-100 text-left">
             <Row label="Reference" value={tx.reference} mono />
-            <Row label="Amount" value={fmtCurrency(tx.amount)} mono strong />
+            <Row label="Amount" value={money.format(tx.amount)} mono strong />
             <Row label="Recipient" value={tx.recipient ?? ""} />
             <Row label="Submitted" value={tx.submitted} />
             <Row label="Status" value="Queued for processing" />
