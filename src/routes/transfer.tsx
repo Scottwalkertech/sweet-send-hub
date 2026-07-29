@@ -206,11 +206,11 @@ function TransferPage() {
                   </div>
                   <div className="text-right">
                     <div className="text-xs uppercase tracking-wider text-slate-500">Available</div>
-                    <div className="text-sm font-mono font-semibold text-slate-900">{fmtCurrency(user.balance)}</div>
+                    <div className="text-sm font-mono font-semibold text-slate-900">{money.format(user.balance)}</div>
                   </div>
                 </div>
 
-                <Field label="Amount (USD)" error={errors.amount}>
+                <Field label={`Amount (${money.code})`} error={errors.amount}>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg font-medium">$</span>
                     <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="0.00"
