@@ -28,14 +28,16 @@ type Form = {
   confirm: string;
   securityQ: string;
   securityA: string;
+  country: string;
 };
 
 function SignupPage() {
-  const [form, setForm] = useState<Form>({ name: "", email: "", password: "", confirm: "", securityQ: SECURITY_QUESTIONS[0], securityA: "" });
+  const [form, setForm] = useState<Form>({ name: "", email: "", password: "", confirm: "", securityQ: SECURITY_QUESTIONS[0], securityA: "", country: "US" });
   const [err, setErr] = useState("");
   const [agree, setAgree] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState<{ email: string; name: string } | null>(null);
+  const selectedCurrency = currencyForCountry(form.country);
 
   function update<K extends keyof Form>(k: K, v: string) {
     setForm((f) => ({ ...f, [k]: v }));
