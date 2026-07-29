@@ -36,6 +36,7 @@ export const Route = createFileRoute("/transfer")({
 
 function TransferPage() {
   const navigate = useNavigate();
+  const money = useMoney();
   const [user, setUser] = useState<MtUser | null>(null);
   const [recipientName, setRecipientName] = useState("");
   const [recipientAcct, setRecipientAcct] = useState("");
