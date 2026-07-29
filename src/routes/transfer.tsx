@@ -212,7 +212,7 @@ function TransferPage() {
 
                 <Field label={`Amount (${money.code})`} error={errors.amount}>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg font-medium">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg font-medium">{money.symbol}</span>
                     <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="0.00"
                       className="w-full h-14 pl-9 pr-4 rounded-lg border border-slate-300 bg-white text-slate-900 text-2xl tabular-nums font-semibold focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 outline-none" />
                   </div>
