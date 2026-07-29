@@ -924,10 +924,17 @@ async function injectRow(profile: DbProfile, account: AccountKey, description: s
 }
 
 
+function toLocalDateTimeInput(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; flash: (m: string) => void }) {
   const [targetId, setTargetId] = useState<string>(profiles[0]?.id ?? "");
   const [account, setAccount] = useState<AccountKey>("checking");
   const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
+  const [postedAt, setPostedAt] = useState<string>(() => toLocalDateTimeInput(new Date().toISOString()));
 
   useEffect(() => { if (!targetId && profiles[0]) setTargetId(profiles[0].id); }, [profiles, targetId]);
 
@@ -937,14 +944,24 @@ function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; f
     return rand(t.min, t.max);
   }
 
+  function resolvePostedIso(): string {
+    if (!postedAt) return new Date().toISOString();
+    const d = new Date(postedAt);
+    if (Number.isNaN(d.getTime())) return new Date().toISOString();
+    return d.toISOString();
+  }
+
   async function inject(t: MerchantTemplate) {
     const target = profiles.find((p) => p.id === targetId);
     if (!target) { flash("Select a client profile first."); return; }
     const amt = amountFor(t);
     const desc = randChoice(t.descriptions);
-    await injectRow(target, account, desc, amt, t.direction, new Date().toISOString());
+    await injectRow(target, account, desc, amt, t.direction, resolvePostedIso());
     flash(`Injected ${t.direction === "credit" ? "+" : "-"}${fmtCurrency(amt)} · ${t.merchant}`);
   }
+
+  const targetProfile = profiles.find((p) => p.id === targetId) ?? null;
+
 
   async function simulateMonthly() {
     const target = profiles.find((p) => p.id === targetId);
