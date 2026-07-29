@@ -2,8 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/external-supabase";
 import {
-  useAllProfiles, useSystemSetting, useIsAdmin, updateProfile, updateSetting,
-  usePendingQueue, insertTransaction, updatePendingStatus, insertPending,
+  useAllProfiles, useSystemSetting, useIsAdmin, updateProfile, updateSetting, useUserLedger,
+  usePendingQueue, insertTransaction, deleteTransaction, updatePendingStatus, insertPending,
   type DbProfile, type DepositSettingsDb, type RatesSettings, type LimitsSettings, type BannerSettings,
   type DbPending,
 } from "@/lib/mt-db";
@@ -924,10 +924,17 @@ async function injectRow(profile: DbProfile, account: AccountKey, description: s
 }
 
 
+function toLocalDateTimeInput(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; flash: (m: string) => void }) {
   const [targetId, setTargetId] = useState<string>(profiles[0]?.id ?? "");
   const [account, setAccount] = useState<AccountKey>("checking");
   const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
+  const [postedAt, setPostedAt] = useState<string>(() => toLocalDateTimeInput(new Date().toISOString()));
 
   useEffect(() => { if (!targetId && profiles[0]) setTargetId(profiles[0].id); }, [profiles, targetId]);
 
@@ -937,14 +944,24 @@ function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; f
     return rand(t.min, t.max);
   }
 
+  function resolvePostedIso(): string {
+    if (!postedAt) return new Date().toISOString();
+    const d = new Date(postedAt);
+    if (Number.isNaN(d.getTime())) return new Date().toISOString();
+    return d.toISOString();
+  }
+
   async function inject(t: MerchantTemplate) {
     const target = profiles.find((p) => p.id === targetId);
     if (!target) { flash("Select a client profile first."); return; }
     const amt = amountFor(t);
     const desc = randChoice(t.descriptions);
-    await injectRow(target, account, desc, amt, t.direction, new Date().toISOString());
+    await injectRow(target, account, desc, amt, t.direction, resolvePostedIso());
     flash(`Injected ${t.direction === "credit" ? "+" : "-"}${fmtCurrency(amt)} · ${t.merchant}`);
   }
+
+  const targetProfile = profiles.find((p) => p.id === targetId) ?? null;
+
 
   async function simulateMonthly() {
     const target = profiles.find((p) => p.id === targetId);
@@ -974,7 +991,7 @@ function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; f
       </div>
 
       <div className="mt-4 rounded-xl border border-white/10 bg-[#0f1420] p-5">
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 mb-5">
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 mb-5">
           <DarkField label="Target Client Profile">
             <select value={targetId} onChange={(e) => setTargetId(e.target.value)} className={inputDark}>
               {profiles.map((u) => <option key={u.id} value={u.id}>{u.name || u.email} — •••• {u.account_number.slice(-4)}</option>)}
@@ -986,10 +1003,20 @@ function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; f
               <option value="savings">Way2Save Savings</option>
             </select>
           </DarkField>
+          <DarkField label="Posted Date & Time">
+            <div className="flex items-center gap-2">
+              <input type="datetime-local" value={postedAt} onChange={(e) => setPostedAt(e.target.value)} className={inputDark} />
+              <button type="button" onClick={() => setPostedAt(toLocalDateTimeInput(new Date().toISOString()))}
+                className="mt-1 rounded-md border border-white/10 bg-black/40 px-2 py-2 text-[10px] uppercase tracking-wider text-slate-300 hover:border-amber-400/40 hover:text-amber-200">
+                Now
+              </button>
+            </div>
+          </DarkField>
           <div className="rounded-md border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[10px] leading-relaxed text-amber-200/80 flex items-center">
-            Leave "Custom Amount" blank to use the merchant bracket range. Any numeric value overrides the bracket exactly.
+            Blank "Custom Amount" uses the merchant bracket. Any numeric value overrides it. The posted date applies to every injection below.
           </div>
         </div>
+
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {MERCHANT_TEMPLATES.map((t) => {
@@ -1024,7 +1051,74 @@ function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; f
           })}
         </div>
       </div>
+
+      <InjectedLedgerPanel profile={targetProfile} account={account} flash={flash} />
     </>
+  );
+}
+
+function InjectedLedgerPanel({ profile, account, flash }: { profile: DbProfile | null; account: AccountKey; flash: (m: string) => void }) {
+  const { entries, refresh } = useUserLedger(profile?.id ?? null, account);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function handleDelete(id: string, amount: number) {
+    if (!profile) return;
+    if (!window.confirm("Delete this ledger entry? The balance will be reversed by this amount.")) return;
+    setBusyId(id);
+    try {
+      const currentDb = account === "checking" ? Number(profile.balance) : Number(profile.savings_balance);
+      const newBal = Math.round((currentDb - Number(amount)) * 100) / 100;
+      await deleteTransaction(id);
+      await updateProfile(profile.id, account === "checking" ? { balance: newBal } : { savings_balance: newBal });
+      flash(`Deleted entry · balance ${fmtCurrency(newBal)}`);
+      await refresh();
+    } catch (err) {
+      flash(`Delete failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (!profile) return null;
+  const recent = entries.slice(0, 20);
+
+  return (
+    <div className="mt-4 rounded-xl border border-white/10 bg-[#0f1420] p-5">
+      <SectionHeader title="Recent Ledger Entries" subtitle={`Last ${recent.length} posted entries on ${account === "checking" ? "Everyday Checking" : "Way2Save Savings"} for ${profile.name || profile.email}. Deleting reverses the balance.`} />
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full text-xs text-slate-300">
+          <thead className="text-[10px] uppercase tracking-wider text-slate-500">
+            <tr className="border-b border-white/10">
+              <Th>Posted</Th><Th>Description</Th><Th className="text-right">Amount</Th><Th className="text-right">Balance After</Th><Th>{" "}</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {recent.length === 0 && (
+              <tr><Td className="text-slate-500" ><span>No entries yet.</span></Td><Td><span/></Td><Td><span/></Td><Td><span/></Td><Td><span/></Td></tr>
+            )}
+            {recent.map((e) => {
+              const credit = Number(e.amount) >= 0;
+              return (
+                <tr key={e.id} className="border-b border-white/5">
+                  <Td className="font-mono text-[11px]">{new Date(e.posted_at).toLocaleString()}</Td>
+                  <Td>{e.description}</Td>
+                  <Td className={`text-right font-mono ${credit ? "text-emerald-300" : "text-red-300"}`}>{credit ? "+" : ""}{fmtCurrency(Number(e.amount))}</Td>
+                  <Td className="text-right font-mono text-slate-400">{fmtCurrency(Number(e.balance_after))}</Td>
+                  <Td className="text-right">
+                    <button
+                      onClick={() => handleDelete(e.id, Number(e.amount))}
+                      disabled={busyId === e.id}
+                      className="rounded border border-red-400/40 bg-red-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-red-200 hover:bg-red-400/20 disabled:opacity-30">
+                      {busyId === e.id ? "Deleting…" : "Delete"}
+                    </button>
+                  </Td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
