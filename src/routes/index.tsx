@@ -1102,6 +1102,7 @@ function AccountCard({ to, params, product, tag, accountMasked, balance }: {
   to: "/account/$type"; params: { type: "checking" | "savings" };
   product: string; tag: string; accountMasked: string; balance: number;
 }) {
+  const { format } = useMoney();
   return (
     <Link to={to} params={params}
       className="group block rounded-2xl overflow-hidden border border-slate-800 shadow-xl hover:border-amber-400 hover:shadow-2xl transition-all">
