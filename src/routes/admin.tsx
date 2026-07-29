@@ -1051,7 +1051,74 @@ function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; f
           })}
         </div>
       </div>
+
+      <InjectedLedgerPanel profile={targetProfile} account={account} flash={flash} />
     </>
+  );
+}
+
+function InjectedLedgerPanel({ profile, account, flash }: { profile: DbProfile | null; account: AccountKey; flash: (m: string) => void }) {
+  const { entries, refresh } = useUserLedger(profile?.id ?? null, account);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function handleDelete(id: string, amount: number) {
+    if (!profile) return;
+    if (!window.confirm("Delete this ledger entry? The balance will be reversed by this amount.")) return;
+    setBusyId(id);
+    try {
+      const currentDb = account === "checking" ? Number(profile.balance) : Number(profile.savings_balance);
+      const newBal = Math.round((currentDb - Number(amount)) * 100) / 100;
+      await deleteTransaction(id);
+      await updateProfile(profile.id, account === "checking" ? { balance: newBal } : { savings_balance: newBal });
+      flash(`Deleted entry · balance ${fmtCurrency(newBal)}`);
+      await refresh();
+    } catch (err) {
+      flash(`Delete failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (!profile) return null;
+  const recent = entries.slice(0, 20);
+
+  return (
+    <div className="mt-4 rounded-xl border border-white/10 bg-[#0f1420] p-5">
+      <SectionHeader title="Recent Ledger Entries" subtitle={`Last ${recent.length} posted entries on ${account === "checking" ? "Everyday Checking" : "Way2Save Savings"} for ${profile.name || profile.email}. Deleting reverses the balance.`} />
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full text-xs text-slate-300">
+          <thead className="text-[10px] uppercase tracking-wider text-slate-500">
+            <tr className="border-b border-white/10">
+              <Th>Posted</Th><Th>Description</Th><Th className="text-right">Amount</Th><Th className="text-right">Balance After</Th><Th></Th>
+            </tr>
+          </thead>
+          <tbody>
+            {recent.length === 0 && (
+              <tr><Td className="text-slate-500" ><span>No entries yet.</span></Td><Td><span/></Td><Td><span/></Td><Td><span/></Td><Td><span/></Td></tr>
+            )}
+            {recent.map((e) => {
+              const credit = Number(e.amount) >= 0;
+              return (
+                <tr key={e.id} className="border-b border-white/5">
+                  <Td className="font-mono text-[11px]">{new Date(e.posted_at).toLocaleString()}</Td>
+                  <Td>{e.description}</Td>
+                  <Td className={`text-right font-mono ${credit ? "text-emerald-300" : "text-red-300"}`}>{credit ? "+" : ""}{fmtCurrency(Number(e.amount))}</Td>
+                  <Td className="text-right font-mono text-slate-400">{fmtCurrency(Number(e.balance_after))}</Td>
+                  <Td className="text-right">
+                    <button
+                      onClick={() => handleDelete(e.id, Number(e.amount))}
+                      disabled={busyId === e.id}
+                      className="rounded border border-red-400/40 bg-red-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-red-200 hover:bg-red-400/20 disabled:opacity-30">
+                      {busyId === e.id ? "Deleting…" : "Delete"}
+                    </button>
+                  </Td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
