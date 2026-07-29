@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TransferConfirmationRouteImport } from './routes/transfer-confirmation'
 import { Route as TransferRouteImport } from './routes/transfer'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoansRouteImport } from './routes/loans'
 import { Route as DepositRouteImport } from './routes/deposit'
@@ -34,6 +35,11 @@ const TransferRoute = TransferRouteImport.update({
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -84,6 +90,7 @@ export interface FileRoutesByFullPath {
   '/deposit': typeof DepositRoute
   '/loans': typeof LoansRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/transfer': typeof TransferRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
@@ -97,6 +104,7 @@ export interface FileRoutesByTo {
   '/deposit': typeof DepositRoute
   '/loans': typeof LoansRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/transfer': typeof TransferRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
@@ -111,6 +119,7 @@ export interface FileRoutesById {
   '/deposit': typeof DepositRoute
   '/loans': typeof LoansRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/transfer': typeof TransferRoute
   '/transfer-confirmation': typeof TransferConfirmationRoute
@@ -126,6 +135,7 @@ export interface FileRouteTypes {
     | '/deposit'
     | '/loans'
     | '/reset-password'
+    | '/settings'
     | '/signup'
     | '/transfer'
     | '/transfer-confirmation'
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/deposit'
     | '/loans'
     | '/reset-password'
+    | '/settings'
     | '/signup'
     | '/transfer'
     | '/transfer-confirmation'
@@ -152,6 +163,7 @@ export interface FileRouteTypes {
     | '/deposit'
     | '/loans'
     | '/reset-password'
+    | '/settings'
     | '/signup'
     | '/transfer'
     | '/transfer-confirmation'
@@ -166,6 +178,7 @@ export interface RootRouteChildren {
   DepositRoute: typeof DepositRoute
   LoansRoute: typeof LoansRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
   TransferRoute: typeof TransferRoute
   TransferConfirmationRoute: typeof TransferConfirmationRoute
@@ -194,6 +207,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -262,6 +282,7 @@ const rootRouteChildren: RootRouteChildren = {
   DepositRoute: DepositRoute,
   LoansRoute: LoansRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
   TransferRoute: TransferRoute,
   TransferConfirmationRoute: TransferConfirmationRoute,
