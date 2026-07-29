@@ -1118,7 +1118,7 @@ function AccountCard({ to, params, product, tag, accountMasked, balance }: {
           <div className="text-right">
             <div className="text-[10px] uppercase tracking-widest text-amber-200/80">Balance</div>
             <div className="text-3xl font-semibold tabular-nums mt-1 bg-gradient-to-b from-amber-200 to-amber-500 bg-clip-text text-transparent">
-              {fmtCurrency(balance)}
+              {format(balance)}
             </div>
           </div>
         </div>
