@@ -142,13 +142,15 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <GlobalBanner />
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      <SiteFooter />
-      <PageTransitionLoader />
-      <FloatingChatBubble />
-      <AdminUnlockCorner onUnlock={() => unlockAdmin(router)} />
+      <MoneyProvider>
+        <GlobalBanner />
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+        <SiteFooter />
+        <PageTransitionLoader />
+        <FloatingChatBubble />
+        <AdminUnlockCorner onUnlock={() => unlockAdmin(router)} />
+      </MoneyProvider>
     </QueryClientProvider>
   );
 }
