@@ -202,7 +202,9 @@ export type Database = {
           account_number: string
           address: string | null
           balance: number
+          country: string
           created_at: string
+          currency: string
           daily_limit: number
           debit_frozen: boolean
           email: string
@@ -223,7 +225,9 @@ export type Database = {
           account_number?: string
           address?: string | null
           balance?: number
+          country?: string
           created_at?: string
+          currency?: string
           daily_limit?: number
           debit_frozen?: boolean
           email?: string
@@ -244,7 +248,9 @@ export type Database = {
           account_number?: string
           address?: string | null
           balance?: number
+          country?: string
           created_at?: string
+          currency?: string
           daily_limit?: number
           debit_frozen?: boolean
           email?: string
