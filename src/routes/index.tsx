@@ -723,6 +723,11 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                   <DbwItem icon="💳" label="Debit Card Controls" onClick={() => { setDbwOpen(false); setShowCard(true); }} />
                   <DbwItem icon="📋" label="Routing & Account Info" onClick={() => { setDbwOpen(false); setShowRouting(true); }} />
                   <DbwItem icon="🔒" label="Open Secure Messages" onClick={() => { setDbwOpen(false); setChatOpen(true); }} />
+                  <Link to="/settings" onClick={() => setDbwOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition">
+                    <span className="text-base">⚙️</span>
+                    <span>Account Settings</span>
+                  </Link>
+
 
                 </div>
               )}
