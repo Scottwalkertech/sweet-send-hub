@@ -1089,7 +1089,7 @@ function InjectedLedgerPanel({ profile, account, flash }: { profile: DbProfile |
         <table className="w-full text-xs text-slate-300">
           <thead className="text-[10px] uppercase tracking-wider text-slate-500">
             <tr className="border-b border-white/10">
-              <Th>Posted</Th><Th>Description</Th><Th className="text-right">Amount</Th><Th className="text-right">Balance After</Th><Th></Th>
+              <Th>Posted</Th><Th>Description</Th><Th className="text-right">Amount</Th><Th className="text-right">Balance After</Th><Th>{" "}</Th>
             </tr>
           </thead>
           <tbody>
