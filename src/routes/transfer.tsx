@@ -7,6 +7,7 @@ import {
   type MtUser, type PendingTx,
 } from "@/lib/mt-store";
 import { insertPending } from "@/lib/mt-db";
+import { useMoney } from "@/lib/currency";
 
 // Local ABA routing lookup — extend as needed. Real, verifiable HQ addresses.
 const ROUTING_DB: Record<string, { name: string; address: string }> = {
