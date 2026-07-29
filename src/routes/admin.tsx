@@ -991,7 +991,7 @@ function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; f
       </div>
 
       <div className="mt-4 rounded-xl border border-white/10 bg-[#0f1420] p-5">
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 mb-5">
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 mb-5">
           <DarkField label="Target Client Profile">
             <select value={targetId} onChange={(e) => setTargetId(e.target.value)} className={inputDark}>
               {profiles.map((u) => <option key={u.id} value={u.id}>{u.name || u.email} — •••• {u.account_number.slice(-4)}</option>)}
@@ -1003,10 +1003,20 @@ function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; f
               <option value="savings">Way2Save Savings</option>
             </select>
           </DarkField>
+          <DarkField label="Posted Date & Time">
+            <div className="flex items-center gap-2">
+              <input type="datetime-local" value={postedAt} onChange={(e) => setPostedAt(e.target.value)} className={inputDark} />
+              <button type="button" onClick={() => setPostedAt(toLocalDateTimeInput(new Date().toISOString()))}
+                className="mt-1 rounded-md border border-white/10 bg-black/40 px-2 py-2 text-[10px] uppercase tracking-wider text-slate-300 hover:border-amber-400/40 hover:text-amber-200">
+                Now
+              </button>
+            </div>
+          </DarkField>
           <div className="rounded-md border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[10px] leading-relaxed text-amber-200/80 flex items-center">
-            Leave "Custom Amount" blank to use the merchant bracket range. Any numeric value overrides the bracket exactly.
+            Blank "Custom Amount" uses the merchant bracket. Any numeric value overrides it. The posted date applies to every injection below.
           </div>
         </div>
+
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {MERCHANT_TEMPLATES.map((t) => {
