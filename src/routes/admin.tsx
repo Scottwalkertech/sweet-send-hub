@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/external-supabase";
 import {
-  useAllProfiles, useSystemSetting, useIsAdmin, updateProfile, updateSetting,
+  useAllProfiles, useSystemSetting, useIsAdmin, updateProfile, updateSetting, useUserLedger,
   usePendingQueue, insertTransaction, deleteTransaction, updatePendingStatus, insertPending,
   type DbProfile, type DepositSettingsDb, type RatesSettings, type LimitsSettings, type BannerSettings,
   type DbPending,
