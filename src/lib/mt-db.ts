@@ -264,6 +264,11 @@ export async function insertTransaction(row: Omit<DbTransaction, "id" | "created
   if (error) throw error;
 }
 
+export async function deleteTransaction(id: string) {
+  const { error } = await supabase.from("transactions").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // ------- pending transactions (queue) ---------------------------------------
 
 export type DbPending = {
