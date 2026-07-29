@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/external-supabase";
 import {
   useAllProfiles, useSystemSetting, useIsAdmin, updateProfile, updateSetting,
-  usePendingQueue, insertTransaction, updatePendingStatus, insertPending,
+  usePendingQueue, insertTransaction, deleteTransaction, updatePendingStatus, insertPending,
   type DbProfile, type DepositSettingsDb, type RatesSettings, type LimitsSettings, type BannerSettings,
   type DbPending,
 } from "@/lib/mt-db";
