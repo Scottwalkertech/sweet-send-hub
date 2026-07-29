@@ -1360,7 +1360,7 @@ function DebitCardModal({ user, onClose }: { user: MtUser; onClose: () => void }
               className="flex-1 rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 tabular-nums" />
             <button onClick={saveLimit} className="rounded-md bg-slate-900 text-white text-xs font-semibold px-3 py-2 hover:bg-slate-800">Save</button>
           </div>
-          <div className="text-xs text-slate-500">Current: {fmtCurrency(user.dailyLimit ?? 2500)} per day</div>
+          <div className="text-xs text-slate-500">Current: {fmt(user.dailyLimit ?? 2500)} per day</div>
           {saved && <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-1.5">{saved}</div>}
         </div>
 
