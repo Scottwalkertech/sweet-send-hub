@@ -140,6 +140,7 @@ function AccountPage() {
 }
 
 function InternalTransfer({ user, source }: { user: MtUser; source: AccountKey }) {
+  const { format: fmt } = useMoney();
   const [dest, setDest] = useState<AccountKey>(source === "checking" ? "savings" : "checking");
   const [amount, setAmount] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
