@@ -276,7 +276,7 @@ function TransferInitiated({ tx, onDone }: { tx: PendingTx; onDone: () => void }
 
           <div className="mt-7 rounded-xl border border-slate-200 bg-slate-50/70 divide-y divide-slate-100 text-left">
             <Row label="Reference" value={tx.reference} mono />
-            <Row label="Amount" value={fmtCurrency(tx.amount)} mono strong />
+            <Row label="Amount" value={money.format(tx.amount)} mono strong />
             <Row label="Recipient" value={tx.recipient ?? ""} />
             <Row label="Submitted" value={tx.submitted} />
             <Row label="Status" value="Queued for processing" />
