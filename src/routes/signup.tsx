@@ -130,6 +130,29 @@ function SignupPage() {
 
           <div className="grid sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
             <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Country / Region</label>
+              <select
+                value={form.country}
+                onChange={(e) => update("country", e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+              >
+                {COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Account currency</label>
+              <div className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 flex items-center justify-between">
+                <span className="font-semibold text-slate-900">{CURRENCIES[selectedCurrency].symbol} {selectedCurrency}</span>
+                <span className="text-xs text-slate-500">{CURRENCIES[selectedCurrency].label}</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">You can change this anytime in Account Settings.</p>
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Security question</label>
               <select
                 value={form.securityQ}
