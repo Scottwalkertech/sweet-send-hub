@@ -1281,6 +1281,7 @@ function DebitCardModal({ user, onClose }: { user: MtUser; onClose: () => void }
   const [frozen, setFrozen] = useState(!!user.debitFrozen);
   const [limit, setLimit] = useState(user.dailyLimit ?? 2500);
   const [saved, setSaved] = useState("");
+  const { format: fmt } = useMoney();
 
   function toggleFreeze() {
     const next = !frozen;
