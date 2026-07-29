@@ -844,7 +844,7 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                         t.status === "Failed" ? "text-slate-400 line-through"
                         : isPending ? "text-slate-500 italic"
                         : isCredit ? "text-emerald-600" : "text-slate-900"
-                      }`}>{sign}{fmtCurrency(Number(t.amount))}</td>
+                      }`}>{sign}{money.format(Number(t.amount))}</td>
                     </tr>
 
                   );
