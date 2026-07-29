@@ -60,7 +60,7 @@ function SignupPage() {
       password: form.password,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
-        data: { full_name: form.name.trim() },
+        data: { full_name: form.name.trim(), name: form.name.trim(), country: form.country, currency: selectedCurrency },
       },
     });
     setSubmitting(false);
