@@ -10,6 +10,7 @@ import {
   type MtUser,
 } from "@/lib/mt-store";
 import { useSystemSetting, insertPending } from "@/lib/mt-db";
+import { useMoney } from "@/lib/currency";
 
 
 export const Route = createFileRoute("/deposit")({
