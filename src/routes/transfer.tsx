@@ -237,7 +237,7 @@ function TransferPage() {
                 <Row label="Bank" value={recipientBank} />
                 <Row label="Routing" value={routingCode} mono />
                 <Row label="Account" value={`•••• ${recipientAcct.slice(-4)}`} mono />
-                <Row label="Amount" value={fmtCurrency(amountNum)} mono strong />
+                <Row label="Amount" value={money.format(amountNum)} mono strong />
                 {memo && <Row label="Memo" value={memo} />}
               </div>
               <Footer>
