@@ -7,6 +7,7 @@ import {
   type MtUser,
 } from "@/lib/mt-store";
 import { useUnifiedUserActivity, updateProfile } from "@/lib/mt-db";
+import { useMoney } from "@/lib/currency";
 import { useChatThread, sendChatMessage } from "@/lib/mt-chat";
 import { supabase } from "@/lib/external-supabase";
 import { SECURITY_QUESTIONS, normalizeSecurityAnswer } from "@/lib/security-questions";
