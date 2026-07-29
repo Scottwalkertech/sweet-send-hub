@@ -767,7 +767,7 @@ function Dashboard({ user, onLogout }: { user: MtUser; onLogout: () => void }) {
                 <div className="text-right">
                   <div className="text-xs uppercase tracking-wider text-amber-200/80">Available Balance</div>
                   <div className="text-4xl font-semibold tabular-nums mt-1 bg-gradient-to-b from-amber-200 to-amber-400 bg-clip-text text-transparent">
-                    {fmtCurrency(displayedBalance)}
+                    {money.format(displayedBalance)}
                   </div>
                 </div>
               </div>
