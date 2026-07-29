@@ -25,6 +25,7 @@ export const Route = createFileRoute("/deposit")({
 
 function DepositPage() {
   const navigate = useNavigate();
+  const { format: fmt } = useMoney();
   const [user, setUser] = useState<MtUser | null>(null);
   const dbSettings = useSystemSetting("deposit");
   const [localSettings, setLocalSettings] = useState<DepositSettings>(loadDepositSettings());
