@@ -1391,8 +1391,26 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
     }
   }
 
+  async function purgeDeclined() {
+    const declined = apps.filter((a) => ["declined", "rejected"].includes((a.status || "").toLowerCase()));
+    if (declined.length === 0) { flash("No declined applications to remove."); return; }
+    setRemovedIds((prev) => {
+      const next = new Set(prev);
+      declined.forEach((a) => next.add(a.id));
+      return next;
+    });
+    const { error } = await supabase.from("loan_applications").delete().in("id", declined.map((a) => a.id));
+    flash(error ? `Hidden from console (${declined.length}) — permanent delete blocked: ${error.message}` : `Deleted ${declined.length} declined application(s).`);
+  }
+
   return (
     <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-[#0f1420]">
+      <div className="flex justify-end border-b border-white/10 px-4 py-3">
+        <button onClick={purgeDeclined}
+          className="rounded-md border border-red-400/40 bg-red-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-red-200 hover:bg-red-400/20">
+          Delete Declined Applications
+        </button>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-white/5 text-xs uppercase tracking-wider text-slate-400">
