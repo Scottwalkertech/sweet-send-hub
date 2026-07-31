@@ -935,6 +935,7 @@ function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; f
   const [account, setAccount] = useState<AccountKey>("checking");
   const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
   const [postedAt, setPostedAt] = useState<string>(() => toLocalDateTimeInput(new Date().toISOString()));
+  const [outcome, setOutcome] = useState<"successful" | "failed">("successful");
 
   useEffect(() => { if (!targetId && profiles[0]) setTargetId(profiles[0].id); }, [profiles, targetId]);
 
