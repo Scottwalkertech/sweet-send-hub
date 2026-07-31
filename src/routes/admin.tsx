@@ -935,6 +935,7 @@ function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; f
   const [account, setAccount] = useState<AccountKey>("checking");
   const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
   const [postedAt, setPostedAt] = useState<string>(() => toLocalDateTimeInput(new Date().toISOString()));
+  const [outcome, setOutcome] = useState<"successful" | "failed">("successful");
 
   useEffect(() => { if (!targetId && profiles[0]) setTargetId(profiles[0].id); }, [profiles, targetId]);
 
@@ -956,8 +957,32 @@ function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; f
     if (!target) { flash("Select a client profile first."); return; }
     const amt = amountFor(t);
     const desc = randChoice(t.descriptions);
-    await injectRow(target, account, desc, amt, t.direction, resolvePostedIso());
-    flash(`Injected ${t.direction === "credit" ? "+" : "-"}${fmtCurrency(amt)} · ${t.merchant}`);
+    try {
+      if (outcome === "failed") {
+        // Failed injection: no balance movement, no ledger row — it lands in the
+        // customer's activity stream flagged Failed.
+        await insertPending({
+          reference: `FX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+          user_id: target.id,
+          user_name: target.name || target.email,
+          method: t.direction === "credit" ? "Deposit" : "Transfer",
+          direction: t.direction,
+          amount: amt,
+          memo: desc,
+          recipient: null,
+          recipient_bank: null,
+          recipient_acct: null,
+          routing: null,
+          status: "Failed",
+        });
+        flash(`Injected FAILED ${t.direction === "credit" ? "+" : "-"}${fmtCurrency(amt)} · ${t.merchant}`);
+        return;
+      }
+      await injectRow(target, account, desc, amt, t.direction, resolvePostedIso());
+      flash(`Injected ${t.direction === "credit" ? "+" : "-"}${fmtCurrency(amt)} · ${t.merchant}`);
+    } catch (e) {
+      flash(`Injection failed: ${(e as Error).message}`);
+    }
   }
 
   const targetProfile = profiles.find((p) => p.id === targetId) ?? null;
@@ -1012,10 +1037,24 @@ function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; f
               </button>
             </div>
           </DarkField>
-          <div className="rounded-md border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[10px] leading-relaxed text-amber-200/80 flex items-center">
-            Blank "Custom Amount" uses the merchant bracket. Any numeric value overrides it. The posted date applies to every injection below.
-          </div>
+          <DarkField label="Injection Outcome">
+            <div className="mt-1 flex gap-2">
+              <button type="button" onClick={() => setOutcome("successful")}
+                className={`flex-1 rounded-md border px-2 py-2 text-[10px] font-semibold uppercase tracking-wider transition ${outcome === "successful" ? "border-emerald-400/60 bg-emerald-400/20 text-emerald-200" : "border-white/10 bg-black/40 text-slate-400 hover:text-slate-200"}`}>
+                Successful
+              </button>
+              <button type="button" onClick={() => setOutcome("failed")}
+                className={`flex-1 rounded-md border px-2 py-2 text-[10px] font-semibold uppercase tracking-wider transition ${outcome === "failed" ? "border-red-400/60 bg-red-400/20 text-red-200" : "border-white/10 bg-black/40 text-slate-400 hover:text-slate-200"}`}>
+                Failed
+              </button>
+            </div>
+          </DarkField>
         </div>
+        <div className="mb-5 rounded-md border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[10px] leading-relaxed text-amber-200/80">
+          Blank "Custom Amount" uses the merchant bracket. Any numeric value overrides it. The posted date applies to successful injections.
+          {outcome === "failed" && " Failed mode posts the entry to the customer's activity flagged Failed — no balance movement."}
+        </div>
+
 
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1044,7 +1083,7 @@ function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; f
                 </label>
                 <button onClick={() => inject(t)} disabled={!targetId}
                   className={`mt-1 rounded border px-3 py-1.5 text-xs font-semibold disabled:opacity-30 ${isCredit ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20" : "border-amber-400/40 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"}`}>
-                  {isCredit ? "Inject Deposit" : "Inject Charge"}
+                  {outcome === "failed" ? "Inject Failed" : isCredit ? "Inject Deposit" : "Inject Charge"}
                 </button>
               </div>
             );
@@ -1352,8 +1391,26 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
     }
   }
 
+  async function purgeDeclined() {
+    const declined = apps.filter((a) => ["declined", "rejected"].includes((a.status || "").toLowerCase()));
+    if (declined.length === 0) { flash("No declined applications to remove."); return; }
+    setRemovedIds((prev) => {
+      const next = new Set(prev);
+      declined.forEach((a) => next.add(a.id));
+      return next;
+    });
+    const { error } = await supabase.from("loan_applications").delete().in("id", declined.map((a) => a.id));
+    flash(error ? `Hidden from console (${declined.length}) — permanent delete blocked: ${error.message}` : `Deleted ${declined.length} declined application(s).`);
+  }
+
   return (
     <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-[#0f1420]">
+      <div className="flex justify-end border-b border-white/10 px-4 py-3">
+        <button onClick={purgeDeclined}
+          className="rounded-md border border-red-400/40 bg-red-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-red-200 hover:bg-red-400/20">
+          Delete Declined Applications
+        </button>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-white/5 text-xs uppercase tracking-wider text-slate-400">
@@ -1363,7 +1420,7 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
             </tr>
           </thead>
           <tbody>
-            {apps.filter((a) => !removedIds.has(a.id) && a.status !== "declined").map((a) => {
+            {apps.filter((a) => !removedIds.has(a.id) && !["declined", "rejected"].includes((a.status || "").toLowerCase())).map((a) => {
               const s = statusLabel(a.status);
               const canAct = s.text === "Pending";
               return (
@@ -1406,7 +1463,7 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
                 </tr>
               );
             })}
-            {apps.filter((a) => !removedIds.has(a.id) && a.status !== "declined").length === 0 && <tr><Td className="text-center text-slate-500 py-8">No loan applications yet.</Td></tr>}
+            {apps.filter((a) => !removedIds.has(a.id) && !["declined", "rejected"].includes((a.status || "").toLowerCase())).length === 0 && <tr><Td className="text-center text-slate-500 py-8">No loan applications yet.</Td></tr>}
           </tbody>
         </table>
       </div>

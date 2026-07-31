@@ -95,7 +95,7 @@ function Landing({ onAuth }: { onAuth: (u: MtUser) => void }) {
       const acctFull = genAccountNumber();
       match = {
         id: data.user?.id ?? "u_" + Math.floor(1000 + Math.random() * 9000),
-        name: (data.user?.user_metadata?.full_name as string) || email.split("@")[0],
+        name: resolveDisplayName(data.user, email),
         email, password, phone: "", ssn: "", securityQ: "", securityA: "",
         accountNumber: acctFull, account: maskAccount(acctFull),
         tier: "Standard", status: "Active", balance: 0, savingsBalance: 0,
@@ -342,6 +342,14 @@ function TrustBadge({ k, v }: { k: string; v: string }) {
   );
 }
 
+// Prefer the name the customer entered at signup (auth metadata) over the
+// email prefix, so their account never displays as an email address.
+function resolveDisplayName(u: { user_metadata?: Record<string, unknown> } | null | undefined, email: string): string {
+  const meta = u?.user_metadata ?? {};
+  const candidate = (meta.full_name as string) || (meta.name as string) || "";
+  return candidate.trim() || email.split("@")[0];
+}
+
 function applyProfilePatch(user: MtUser, row: Record<string, unknown>) {
   const enr = (row.enrollments as MtUser["enrollments"]) ?? user.enrollments;
   const svc = (row.service_balances as MtUser["serviceBalances"]) ?? user.serviceBalances;
@@ -404,7 +412,7 @@ function Login({ onAuth }: { onAuth: (u: MtUser) => void }) {
       const acctFull = genAccountNumber();
       match = {
         id: data.user?.id ?? "u_" + Math.floor(1000 + Math.random() * 9000),
-        name: (data.user?.user_metadata?.full_name as string) || email.split("@")[0],
+        name: resolveDisplayName(data.user, email),
         email,
         password,
         phone: "",
