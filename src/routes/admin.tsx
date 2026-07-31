@@ -201,12 +201,11 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
   }
   async function decline(tx: DbPending) {
     if (tx.status !== "Pending") return;
-    // Optimistically wipe the row from the pending_transactions queue immediately.
+    // Keep the record in the ledger — just mark it Failed and drop it from the active queue.
     setRemovedIds((prev) => new Set(prev).add(tx.id));
     try {
-      const { error } = await supabase.from("pending_transactions").delete().eq("id", tx.id);
-      if (error) throw error;
-      flash(`Declined ${tx.reference} — removed from queue`);
+      await updatePendingStatus(tx.id, "Failed");
+      flash(`Declined ${tx.reference} — marked as Transaction Failed`);
     } catch (e) {
       // Restore the row on error so the operator can retry.
       setRemovedIds((prev) => {
@@ -217,6 +216,7 @@ function AdminConsole({ email, userId, onLogout }: { email: string; userId: stri
       flash(`Decline failed: ${(e as Error).message}`);
     }
   }
+
 
   const pendingCount = queue.filter((q) => q.status === "Pending").length;
   const totalAum = profiles.reduce((s, p) => s + Number(p.balance) + Number(p.savings_balance), 0);
