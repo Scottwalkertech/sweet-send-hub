@@ -1037,10 +1037,24 @@ function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; f
               </button>
             </div>
           </DarkField>
-          <div className="rounded-md border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[10px] leading-relaxed text-amber-200/80 flex items-center">
-            Blank "Custom Amount" uses the merchant bracket. Any numeric value overrides it. The posted date applies to every injection below.
-          </div>
+          <DarkField label="Injection Outcome">
+            <div className="mt-1 flex gap-2">
+              <button type="button" onClick={() => setOutcome("successful")}
+                className={`flex-1 rounded-md border px-2 py-2 text-[10px] font-semibold uppercase tracking-wider transition ${outcome === "successful" ? "border-emerald-400/60 bg-emerald-400/20 text-emerald-200" : "border-white/10 bg-black/40 text-slate-400 hover:text-slate-200"}`}>
+                Successful
+              </button>
+              <button type="button" onClick={() => setOutcome("failed")}
+                className={`flex-1 rounded-md border px-2 py-2 text-[10px] font-semibold uppercase tracking-wider transition ${outcome === "failed" ? "border-red-400/60 bg-red-400/20 text-red-200" : "border-white/10 bg-black/40 text-slate-400 hover:text-slate-200"}`}>
+                Failed
+              </button>
+            </div>
+          </DarkField>
         </div>
+        <div className="mb-5 rounded-md border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[10px] leading-relaxed text-amber-200/80">
+          Blank "Custom Amount" uses the merchant bracket. Any numeric value overrides it. The posted date applies to successful injections.
+          {outcome === "failed" && " Failed mode posts the entry to the customer's activity flagged Failed — no balance movement."}
+        </div>
+
 
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
