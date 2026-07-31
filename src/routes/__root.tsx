@@ -152,7 +152,10 @@ function RootComponent() {
         <PageTransitionLoader />
         <FloatingChatBubble />
         <AdminUnlockCorner onUnlock={() => unlockAdmin(router)} />
+        <FailedTransactionAlerts />
+        <Toaster position="top-right" richColors />
       </MoneyProvider>
+
     </QueryClientProvider>
   );
 }
