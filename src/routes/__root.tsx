@@ -14,6 +14,8 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PageTransitionLoader } from "../components/PageTransitionLoader";
 import { useSystemSetting } from "../lib/mt-db";
 import { MoneyProvider } from "../lib/currency";
+import { Toaster } from "../components/ui/sonner";
+import { FailedTransactionAlerts } from "../components/FailedTransactionAlerts";
 
 function NotFoundComponent() {
   return (
