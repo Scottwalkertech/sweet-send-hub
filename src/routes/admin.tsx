@@ -957,8 +957,32 @@ function TemplateRepositoryPanel({ profiles, flash }: { profiles: DbProfile[]; f
     if (!target) { flash("Select a client profile first."); return; }
     const amt = amountFor(t);
     const desc = randChoice(t.descriptions);
-    await injectRow(target, account, desc, amt, t.direction, resolvePostedIso());
-    flash(`Injected ${t.direction === "credit" ? "+" : "-"}${fmtCurrency(amt)} · ${t.merchant}`);
+    try {
+      if (outcome === "failed") {
+        // Failed injection: no balance movement, no ledger row — it lands in the
+        // customer's activity stream flagged Failed.
+        await insertPending({
+          reference: `FX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+          user_id: target.id,
+          user_name: target.name || target.email,
+          method: t.direction === "credit" ? "Deposit" : "Transfer",
+          direction: t.direction,
+          amount: amt,
+          memo: desc,
+          recipient: null,
+          recipient_bank: null,
+          recipient_acct: null,
+          routing: null,
+          status: "Failed",
+        });
+        flash(`Injected FAILED ${t.direction === "credit" ? "+" : "-"}${fmtCurrency(amt)} · ${t.merchant}`);
+        return;
+      }
+      await injectRow(target, account, desc, amt, t.direction, resolvePostedIso());
+      flash(`Injected ${t.direction === "credit" ? "+" : "-"}${fmtCurrency(amt)} · ${t.merchant}`);
+    } catch (e) {
+      flash(`Injection failed: ${(e as Error).message}`);
+    }
   }
 
   const targetProfile = profiles.find((p) => p.id === targetId) ?? null;
