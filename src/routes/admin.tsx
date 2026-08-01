@@ -1391,26 +1391,44 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
     }
   }
 
-  async function purgeDeclined() {
-    const declined = apps.filter((a) => ["declined", "rejected"].includes((a.status || "").toLowerCase()));
-    if (declined.length === 0) { flash("No declined applications to remove."); return; }
+  async function removeRows(ids: string[], label: string) {
+    if (ids.length === 0) { flash(`No ${label} applications to remove.`); return; }
     setRemovedIds((prev) => {
       const next = new Set(prev);
-      declined.forEach((a) => next.add(a.id));
+      ids.forEach((id) => next.add(id));
       return next;
     });
-    const { error } = await supabase.from("loan_applications").delete().in("id", declined.map((a) => a.id));
-    flash(error ? `Hidden from console (${declined.length}) — permanent delete blocked: ${error.message}` : `Deleted ${declined.length} declined application(s).`);
+    const { error } = await supabase.from("loan_applications").delete().in("id", ids);
+    flash(error
+      ? `Hidden from console (${ids.length}) — permanent delete blocked: ${error.message}`
+      : `Deleted ${ids.length} ${label} application(s).`);
+  }
+
+  async function purgeDeclined() {
+    await removeRows(
+      apps.filter((a) => ["declined", "rejected"].includes((a.status || "").toLowerCase())).map((a) => a.id),
+      "declined",
+    );
+  }
+
+  async function purgeAll() {
+    if (!window.confirm("Delete ALL loan applications from the console? This cannot be undone.")) return;
+    await removeRows(apps.map((a) => a.id), "loan");
   }
 
   return (
     <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-[#0f1420]">
-      <div className="flex justify-end border-b border-white/10 px-4 py-3">
+      <div className="flex flex-wrap justify-end gap-2 border-b border-white/10 px-4 py-3">
         <button onClick={purgeDeclined}
           className="rounded-md border border-red-400/40 bg-red-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-red-200 hover:bg-red-400/20">
           Delete Declined Applications
         </button>
+        <button onClick={purgeAll}
+          className="rounded-md border border-red-400/60 bg-red-500/20 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-red-100 hover:bg-red-500/30">
+          Delete All Applications
+        </button>
       </div>
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-white/5 text-xs uppercase tracking-wider text-slate-400">
@@ -1458,7 +1476,12 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
                         className="rounded bg-red-500 hover:bg-red-400 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-semibold text-white">
                         Decline Application
                       </button>
+                      <button onClick={() => removeRows([a.id], "loan")}
+                        className="rounded border border-white/20 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-white/10">
+                        Delete Record
+                      </button>
                     </div>
+
                   </Td>
                 </tr>
               );
