@@ -1476,7 +1476,12 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
                         className="rounded bg-red-500 hover:bg-red-400 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-semibold text-white">
                         Decline Application
                       </button>
+                      <button onClick={() => removeRows([a.id], "loan")}
+                        className="rounded border border-white/20 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-white/10">
+                        Delete Record
+                      </button>
                     </div>
+
                   </Td>
                 </tr>
               );
