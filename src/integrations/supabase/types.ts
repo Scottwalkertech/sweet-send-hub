@@ -74,7 +74,6 @@ export type Database = {
           proof_of_income_path: string | null
           requested_amount: number
           reviewed_at: string | null
-          ssn_encrypted: string | null
           ssn_last4: string | null
           status: string
           terms_accepted: boolean
@@ -101,7 +100,6 @@ export type Database = {
           proof_of_income_path?: string | null
           requested_amount: number
           reviewed_at?: string | null
-          ssn_encrypted?: string | null
           ssn_last4?: string | null
           status?: string
           terms_accepted?: boolean
@@ -128,7 +126,6 @@ export type Database = {
           proof_of_income_path?: string | null
           requested_amount?: number
           reviewed_at?: string | null
-          ssn_encrypted?: string | null
           ssn_last4?: string | null
           status?: string
           terms_accepted?: boolean
@@ -376,6 +373,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      internal_transfer: {
+        Args: { p_amount: number; p_from: string; p_to: string }
+        Returns: Json
       }
       process_loan_disbursement: { Args: { app_id: string }; Returns: Json }
       verify_loan_code: {
