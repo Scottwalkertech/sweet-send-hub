@@ -4,7 +4,7 @@ import {
   currentUser, upsertUser, onStoreChange,
   fmtCurrency, type MtUser, type AccountKey,
 } from "@/lib/mt-store";
-import { useUserLedger, insertTransaction, updateProfile } from "@/lib/mt-db";
+import { useUserLedger, internalTransfer } from "@/lib/mt-db";
 import { useMoney } from "@/lib/currency";
 
 export const Route = createFileRoute("/account/$type")({
