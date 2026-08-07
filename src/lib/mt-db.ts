@@ -259,9 +259,27 @@ export function useUserLedger(userId: string | null | undefined, account: "check
   return { entries, loading, refresh: load };
 }
 
+// Admin-only: RLS allows ledger inserts for admins exclusively.
 export async function insertTransaction(row: Omit<DbTransaction, "id" | "created_at">) {
   const { error } = await supabase.from("transactions").insert(row);
   if (error) throw error;
+}
+
+// Customer-facing internal transfer. All money movement and both ledger legs
+// are computed and written server-side by a verified database function.
+export async function internalTransfer(
+  from: "checking" | "savings",
+  to: "checking" | "savings",
+  amount: number,
+): Promise<{ balance: number; savings_balance: number }> {
+  const { data, error } = await supabase.rpc("internal_transfer", {
+    p_from: from,
+    p_to: to,
+    p_amount: amount,
+  });
+  if (error) throw error;
+  const res = data as unknown as { balance: number; savings_balance: number };
+  return { balance: Number(res.balance), savings_balance: Number(res.savings_balance) };
 }
 
 export async function deleteTransaction(id: string) {
