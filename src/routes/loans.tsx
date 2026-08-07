@@ -147,14 +147,13 @@ function LoansPage() {
     try {
       const digits = ssn.replace(/\D/g, "");
       const last4 = digits.slice(-4);
-      const encoded = typeof window !== "undefined" ? window.btoa(digits) : digits;
+      // Only the last four digits are persisted — the full SSN never leaves the browser.
       if (applicationId) {
         const { error } = await supabase.from("loan_applications").update({
           full_name: fullName.trim(),
           email: email.trim(),
           occupation: occupation.trim(),
           ssn_last4: last4,
-          ssn_encrypted: encoded,
           status: "kyc_submitted",
         }).eq("id", applicationId);
         if (error) throw error;

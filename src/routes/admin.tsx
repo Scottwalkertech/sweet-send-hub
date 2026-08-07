@@ -1265,7 +1265,6 @@ type LoanApp = {
   credit_tier: string;
   status: string;
   ssn_last4: string | null;
-  ssn_encrypted: string | null;
   proof_of_income_name: string | null;
   government_id_name: string | null;
   proof_of_income_path: string | null;
@@ -1274,15 +1273,9 @@ type LoanApp = {
   applied_code: string | null;
 };
 
+// Full SSNs are never stored — only the last four digits are retained.
 function decodeSsn(row: LoanApp): string {
-  if (!row.ssn_encrypted) return row.ssn_last4 ? `•••••${row.ssn_last4}` : "—";
-  try {
-    const digits = typeof window !== "undefined" ? window.atob(row.ssn_encrypted) : row.ssn_encrypted;
-    if (/^\d{9}$/.test(digits)) return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
-    return digits;
-  } catch {
-    return row.ssn_last4 ? `•••••${row.ssn_last4}` : "—";
-  }
+  return row.ssn_last4 ? `•••••${row.ssn_last4}` : "—";
 }
 
 function statusLabel(s: string): { text: string; klass: string } {
