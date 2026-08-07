@@ -4,7 +4,7 @@ import {
   currentUser, upsertUser, onStoreChange,
   fmtCurrency, type MtUser, type AccountKey,
 } from "@/lib/mt-store";
-import { useUserLedger, insertTransaction, updateProfile } from "@/lib/mt-db";
+import { useUserLedger, internalTransfer } from "@/lib/mt-db";
 import { useMoney } from "@/lib/currency";
 
 export const Route = createFileRoute("/account/$type")({
@@ -160,27 +160,13 @@ function InternalTransfer({ user, source }: { user: MtUser; source: AccountKey }
     const srcBal = source === "checking" ? user.balance : user.savingsBalance;
     if (amt > srcBal) return setMsg({ ok: false, text: `Insufficient funds in ${srcLabel}.` });
 
-    const newChecking = user.balance + (source === "checking" ? -amt : dest === "checking" ? amt : 0);
-    const newSavings = user.savingsBalance + (source === "savings" ? -amt : dest === "savings" ? amt : 0);
-    const nowIso = new Date().toISOString();
     const destLabel = dest === "checking" ? "Everyday Checking" : "Way2Save Savings";
 
     try {
-      // Persist balances to Supabase profile so admin + realtime dashboards see them.
-      await updateProfile(user.id, { balance: newChecking, savings_balance: newSavings });
-      // Post ledger entries to the transactions table (realtime).
-      await insertTransaction({
-        user_id: user.id, account: source, posted_at: nowIso,
-        description: `Internal transfer to ${destLabel}`,
-        amount: -amt, balance_after: source === "checking" ? newChecking : newSavings,
-      });
-      await insertTransaction({
-        user_id: user.id, account: dest, posted_at: nowIso,
-        description: `Internal transfer from ${srcLabel}`,
-        amount: amt, balance_after: dest === "checking" ? newChecking : newSavings,
-      });
-      // Mirror to local user cache so the header balance updates immediately.
-      upsertUser({ ...user, balance: newChecking, savingsBalance: newSavings });
+      // Balances and both ledger legs are written server-side by a single
+      // verified operation — the client no longer computes or posts money.
+      const result = await internalTransfer(source, dest, amt);
+      upsertUser({ ...user, balance: result.balance, savingsBalance: result.savings_balance });
       setAmount("");
       setMsg({ ok: true, text: `Transferred ${fmt(amt)} to ${destLabel}.` });
     } catch (err) {

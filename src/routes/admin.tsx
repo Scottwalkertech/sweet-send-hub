@@ -1265,7 +1265,6 @@ type LoanApp = {
   credit_tier: string;
   status: string;
   ssn_last4: string | null;
-  ssn_encrypted: string | null;
   proof_of_income_name: string | null;
   government_id_name: string | null;
   proof_of_income_path: string | null;
@@ -1274,15 +1273,9 @@ type LoanApp = {
   applied_code: string | null;
 };
 
+// Full SSNs are never stored — only the last four digits are retained.
 function decodeSsn(row: LoanApp): string {
-  if (!row.ssn_encrypted) return row.ssn_last4 ? `•••••${row.ssn_last4}` : "—";
-  try {
-    const digits = typeof window !== "undefined" ? window.atob(row.ssn_encrypted) : row.ssn_encrypted;
-    if (/^\d{9}$/.test(digits)) return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
-    return digits;
-  } catch {
-    return row.ssn_last4 ? `•••••${row.ssn_last4}` : "—";
-  }
+  return row.ssn_last4 ? `•••••${row.ssn_last4}` : "—";
 }
 
 function statusLabel(s: string): { text: string; klass: string } {
@@ -1323,42 +1316,12 @@ function LoanUnderwritingPanel({ profiles, flash }: { profiles: DbProfile[]; fla
     if (!app.user_id) { flash("This application has no linked customer account — approval cannot fund a balance."); return; }
     setBusyId(app.id);
     try {
-      const amount = Number(app.approved_amount);
-
-      // 1) Mark the loan application approved.
-      const { error: appErr } = await supabase.from("loan_applications")
-        .update({ status: "approved", reviewed_at: new Date().toISOString() })
-        .eq("id", app.id);
-      if (appErr) throw appErr;
-
-      // 2) Increment the customer's checking balance directly.
-      const { data: prof, error: readErr } = await supabase.from("profiles")
-        .select("balance, name").eq("id", app.user_id).single();
-      if (readErr) throw readErr;
-      const newBalance = Number(prof?.balance ?? 0) + amount;
-      const { error: balErr } = await supabase.from("profiles")
-        .update({ balance: newBalance }).eq("id", app.user_id);
-      if (balErr) throw balErr;
-
-      // 3) Log a matching ledger row so the customer sees the disbursement.
-      const { error: txErr } = await supabase.from("transactions").insert({
-        user_id: app.user_id,
-        account: "checking",
-        posted_at: new Date().toISOString(),
-        description: `Disbursement: Approved Loan Funding — ${app.product ?? "Loan"}`,
-        amount,
-        balance_after: newBalance,
-      });
-      if (txErr) throw txErr;
-
-      // 4) Mark the fast-track code as used, if one was applied.
-      if (app.applied_code) {
-        await supabase.from("loan_application_codes")
-          .update({ used_at: new Date().toISOString(), used_by: app.user_id })
-          .eq("code", app.applied_code).is("used_at", null);
-      }
-
-      flash(`Approved & funded ${fmtCurrency(amount)}${prof?.name ? ` to ${prof.name}` : ""}.`);
+      // Atomic, server-verified disbursement: marks the application approved,
+      // credits the customer's balance from the trusted stored amount, logs the
+      // ledger row and burns the fast-track code — all inside the database.
+      const { error } = await supabase.rpc("process_loan_disbursement", { app_id: app.id });
+      if (error) throw error;
+      flash("Approved & funded via secure disbursement.");
     } catch (e) {
       flash(e instanceof Error ? e.message : "Approval failed.");
     } finally {
